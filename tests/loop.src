@@ -1,0 +1,6 @@
+fn main(ac: i32) -> i32 {
+    for 5 == 5 {
+        ret 5;
+    }
+    ret 5;
+}

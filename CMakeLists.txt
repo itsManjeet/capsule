@@ -4,6 +4,14 @@ project(src)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
 
-add_executable(src main.cc)
+find_package(Boost REQUIRED)
 
-add_subdirectory(lang/tests)
+find_package(LLVM REQUIRED CONFIG)
+message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
+
+include_directories(${LLVM_INCLUDE_DIRS})
+add_definitions(${LLVM_DEFINATIONS})
+llvm_map_components_to_libnames(LLVM_LIBS core)
+
+add_executable(src main.cc)
+target_link_libraries(src ${LLVM_LIBS})

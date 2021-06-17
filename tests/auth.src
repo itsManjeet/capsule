@@ -1,0 +1,17 @@
+fn scanf(mesg: ptr i8, ...) -> i32;
+fn strcmp(a: ptr i8, b: ptr i8) -> i32;
+fn printf(mesg: ptr i8, ...) -> i32;
+
+fn main(ac: i32, av: ptr ptr i8) -> i32
+{
+    let userid: i8[5];
+    let useridptr: ptr i8 = ptr userid;
+    let isauth: i32 = 0;
+
+    scanf("%s", userid);
+
+    printf("got %s\n", userid);
+
+
+    ret 0;
+}

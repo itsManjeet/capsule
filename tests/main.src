@@ -1,0 +1,6 @@
+fn main(ac: i32) -> i32 {
+    if 5 == 5 {
+        ret 9;
+    }
+    ret 8;
+}

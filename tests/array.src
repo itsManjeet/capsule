@@ -1,0 +1,18 @@
+fn printf(mesg: ptr i8, ...) -> i32;
+fn getchar() -> i32;
+fn exit(code: i32) -> i32;
+
+fn outofindex(arr: i32, size: i32) -> i32 {
+    printf("out of index %d, %d\n", arr, size);
+    exit(5);
+    ret 0;
+}
+
+fn main(ac: i32, av: ptr ptr i8) -> i32 {
+    let arr: i32[5] = [1, 2, 3, 4, 5];
+
+    let val: i32 = getchar() - 48;
+    let y: i32 = arr[val];
+    printf("%d\n", y);
+    ret 5;
+}

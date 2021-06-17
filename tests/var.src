@@ -1,0 +1,7 @@
+fn printf(mesg: ptr i8, ...) -> i32;
+
+fn main(ac: i32) -> i32 {
+    let x: ptr i8 = "Hello world\n";
+    printf(x);
+    ret 5;
+}
