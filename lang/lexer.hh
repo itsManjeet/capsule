@@ -18,6 +18,7 @@ namespace src::lang
         if_ = 5,
         else_,
         for_,
+        while_,
         ret,
 
         to,
@@ -25,8 +26,10 @@ namespace src::lang
 
         fn,
         let,
+        use,
         ptr,
         ref,
+        struct_,
         and_,
         or_,
         not_,
@@ -54,6 +57,9 @@ namespace src::lang
         case for_:
             return "for";
 
+        case while_:
+            return "while";
+
         case ret:
             return "ret";
         case fn:
@@ -65,6 +71,9 @@ namespace src::lang
             return "ptr";
         case ref:
             return "ref";
+
+        case struct_:
+            return "struct";
 
         case and_:
             return "and";
@@ -205,6 +214,10 @@ namespace src::lang
                     return tokentype::or_;
                 if (_ident == "not")
                     return tokentype::not_;
+                if (_ident == "use")
+                    return tokentype::use;
+                if (_ident == "struct")
+                    return tokentype::struct_;
 
                 return tokentype::ident;
             }
@@ -261,7 +274,7 @@ namespace src::lang
                 } while (*_iter != '"');
                 _iter++;
 
-                _ident = id.substr(0, id.length() );
+                _ident = id.substr(0, id.length());
                 io::debug(level::trace, "got string ", _ident);
                 return tokentype::str;
             }

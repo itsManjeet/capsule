@@ -1,0 +1,10 @@
+struct Pointer {
+    start: i64,
+    end: i64
+};
+
+fn main(ac: i32) -> i32 {
+    let p: Pointer;
+
+    ret 0;
+}

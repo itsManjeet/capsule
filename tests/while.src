@@ -1,0 +1,12 @@
+fn printf(mesg: ptr i8, ...) -> i32;
+
+fn main(ac: i32, av: ptr ptr i8) -> i32 {
+    let x: i32 = 5;
+
+    while x >= 1 {
+        printf("loop %d\n",x);
+        x = x - 1;
+    }
+
+    ret 0;
+}

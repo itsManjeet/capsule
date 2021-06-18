@@ -99,7 +99,8 @@ namespace src::lang::ast
     };
 
     struct condition;
-    struct loop;
+    struct for_loop;
+    struct while_loop;
     struct proto;
     struct fn;
     struct block;
@@ -110,7 +111,8 @@ namespace src::lang::ast
         let,
         ret,
         boost::recursive_wrapper<condition>,
-        boost::recursive_wrapper<loop>,
+        boost::recursive_wrapper<for_loop>,
+        boost::recursive_wrapper<while_loop>,
         boost::recursive_wrapper<block>>
         stmt;
 
@@ -124,10 +126,21 @@ namespace src::lang::ast
         stmt then_, else_;
     };
 
-    struct loop
+    struct while_loop
     {
         expr cond;
         stmt body;
+    };
+
+    struct for_loop
+    {
+        expr cond;
+        stmt init, inc, body;
+    };
+
+    struct use
+    {
+        std::string path;
     };
 
     struct proto
@@ -144,7 +157,13 @@ namespace src::lang::ast
         block body;
     };
 
-    typedef boost::variant<proto, fn>
+    struct struct_
+    {
+        ident id;
+        std::vector<variable> vars;
+    };
+
+    typedef boost::variant<proto, fn, use, struct_>
         root_decl;
 
     typedef std::vector<root_decl> root_decls;

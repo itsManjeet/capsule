@@ -2,19 +2,33 @@
 #define __COMPILER__
 
 #include "../lang/ast.hh"
+#include "../lang/parser.hh"
+#include "../lang/lexer.hh"
+
 #include <llvm/ADT/APFloat.h>
+#include <llvm/ADT/Optional.h>
 #include <llvm/ADT/STLExtras.h>
 #include <llvm/IR/BasicBlock.h>
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
+#include <llvm/IR/Instructions.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/LLVMContext.h>
+#include <llvm/IR/LegacyPassManager.h>
 #include <llvm/IR/Module.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Verifier.h>
-#include <rlx.hh>
+#include <llvm/Support/FileSystem.h>
+#include <llvm/Support/Host.h>
+#include <llvm/Support/raw_ostream.h>
+#include <llvm/Support/TargetRegistry.h>
+#include <llvm/Support/TargetSelect.h>
+#include <llvm/Target/TargetMachine.h>
+#include <llvm/Target/TargetOptions.h>
 
+#include <rlx.hh>
+#include <path/path.hh>
 #include <boost/variant.hpp>
 
 #define DEFINE_TYPE(type, method)                \
@@ -34,7 +48,12 @@ namespace src::backend
         std::unique_ptr<llvm::IRBuilder<>> builder;
         std::map<std::string, llvm::AllocaInst *> values;
         std::map<std::string, llvm::Type *> types;
+        std::map<std::string, std::vector<std::string>> structs;
         std::map<std::string, std::unique_ptr<ast::proto>> protos;
+        llvm::TargetMachine *target_machine;
+
+        std::vector<std::string> modules_loaded;
+        std::string filename;
 
         void error(std::string const &x)
         {
@@ -45,11 +64,12 @@ namespace src::backend
     public:
         std::unique_ptr<llvm::Module> module_;
 
-        compiler()
+        compiler(std::string f)
+            : filename(f)
         {
             context = std::make_unique<llvm::LLVMContext>();
             builder = std::make_unique<llvm::IRBuilder<>>(*context);
-            module_ = std::make_unique<llvm::Module>("src", *context);
+            module_ = std::make_unique<llvm::Module>(filename, *context);
 
             types =
                 {
@@ -58,13 +78,59 @@ namespace src::backend
                     DEFINE_TYPE(i32, Int32Ty),
                     DEFINE_TYPE(i64, Int64Ty),
                     DEFINE_TYPE(i128, Int128Ty),
-                };
+                    DEFINE_TYPE(none, VoidTy)};
         }
 
-        void compile(ast::root_decls const &x)
+        llvm::Value *operator()(ast::root_decls const &x)
         {
             for (auto const &i : x)
                 boost::apply_visitor(*this, i);
+
+            return nullptr;
+        }
+
+        void compile(std::string output = "a.o", std::string target_triple = "", std::string CPU = "generic", std::string features = "")
+        {
+            llvm::InitializeAllTargetInfos();
+            llvm::InitializeAllTargets();
+            llvm::InitializeAllTargetMCs();
+            llvm::InitializeAllAsmParsers();
+            llvm::InitializeAllAsmPrinters();
+
+            if (target_triple.length() == 0)
+                target_triple = llvm::sys::getDefaultTargetTriple();
+
+            io::debug(level::debug, "Target: ", target_triple, "CPU: ", CPU);
+
+            module_->setTargetTriple(target_triple);
+
+            std::string err;
+            auto target = llvm::TargetRegistry::lookupTarget(target_triple, err);
+            if (!target)
+                error(err);
+
+            llvm::TargetOptions opt;
+            auto rm = llvm::Optional<llvm::Reloc::Model>();
+
+            target_machine =
+                target->createTargetMachine(target_triple, CPU, features, opt, rm);
+
+            module_->setDataLayout(target_machine->createDataLayout());
+
+            std::error_code ec;
+            llvm::raw_fd_ostream dest(output, ec, llvm::sys::fs::OF_None);
+
+            if (ec)
+                error(ec.message());
+
+            llvm::legacy::PassManager pass;
+            auto ftype = llvm::CGFT_ObjectFile;
+
+            if (target_machine->addPassesToEmitFile(pass, dest, nullptr, ftype))
+                error("target machine can't emit a file of this type");
+
+            pass.run(*module_);
+            dest.flush();
         }
 
         llvm::AllocaInst *_alloc(llvm::Function *fn, std::string const &id, llvm::Type *t, llvm::Value *size = 0)
@@ -194,30 +260,16 @@ namespace src::backend
         {
             auto v = boost::apply_visitor(*this, x.lhs);
 
-            std::string fn_id = "_src_unary_";
             switch (x.oper)
             {
             case tokentype::not_:
-                fn_id += "not";
-                break;
-
-            case tokentype::ptr:
-                return builder->CreateLoad(v);
-
-            case tokentype::ref:
-                fn_id += "ref";
-                break;
+                return builder->CreateNot(v);
 
             case '-':
-                fn_id += "neg";
-                break;
+                return builder->CreateNeg(v);
             }
-
-            auto fn = get_fn(fn_id);
-            if (!fn)
-                error("unknown unary operator");
-
-            return builder->CreateCall(fn, v, "unop");
+            error("invalid operator " + x.oper);
+            return nullptr;
         }
 
         llvm::Value *operator()(ast::assign const &x)
@@ -256,7 +308,8 @@ namespace src::backend
             else
             {
                 llvm::Value *val = boost::apply_visitor(*this, x.val);
-                builder->CreateStore(val, a);
+                if (val)
+                    builder->CreateStore(val, a);
             }
             values[x.var.ident_.id] = a;
 
@@ -285,6 +338,82 @@ namespace src::backend
             }
 
             return builder->CreateCall(fn, args_v);
+        }
+
+        llvm::Value *operator()(ast::use const &x)
+        {
+            auto readfile = [](std::string const &path) -> std::string
+            {
+                std::ifstream file(path);
+                std::string input(
+                    (std::istreambuf_iterator<char>(file)),
+                    (std::istreambuf_iterator<char>()));
+
+                return input;
+            };
+
+            std::string module_path = rlx::path::dirname(filename) + "/" + x.path + ".src";
+
+            if (!std::filesystem::exists(module_path))
+            {
+                std::string src_path = "/lib/src:/usr/lib/src";
+                auto env_path = getenv("SRC_PATH");
+                if (env_path)
+                    src_path = std::string(env_path) + ":" + src_path;
+
+                std::stringstream ss(src_path);
+                std::string tpath;
+
+                bool found = false;
+
+                while (std::getline(ss, tpath, ':'))
+                {
+                    if (std::filesystem::exists(tpath + "/" + module_path))
+                    {
+                        found = true;
+                        module_path = tpath;
+                        break;
+                    }
+                }
+
+                if (!found)
+                    error("failed to found module " + x.path);
+            }
+
+            if (std::find(modules_loaded.begin(), modules_loaded.end(), module_path) != modules_loaded.end())
+            {
+                io::debug(level::trace, "already loaded", x.path);
+                return nullptr;
+            }
+
+            using iterator = std::string::const_iterator;
+
+            auto input = readfile(module_path);
+            auto lexer = src::lang::lexer<iterator>(input.begin(), input.end());
+            auto parser = src::lang::parser<iterator>(lexer);
+            auto ast = parser.parse();
+            (*this)(ast);
+
+            return nullptr;
+        }
+
+        llvm::Value *operator()(ast::struct_ const &x)
+        {
+            io::debug(level::trace, "compiling struct");
+            std::vector<llvm::Type *> members;
+            structs[x.id.id] = std::vector<std::string>();
+            for (auto const &i : x.vars)
+            {
+                auto t = (*this)(i);
+                members.push_back(t);
+                structs[x.id.id].push_back(i.ident_.id);
+            }
+
+            auto s = llvm::StructType::create(*context, x.id.id.c_str());
+            s->setBody(members);
+            types[x.id.id] = s;
+
+            return nullptr;
         }
 
         llvm::Function *operator()(ast::proto const &x)
@@ -381,7 +510,12 @@ namespace src::backend
             return nullptr;
         }
 
-        llvm::Value *operator()(ast::loop const &x)
+        llvm::Value *operator()(ast::for_loop const &x)
+        {
+            auto fn = builder->GetInsertBlock()->getParent();
+        }
+
+        llvm::Value *operator()(ast::while_loop const &x)
         {
             auto fn = builder->GetInsertBlock()->getParent();
             auto condbb =

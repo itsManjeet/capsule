@@ -149,21 +149,92 @@ namespace src::lang
         }
 
         /// root_decl ::= proto ';'
-        ///           ::= fn block
+        ///           ::= proto block
+        ///           ::= 'use' str ';'
+        ///           ::= 'struct' ident '{' (variables % ',') '}' ';'
         ast::root_decl parse_root_decl()
         {
             io::debug(level::trace, "parsing root decl");
-            // eat proto
-            auto proto = parse_proto();
-
-            // eat ';'
-            if (curtok == ';')
+            switch (curtok)
             {
-                eat();
-                return proto;
+            case tokentype::use:
+                return parse_use();
+
+            case tokentype::struct_:
+                return parse_struct();
+
+            case tokentype::fn:
+            {
+                // eat proto
+                auto proto = parse_proto();
+
+                // eat ';'
+                if (curtok == ';')
+                {
+                    eat();
+                    return proto;
+                }
+
+                return parse_fn(proto);
+            }
             }
 
-            return parse_fn(proto);
+            _lexer.throw_error("unknown starting declaration");
+        }
+
+        /// use ::= 'use' str ';'
+        ast::use parse_use()
+        {
+            io::debug(level::trace, "parsing use");
+            ast::use use;
+
+            // eat 'use'
+            eat();
+
+            // eat str
+            use.path = parse_str();
+
+            // eat ';'
+            expect(';');
+
+            return use;
+        }
+
+        /// struct ::= 'struct' ident '{' -(variable % ',') '}' ';'
+        ast::struct_ parse_struct()
+        {
+            io::debug(level::trace, "parsing struct");
+            ast::struct_ struct_;
+
+            // eat 'struct'
+            eat();
+
+            // eat ident
+            struct_.id = parse_ident();
+
+            // eat '{'
+            expect('{');
+
+            // eat -(variable % ',')
+            while (curtok != '}')
+            {
+                // eat variable
+                struct_.vars.push_back(parse_variable());
+
+                if (curtok == '}')
+                    break;
+
+                // eat ','
+                expect(',');
+            }
+
+            // eat '}'
+            expect('}');
+
+            // eat ';'
+            expect(';');
+
+            return struct_;
         }
 
         /// proto ::=  'fn' ident '(' -(args % ',') ',' '...' ')' '->' datatype
@@ -239,7 +310,10 @@ namespace src::lang
                 return parse_condition();
 
             case for_:
-                return parse_loop();
+                return parse_for_loop();
+
+            case while_:
+                return parse_while_loop();
 
             case ret:
                 return parse_ret();
@@ -344,12 +418,39 @@ namespace src::lang
             return condition;
         }
 
-        /// loop ::= 'for'  expr  stmt
-        ast::loop parse_loop()
+        /// for_loop ::= 'for' stmt expr stmt stmt
+        ast::for_loop parse_for_loop()
         {
-            io::debug(level::trace, "parsing loop");
+            io::debug(level::trace, "parsing for loop");
+            ast::for_loop loop;
 
-            ast::loop loop;
+            // eat 'for'
+            eat();
+
+            // eat stmt
+            loop.init = parse_stmt();
+
+            // eat expr
+            loop.cond = parse_expr(-1);
+
+            // eat ';'
+            eat();
+
+            // eat stmt
+            loop.inc = parse_stmt();
+
+            // eat body
+            loop.body = parse_stmt();
+
+            return loop;
+        }
+
+        /// loop ::= 'while'  expr  stmt
+        ast::while_loop parse_while_loop()
+        {
+            io::debug(level::trace, "parsing while loop");
+
+            ast::while_loop loop;
 
             // eat 'for'
             eat();
@@ -539,7 +640,7 @@ namespace src::lang
 
             // eat '='
             eat();
-            
+
             // eat rhs
             assign.val = parse_expr(-1);
 

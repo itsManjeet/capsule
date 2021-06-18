@@ -1,0 +1,6 @@
+use "touse";
+
+fn main() -> i32 {
+    printf("Hello World\n");   
+    ret 0;
+}

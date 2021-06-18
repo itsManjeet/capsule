@@ -1,0 +1,1 @@
+fn printf(mesg: ptr i8, ...) -> i32;

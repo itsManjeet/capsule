@@ -1,6 +1,20 @@
+fn printf(mesg: ptr i8, ...) -> i32;
+
 fn main(ac: i32) -> i32 {
-    if 5 == 5 {
-        ret 9;
+
+    let i: i32 = 1;
+    let j: i32 = 1;
+    let row: i32 = 5;
+
+    for i <= row {
+        j = 1;
+        for j <= i {
+            printf("* ");
+            j = j + 1;
+        }
+        i = i + 1;
+        printf("\n");
     }
-    ret 8;
+    
+    ret 0;
 }

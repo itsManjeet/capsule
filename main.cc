@@ -34,41 +34,25 @@ int main(int ac, char **av)
         .usage("<filename> <Args>")
 
         .arg(arg::create("help")
-            .long_id("help")
-            .short_id('h')
-            .fn([](context const& cc) -> int 
-            {
-                io::println(*cc.getapp());
-                return 0;    
-            }))
+                 .long_id("help")
+                 .short_id('h')
+                 .fn([](context const &cc) -> int
+                     {
+                         io::println(*cc.getapp());
+                         return 0;
+                     }))
 
-        .arg(arg::create("output")
-                 .long_id("output")
-                 .short_id('o')
-                 .about("specify output name")
-                 .required(true))
+        .arg(arg::create("output").long_id("output").short_id('o').about("specify output name").required(true))
 
-        .arg(arg::create("lex")
-                 .long_id("lex")
-                 .about("perform lexical analysis of input stream"))
+        .arg(arg::create("lex").long_id("lex").about("perform lexical analysis of input stream"))
 
-        .arg(arg::create("emit-ir")
-                 .long_id("emit-ir")
-                 .about("emit llvm itermediate representation"))
+        .arg(arg::create("emit-ir").long_id("emit-ir").about("emit llvm itermediate representation"))
 
-        .arg(arg::create("emit-bc")
-                 .long_id("emit-bc")
-                 .about("emit bytecode"))
+        .arg(arg::create("emit-bc").long_id("emit-bc").about("emit bytecode"))
 
-        .arg(arg::create("gcc-flags")
-                 .long_id("gcc-flags")
-                 .about("add gcc flags for compilation")
-                 .required(true))
+        .arg(arg::create("gcc-flags").long_id("gcc-flags").about("add gcc flags for compilation").required(true))
 
-        .arg(arg::create("llc-flags")
-                 .long_id("llc-flags")
-                 .about("add lc flags")
-                 .required(true))
+        .arg(arg::create("target").long_id("target").about("specify target triple").required(true))
 
         .fn([](context const &cc) -> int
             {
@@ -93,13 +77,13 @@ int main(int ac, char **av)
                     {
                         t = lexer.eat_token();
                         if (t == src::lang::ident)
-                            io::println("[ident:", lexer.ident(), "]");
+                            io::print("[ident:", lexer.ident(), "]");
                         else if (t == src::lang::number)
-                            io::println("[num:", lexer.num(), "]");
+                            io::print("[num:", lexer.num(), "]");
                         else if (t == src::lang::str)
-                            io::println("[str:", lexer.ident(), "]");
+                            io::print("[str:", lexer.ident(), "]");
                         else
-                            io::println("[", src::lang::tokentostr(t), "]");
+                            io::print("[", src::lang::tokentostr(t), "]");
                     } while (t != src::lang::eof);
 
                     return 0;
@@ -118,53 +102,34 @@ int main(int ac, char **av)
                     return 0;
                 }
 
-                auto compiler = src::backend::compiler();
+                auto compiler = src::backend::compiler(filename);
 
                 try
                 {
-                    compiler.compile(ast);
+                    io::debug(level::debug, "visiting ast nodes");
+                    compiler(ast);
+
+                    if (cc.checkflag("emit-ir"))
+                    {
+                        compiler.module_->print(llvm::errs(), nullptr);
+                        return 0;
+                    }
+
+                    io::debug(level::debug, "compiling to object file");
+                    std::string objfile = filename+".o";
+                    compiler.compile(objfile, cc.value("target", ""), cc.value("cpu", "generic"), cc.value("features", ""));
+                    if (rlx::utils::exec::command("gcc  " + cc.value("gcc-flags", "") + " " + objfile + " -o " + cc.value("output", "a.out")))
+                    {
+                        io::error("failed to generate executable");
+                        return 1;
+                    }
+                    std::filesystem::remove(objfile);
                 }
                 catch (const std::exception &e)
                 {
                     std::cerr << e.what() << '\n';
                     return 1;
                 }
-
-                if (cc.checkflag("emit-ir"))
-                {
-                    compiler.module_->print(llvm::errs(), nullptr);
-                    return 0;
-                }
-
-                std::error_code ec;
-                llvm::raw_fd_ostream irf(filename + ".ir", ec);
-
-                compiler.module_->print(irf, nullptr);
-                irf.flush();
-
-                io::success("written ir to ", filename, ".ir");
-                
-
-                if (rlx::utils::exec::command("llc " + cc.value("llc-flags","-filetype=obj") +" " + filename + ".ir -o " + filename + ".bc"))
-                {
-                    io::error("failed to generate bytecode");
-                    return 1;
-                }
-
-                io::success("byte code generated at ", filename + ".bc");
-                std::filesystem::remove(filename + ".ir");
-
-                if (cc.checkflag("emit-bc"))
-                    return 0;
-
-                if (rlx::utils::exec::command("gcc  " + cc.value("gcc-flags", "") + " " + filename + ".bc -o " + cc.value("output", "a.out")))
-                {
-                    io::error("failed to generate executable");
-                    return 1;
-                }
-
-                io::success("executable generated at ", cc.value("output", "a.out"));
-                std::filesystem::remove(filename + ".bc");
 
                 return 0;
             })

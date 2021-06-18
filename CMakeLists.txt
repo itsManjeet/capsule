@@ -11,7 +11,7 @@ message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
 
 include_directories(${LLVM_INCLUDE_DIRS})
 add_definitions(${LLVM_DEFINATIONS})
-llvm_map_components_to_libnames(LLVM_LIBS core)
+llvm_map_components_to_libnames(LLVM_LIBS all)
 
 add_executable(src main.cc)
-target_link_libraries(src ${LLVM_LIBS})
+target_link_libraries(src ${LLVM_LIBS} LLVM)
