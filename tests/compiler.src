@@ -1,0 +1,7 @@
+fn main(ac: i32) -> i32 {
+    let x: i32 = 5;
+    while x > 0 {
+        x = x - 1;
+    }
+    ret x;
+}

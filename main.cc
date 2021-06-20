@@ -1,6 +1,7 @@
 #include "lang/lexer.hh"
 #include "lang/parser.hh"
 #include "compiler/compiler.hh"
+#include "interpreter/interpreter.hh"
 
 #include <io.hh>
 #include <cli/cli.hh>
@@ -42,17 +43,56 @@ int main(int ac, char **av)
                          return 0;
                      }))
 
-        .arg(arg::create("output").long_id("output").short_id('o').about("specify output name").required(true))
+        .arg(arg::create("output")
+            .long_id("output")
+            .short_id('o')
+            .about("specify output name")
+            .required(true))
 
-        .arg(arg::create("lex").long_id("lex").about("perform lexical analysis of input stream"))
+        .arg(arg::create("lex")
+            .long_id("lex")
+            .about("perform lexical analysis of input stream"))
 
-        .arg(arg::create("emit-ir").long_id("emit-ir").about("emit llvm itermediate representation"))
+        .sub(app::create("run")
+            .about("interpreter bytecodes")
+            .fn([](context const& cc) -> int
+            {
+                if (cc.args().size() == 0)
+                {
+                    io::error("no input file provided");
+                    return 1;
+                }
 
-        .arg(arg::create("emit-bc").long_id("emit-bc").about("emit bytecode"))
+                auto filename = cc.args()[0];
 
-        .arg(arg::create("gcc-flags").long_id("gcc-flags").about("add gcc flags for compilation").required(true))
+                FILE* file = fopen(filename.c_str(), "rb");
+                if (file == nullptr)
+                {
+                    io::error("failed to read file");
+                    return 1;
+                }
 
-        .arg(arg::create("target").long_id("target").about("specify target triple").required(true))
+                int magic_no, code_size, bytecode;
+                fread(&magic_no, sizeof(int), 1, file);
+                if (magic_no != src_code)
+                {
+                    io::error("not a src byte code file");
+                    return 1;
+                }
+
+                fread(&code_size, sizeof(int), 1, file);
+                
+                std::vector<int> code;
+                for(int i = 0; i < code_size; i++)
+                {
+                    fread(&bytecode, sizeof(int), 1, file);
+                    code.push_back(bytecode);
+                }
+
+                auto interpreter = src::interpreter::machine();
+                return interpreter.execute(code);
+            }))
+
 
         .fn([](context const &cc) -> int
             {
@@ -102,35 +142,13 @@ int main(int ac, char **av)
                     return 0;
                 }
 
-                auto compiler = src::backend::compiler(filename);
-
-                try
-                {
-                    io::debug(level::debug, "visiting ast nodes");
-                    compiler(ast);
-
-                    if (cc.checkflag("emit-ir"))
-                    {
-                        compiler.module_->print(llvm::errs(), nullptr);
-                        return 0;
-                    }
-
-                    io::debug(level::debug, "compiling to object file");
-                    std::string objfile = filename+".o";
-                    compiler.compile(objfile, cc.value("target", ""), cc.value("cpu", "generic"), cc.value("features", ""));
-                    if (rlx::utils::exec::command("gcc  " + cc.value("gcc-flags", "") + " " + objfile + " -o " + cc.value("output", "a.out")))
-                    {
-                        io::error("failed to generate executable");
-                        return 1;
-                    }
-                    std::filesystem::remove(objfile);
-                }
-                catch (const std::exception &e)
-                {
-                    std::cerr << e.what() << '\n';
+                auto compiler = src::compiler::codegen();
+                if (!compiler(ast))
                     return 1;
-                }
 
+                if (!compiler.dump(cc.value("output","a.out")))
+                    return 1;
+                
                 return 0;
             })
 

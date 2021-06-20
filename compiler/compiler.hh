@@ -1,583 +1,450 @@
 #ifndef __COMPILER__
 #define __COMPILER__
 
-#include "../lang/ast.hh"
-#include "../lang/parser.hh"
-#include "../lang/lexer.hh"
-
-#include <llvm/ADT/APFloat.h>
-#include <llvm/ADT/Optional.h>
-#include <llvm/ADT/STLExtras.h>
-#include <llvm/IR/BasicBlock.h>
-#include <llvm/IR/Constants.h>
-#include <llvm/IR/DerivedTypes.h>
-#include <llvm/IR/Function.h>
-#include <llvm/IR/Instructions.h>
-#include <llvm/IR/IRBuilder.h>
-#include <llvm/IR/LLVMContext.h>
-#include <llvm/IR/LegacyPassManager.h>
-#include <llvm/IR/Module.h>
-#include <llvm/IR/Type.h>
-#include <llvm/IR/Verifier.h>
-#include <llvm/Support/FileSystem.h>
-#include <llvm/Support/Host.h>
-#include <llvm/Support/raw_ostream.h>
-#include <llvm/Support/TargetRegistry.h>
-#include <llvm/Support/TargetSelect.h>
-#include <llvm/Target/TargetMachine.h>
-#include <llvm/Target/TargetOptions.h>
-
-#include <rlx.hh>
-#include <path/path.hh>
+#include <utils/define.hh>
 #include <boost/variant.hpp>
 
-#define DEFINE_TYPE(type, method)                \
-    {                                            \
-#type, llvm::Type::get##method(*context) \
-    }
+#include <vector>
+#include <map>
+#include <string>
 
-namespace src::backend
+#include <assert.h>
+
+#include "../lang/ast.hh"
+#include "../lang/code.hh"
+
+namespace src::compiler
 {
-    using namespace rlx;
-    using namespace src::lang;
+    using std::string;
 
-    class compiler
+    using src::lang::bytecode;
+    using src::lang::tokentype;
+
+    namespace ast = src::lang::ast;
+
+    class block
     {
     private:
-        std::unique_ptr<llvm::LLVMContext> context;
-        std::unique_ptr<llvm::IRBuilder<>> builder;
-        std::map<std::string, llvm::AllocaInst *> values;
-        std::map<std::string, llvm::Type *> types;
-        std::map<std::string, std::vector<std::string>> structs;
-        std::map<std::string, std::unique_ptr<ast::proto>> protos;
-        llvm::TargetMachine *target_machine;
-
-        std::vector<std::string> modules_loaded;
-        std::string filename;
-
-        void error(std::string const &x)
-        {
-            io::error(x);
-            throw std::runtime_error("compilation failed");
-        }
+        std::map<string, int> _vars;
+        std::map<uint64_t, string> _calls;
+        std::vector<int> &_code;
+        uint64_t _address;
+        uint64_t _size;
+        uint _ac;
 
     public:
-        std::unique_ptr<llvm::Module> module_;
-
-        compiler(std::string f)
-            : filename(f)
+        block(std::vector<int> &code, uint ac)
+            : _code(code),
+              _ac(ac)
         {
-            context = std::make_unique<llvm::LLVMContext>();
-            builder = std::make_unique<llvm::IRBuilder<>>(*context);
-            module_ = std::make_unique<llvm::Module>(filename, *context);
-
-            types =
-                {
-                    DEFINE_TYPE(i8, Int8Ty),
-                    DEFINE_TYPE(i16, Int16Ty),
-                    DEFINE_TYPE(i32, Int32Ty),
-                    DEFINE_TYPE(i64, Int64Ty),
-                    DEFINE_TYPE(i128, Int128Ty),
-                    DEFINE_TYPE(none, VoidTy)};
         }
 
-        llvm::Value *operator()(ast::root_decls const &x)
+        void append(int a)
         {
-            for (auto const &i : x)
-                boost::apply_visitor(*this, i);
-
-            return nullptr;
+            _code.push_back(a);
+            _size++;
         }
 
-        void compile(std::string output = "a.o", std::string target_triple = "", std::string CPU = "generic", std::string features = "")
+        void append(int a, int b)
         {
-            llvm::InitializeAllTargetInfos();
-            llvm::InitializeAllTargets();
-            llvm::InitializeAllTargetMCs();
-            llvm::InitializeAllAsmParsers();
-            llvm::InitializeAllAsmPrinters();
-
-            if (target_triple.length() == 0)
-                target_triple = llvm::sys::getDefaultTargetTriple();
-
-            io::debug(level::debug, "Target: ", target_triple, "CPU: ", CPU);
-
-            module_->setTargetTriple(target_triple);
-
-            std::string err;
-            auto target = llvm::TargetRegistry::lookupTarget(target_triple, err);
-            if (!target)
-                error(err);
-
-            llvm::TargetOptions opt;
-            auto rm = llvm::Optional<llvm::Reloc::Model>();
-
-            target_machine =
-                target->createTargetMachine(target_triple, CPU, features, opt, rm);
-
-            module_->setDataLayout(target_machine->createDataLayout());
-
-            std::error_code ec;
-            llvm::raw_fd_ostream dest(output, ec, llvm::sys::fs::OF_None);
-
-            if (ec)
-                error(ec.message());
-
-            llvm::legacy::PassManager pass;
-            auto ftype = llvm::CGFT_ObjectFile;
-
-            if (target_machine->addPassesToEmitFile(pass, dest, nullptr, ftype))
-                error("target machine can't emit a file of this type");
-
-            pass.run(*module_);
-            dest.flush();
+            _code.push_back(a);
+            _code.push_back(b);
+            _size += 2;
         }
 
-        llvm::AllocaInst *_alloc(llvm::Function *fn, std::string const &id, llvm::Type *t, llvm::Value *size = 0)
+        void append(int a, int b, int c)
         {
-            llvm::IRBuilder<> tmpb(&fn->getEntryBlock(),
-                                   fn->getEntryBlock().begin());
-
-            return tmpb.CreateAlloca(t);
+            _code.push_back(a);
+            _code.push_back(b);
+            _code.push_back(c);
+            _size += 3;
         }
 
-        llvm::Value *operator()(ast::nil)
+        int &operator[](uint64_t i)
         {
-            return nullptr;
+            return _code[_address + i];
         }
 
-        llvm::Value *operator()(unsigned int x)
+        int const &operator[](uint64_t i) const
         {
-            return llvm::ConstantInt::get(*context, llvm::APInt(32, x, false));
+            return _code[_address + i];
         }
 
-        llvm::Value *operator()(std::string const &x)
+        DEFINE_GET_METHOD(uint64_t, size);
+        DEFINE_GET_METHOD(uint64_t, address);
+
+        DEFINE_GET_METHOD(uint, ac);
+
+        int vars_size() const
         {
-            return builder->CreateGlobalStringPtr(x);
+            return _vars.size();
         }
 
-        llvm::Value *operator()(ast::ident const &x)
+        int const *lookup(string const &name) const
         {
-            auto v = values[x.id];
-            if (!v)
-                error("unknow variable " + x.id);
-
-            return builder->CreateLoad(v, x.id.c_str());
-        }
-
-        llvm::Value *operator()(ast::index const &x)
-        {
-            auto fn = builder->GetInsertBlock()->getParent();
-
-            auto cont = values[boost::get<ast::ident>(x.id).id];
-            auto idx = boost::apply_visitor(*this, x.val);
-
-            auto v = builder->CreateLoad(cont);
-            if (!v->getType()->isArrayTy())
-                error("restricted index access from non-array value");
-
-            io::debug(level::debug, "index type: ", idx->getValueName()->first().str());
-            auto arr_size = (*this)((unsigned int)llvm::dyn_cast<llvm::ArrayType>(v->getType())->getNumElements());
-
-            /// bound condition check
-            auto cond = builder->CreateICmpSGE(idx, arr_size);
-
-            auto thenbb =
-                     llvm::BasicBlock::Create(*context, "ifyes", fn),
-                 contbb =
-                     llvm::BasicBlock::Create(*context, "cond", fn);
-
-            builder->CreateCondBr(cond, thenbb, contbb);
-            builder->SetInsertPoint(thenbb);
-            auto exception_handler_fn = module_->getFunction("outofindex");
-            if (!exception_handler_fn)
-                error("no exception handler defined for 'outofindex'");
-
-            builder->CreateCall(exception_handler_fn, {arr_size, idx});
-
-            builder->CreateBr(contbb);
-            builder->SetInsertPoint(contbb);
-
-            auto ptr = builder->CreateGEP(cont, {(*this)((unsigned int)0), idx});
-            return builder->CreateLoad(ptr);
-        }
-
-        llvm::Value *operator()(ast::binary const &x)
-        {
-            auto lhs = boost::apply_visitor(*this, x.lhs);
-            auto rhs = boost::apply_visitor(*this, x.rhs);
-
-            if (!lhs || !rhs)
+            auto iter = _vars.find(name);
+            if (iter == _vars.end())
                 return nullptr;
+
+            return &iter->second;
+        }
+
+        void insert(string const &name)
+        {
+            int i = _vars.size();
+            _vars[name] = i;
+        }
+
+        void link_to(string id, uint64_t addr)
+        {
+            _calls[addr] = id;
+        }
+    };
+
+    class codegen
+    {
+    private:
+        compiler::block *cur;
+        std::map<string, std::shared_ptr<compiler::block>> _fns;
+        string cur_fn;
+        std::vector<int> _code;
+
+    public:
+        typedef bool result_type;
+
+        codegen()
+            : cur(0)
+        {
+        }
+
+        bool operator()(ast::nil)
+        {
+            assert(0);
+            return false;
+        }
+
+        bool operator()(unsigned int x)
+        {
+            assert(cur != 0);
+            cur->append(bytecode::INT, x);
+
+            return true;
+        }
+
+        bool operator()(string const &x)
+        {
+            assert(cur != 0);
+            return false;
+        }
+
+        bool operator()(ast::ident const &x)
+        {
+            assert(cur != 0);
+
+            int const *p = cur->lookup(x.id);
+            if (p == 0)
+            {
+                std::cout << "Undefined variable: " << x.id << std::endl;
+                return false;
+            }
+
+            cur->append(bytecode::LOAD, *p);
+            return false;
+        }
+
+        bool operator()(ast::binary const &x)
+        {
+            assert(cur != 0);
+            if (!boost::apply_visitor(*this, x.lhs))
+                return false;
+
+            if (!boost::apply_visitor(*this, x.rhs))
+                return false;
 
             switch (x.oper)
             {
             case '+':
-                return builder->CreateAdd(lhs, rhs);
+                cur->append(bytecode::ADD);
+                break;
             case '-':
-                return builder->CreateSub(lhs, rhs);
+                cur->append(bytecode::SUB);
+                break;
             case '*':
-                return builder->CreateMul(lhs, rhs);
+                cur->append(bytecode::MUL);
+                break;
             case '/':
-                return builder->CreateFDiv(lhs, rhs);
-            case eq:
-                return builder->CreateICmpEQ(lhs, rhs);
-            case ne:
-                return builder->CreateICmpNE(lhs, rhs);
-            case le:
-                return builder->CreateICmpSLE(lhs, rhs);
+                cur->append(bytecode::DIV);
+                break;
+
+            case tokentype::eq:
+                cur->append(bytecode::EQ);
+                break;
+            case tokentype::ne:
+                cur->append(bytecode::NE);
+                break;
+            case tokentype::le:
+                cur->append(bytecode::LE);
+                break;
+            case tokentype::ge:
+                cur->append(bytecode::GE);
+                break;
             case '<':
-                return builder->CreateICmpSLT(lhs, rhs);
-            case ge:
-                return builder->CreateICmpSGE(lhs, rhs);
+                cur->append(bytecode::LT);
+                break;
             case '>':
-                return builder->CreateICmpSGT(lhs, rhs);
-            case and_:
-                return builder->CreateAnd(lhs, rhs);
-            case or_:
-                return builder->CreateOr(lhs, rhs);
+                cur->append(bytecode::GT);
+                break;
+
+            case tokentype::and_:
+                cur->append(bytecode::AND);
+                break;
+            case tokentype::or_:
+                cur->append(bytecode::OR);
+                break;
 
             default:
-                error(io::format("operator '", x.oper, "' not yet implemented"));
+                assert(0);
+                return false;
             }
 
-            return nullptr;
+            return true;
         }
 
-        llvm::Function *get_fn(std::string const &id)
+        bool operator()(ast::unary const &x)
         {
-            if (auto *f = module_->getFunction(id))
-                return f;
-
-            auto fi = protos.find(id);
-            if (fi != protos.end())
-                return (*this)(*fi->second.get());
-
-            return nullptr;
-        }
-
-        llvm::Value *operator()(ast::unary const &x)
-        {
-            auto v = boost::apply_visitor(*this, x.lhs);
+            assert(cur != 0);
+            if (!boost::apply_visitor(*this, x.lhs))
+                return false;
 
             switch (x.oper)
             {
-            case tokentype::not_:
-                return builder->CreateNot(v);
-
             case '-':
-                return builder->CreateNeg(v);
+                cur->append(bytecode::NEG);
+                break;
+            case tokentype::not_:
+                cur->append(bytecode::NOT);
+                break;
+
+            default:
+                assert(0);
+                return false;
             }
-            error("invalid operator " + x.oper);
-            return nullptr;
+
+            return true;
         }
 
-        llvm::Value *operator()(ast::assign const &x)
+        bool operator()(ast::call const &x)
         {
-            auto id = boost::get<ast::ident>(x.id).id;
-            auto val = boost::apply_visitor(*this, x.val);
+            assert(cur != 0);
+            string fn_id = boost::get<ast::ident>(x.id).id;
 
-            auto var = values[id];
-            if (!var)
-                error("unknow variable " + id);
-
-            builder->CreateStore(val, var);
-            return val;
-        }
-
-        llvm::Value *operator()(ast::let const &x)
-        {
-            auto fn = builder->GetInsertBlock()->getParent();
-            auto a = _alloc(fn, x.var.ident_.id, (*this)(x.var));
-
-            if (x.var.size > 1)
+            if (_fns.find(fn_id) == _fns.end())
             {
-                if (x.val.which() != 0)
-                {
-                    auto arr = boost::get<ast::array>(x.val);
-                    // if ((*this)((unsigned int)arr.size()) != a->getArraySize())
-                    //     error("invalid array size");
-
-                    for (int i = 0; i < arr.size(); i++)
-                    {
-                        auto ptr = builder->CreateGEP(a, {(*this)((unsigned int)0), (*this)((unsigned int)i)});
-                        builder->CreateStore(boost::apply_visitor(*this, arr[i]), ptr);
-                    }
-                }
-            }
-            else
-            {
-                llvm::Value *val = boost::apply_visitor(*this, x.val);
-                if (val)
-                    builder->CreateStore(val, a);
-            }
-            values[x.var.ident_.id] = a;
-
-            return nullptr;
-        }
-
-        llvm::Value *operator()(ast::call const &x)
-        {
-            auto id = boost::get<ast::ident>(x.id).id;
-
-            auto fn = module_->getFunction(id);
-            if (!fn)
-                error("unknown method call");
-
-            if (fn->arg_size() != x.args.size() && !fn->isVarArg())
-                error("incorrect # args");
-
-            std::vector<llvm::Value *> args_v;
-            for (size_t i = 0, e = x.args.size(); i != e; ++i)
-            {
-                auto a = boost::apply_visitor(*this, x.args[i]);
-                if (!a)
-                    return nullptr;
-
-                args_v.push_back(a);
+                std::cout << "unknown function: " << fn_id << std::endl;
+                return false;
             }
 
-            return builder->CreateCall(fn, args_v);
-        }
-
-        llvm::Value *operator()(ast::use const &x)
-        {
-            auto readfile = [](std::string const &path) -> std::string
+            auto p = _fns[fn_id];
+            if (p->ac() != x.args.size())
             {
-                std::ifstream file(path);
-                std::string input(
-                    (std::istreambuf_iterator<char>(file)),
-                    (std::istreambuf_iterator<char>()));
-
-                return input;
-            };
-
-            std::string module_path = rlx::path::dirname(filename) + "/" + x.path + ".src";
-
-            if (!std::filesystem::exists(module_path))
-            {
-                std::string src_path = "/lib/src:/usr/lib/src";
-                auto env_path = getenv("SRC_PATH");
-                if (env_path)
-                    src_path = std::string(env_path) + ":" + src_path;
-
-                std::stringstream ss(src_path);
-                std::string tpath;
-
-                bool found = false;
-
-                while (std::getline(ss, tpath, ':'))
-                {
-                    if (std::filesystem::exists(tpath + "/" + module_path))
-                    {
-                        found = true;
-                        module_path = tpath;
-                        break;
-                    }
-                }
-
-                if (!found)
-                    error("failed to found module " + x.path);
+                std::cout << "wrong args " << fn_id << std::endl;
+                return false;
             }
 
-            if (std::find(modules_loaded.begin(), modules_loaded.end(), module_path) != modules_loaded.end())
-            {
-                io::debug(level::trace, "already loaded", x.path);
-                return nullptr;
-            }
-
-            using iterator = std::string::const_iterator;
-
-            auto input = readfile(module_path);
-            auto lexer = src::lang::lexer<iterator>(input.begin(), input.end());
-            auto parser = src::lang::parser<iterator>(lexer);
-            auto ast = parser.parse();
-            (*this)(ast);
-
-            return nullptr;
-        }
-
-        llvm::Value *operator()(ast::struct_ const &x)
-        {
-            io::debug(level::trace, "compiling struct");
-            std::vector<llvm::Type *> members;
-            structs[x.id.id] = std::vector<std::string>();
-            for (auto const &i : x.vars)
-            {
-                auto t = (*this)(i);
-                members.push_back(t);
-                structs[x.id.id].push_back(i.ident_.id);
-            }
-
-            auto s = llvm::StructType::create(*context, x.id.id.c_str());
-            s->setBody(members);
-            types[x.id.id] = s;
-
-            return nullptr;
-        }
-
-        llvm::Function *operator()(ast::proto const &x)
-        {
-            std::vector<llvm::Type *> params_types;
             for (auto const &i : x.args)
-                params_types.push_back((*this)(i));
-
-            auto ft = llvm::FunctionType::get((*this)(x.type_), params_types, x.is_variadic);
-            auto fn = llvm::Function::Create(ft, llvm::Function::ExternalLinkage, x.id.id.c_str(), module_.get());
-
-            unsigned idx = 0;
-            for (auto &i : fn->args())
-                i.setName(x.args[idx++].ident_.id);
-
-            return fn;
-        }
-
-        llvm::Function *operator()(ast::fn const &x)
-        {
-            auto fn = module_->getFunction(x.proto_.id.id);
-            if (!fn)
-                fn = (*this)(x.proto_);
-
-            if (!fn)
-                return nullptr;
-
-            if (!fn->empty())
-                error("fn can't be redefined");
-
-            auto bb = llvm::BasicBlock::Create(*context, "entry", fn);
-            builder->SetInsertPoint(bb);
-
-            values.clear();
-            for (auto &i : fn->args())
             {
-                auto a = _alloc(fn, i.getName().str(), i.getType());
-                values[i.getName().str()] = a;
+                if (!boost::apply_visitor(*this, i))
+                    return false;
             }
 
-            (*this)(x.body);
+            cur->append(
+                bytecode::CALL,
+                p->ac(),
+                p->address());
 
-            return fn;
+            cur->link_to(fn_id, p->address());
+            return true;
         }
 
-        llvm::Value *operator()(ast::block const &x)
+        bool operator()(ast::assign const &x)
         {
+            assert(cur != 0);
+            if (!boost::apply_visitor(*this, x.val))
+                return false;
+
+            auto id = boost::get<ast::ident>(x.id).id;
+            auto p = cur->lookup(id);
+
+            if (p == 0)
+            {
+                std::cout << "undeclared var: " << id << std::endl;
+                return false;
+            }
+
+            cur->append(bytecode::STORE, *p);
+            return true;
+        }
+
+        bool operator()(ast::let const &x)
+        {
+            assert(cur != 0);
+
+            auto id = x.var.ident_.id;
+
+            auto p = cur->lookup(id);
+            if (p != 0)
+            {
+                std::cout << "already declared var: " << id << std::endl;
+                return false;
+            }
+
+            if (!boost::apply_visitor(*this, x.val))
+                return false;
+
+            cur->insert(id);
+            cur->append(bytecode::STORE, *cur->lookup(id));
+            return true;
+        }
+
+        bool operator()(ast::block const &x)
+        {
+            assert(cur != 0);
             for (auto const &i : x)
-                boost::apply_visitor(*this, i);
+                if (!(boost::apply_visitor(*this, i)))
+                    return false;
 
-            return nullptr;
+            return true;
         }
 
-        llvm::Value *operator()(ast::ret const &x)
+        bool operator()(ast::condition const &x)
         {
-            auto fn = builder->GetInsertBlock()->getParent();
-            auto v = boost::apply_visitor(*this, x.val);
-            if (v == nullptr && !fn->getReturnType()->isVoidTy())
-                error("return type is not void");
+            assert(cur != 0);
+            if (!(boost::apply_visitor(*this, x.cond)))
+                return false;
 
-            if (v == nullptr)
-                return builder->CreateRetVoid();
+            cur->append(bytecode::JMP_IF, 0);
+            auto skip = cur->size();
 
-            if (v->getType() != v->getType())
-                error("return type is not same");
+            if (!(boost::apply_visitor(*this, x.then_)))
+                return false;
 
-            return builder->CreateRet(v);
+            (*cur)[skip] = cur->size() - skip;
+
+            (*cur)[skip] += 2;
+            cur->append(bytecode::JMP, 0);
+            auto _exit = cur->size() - 1;
+            if (!(boost::apply_visitor(*this)(x.else_)))
+                return false;
+
+            (*cur)[_exit] = cur->size() - _exit;
+
+            return true;
         }
 
-        llvm::Value *operator()(ast::condition const &x)
+        bool operator()(ast::while_loop const &x)
         {
-            auto cond = boost::apply_visitor(*this, x.cond);
-            auto fn = builder->GetInsertBlock()->getParent();
+            assert(cur != 0);
+            auto pos = cur->size();
+            if (!boost::apply_visitor(*this, x.cond))
+                return false;
 
-            auto thenbb =
-                     llvm::BasicBlock::Create(*context, "true", fn),
-                 condbb =
-                     llvm::BasicBlock::Create(*context, "cond", fn),
-                 elsebb =
-                     llvm::BasicBlock::Create(*context, "else", fn);
+            cur->append(bytecode::JMP_IF, 0);
+            auto _exit = cur->size() - 1;
+            if (!boost::apply_visitor(*this, x.body))
+                return false;
 
-            builder->CreateCondBr(cond, thenbb, elsebb);
+            cur->append(bytecode::JMP, int(pos - 1) - int(cur->size()));
+            (*cur)[_exit] = cur->size() - _exit;
 
-            builder->SetInsertPoint(thenbb);
-            boost::apply_visitor(*this, x.then_);
-            builder->CreateBr(condbb);
-
-            builder->SetInsertPoint(elsebb);
-            boost::apply_visitor(*this, x.else_);
-            builder->CreateBr(condbb);
-
-            builder->SetInsertPoint(condbb);
-
-            return nullptr;
+            return true;
         }
 
-        llvm::Value *operator()(ast::for_loop const &x)
+        bool operator()(ast::ret const &x)
         {
-            auto fn = builder->GetInsertBlock()->getParent();
+            assert(cur != 0);
+            if (!boost::apply_visitor(*this, x.val))
+                return false;
+
+            cur->append(bytecode::RET);
+            return true;
         }
 
-        llvm::Value *operator()(ast::while_loop const &x)
+        bool operator()(ast::fn const &x)
         {
-            auto fn = builder->GetInsertBlock()->getParent();
-            auto condbb =
-                     llvm::BasicBlock::Create(*context, "loop", fn),
-                 bodybb =
-                     llvm::BasicBlock::Create(*context, "body", fn),
-                 contbb =
-                     llvm::BasicBlock::Create(*context, "cont", fn);
-
-            builder->CreateBr(condbb);
-            builder->SetInsertPoint(condbb);
-
-            auto condv = boost::apply_visitor(*this, x.cond);
-            builder->CreateCondBr(condv, bodybb, contbb);
-
-            builder->SetInsertPoint(bodybb);
-            boost::apply_visitor(*this, x.body);
-            builder->CreateBr(condbb);
-
-            builder->SetInsertPoint(contbb);
-
-            return nullptr;
-        }
-
-        llvm::Value *operator()(ast::expr_stmt const &x)
-        {
-            boost::apply_visitor(*this, x.expr_);
-            return nullptr;
-        }
-
-        llvm::Type *operator()(ast::variable const &t)
-        {
-            auto ty = (*this)(t.type_);
-            for (auto i : t.args)
+            if (_fns.find(x.proto_.id.id) != _fns.end())
             {
-                switch (i)
-                {
-                case tokentype::ptr:
-                    ty = llvm::PointerType::get(ty, 0);
-                }
+                std::cout << "duplicate fn: " << x.proto_.id.id << std::endl;
+                return false;
             }
 
-            if (t.size > 1)
-                ty = llvm::ArrayType::get(ty, t.size);
+            auto p = _fns[x.proto_.id.id];
+            p.reset(new compiler::block(_code, x.proto_.args.size()));
+            cur = p.get();
+            cur_fn = x.proto_.id.id;
 
-            return ty;
+            cur->append(bytecode::ADJ_STK, 0);
+            for (auto const &i : x.proto_.args)
+                cur->insert(i.ident_.id);
+
+            if (!(*this)(x.body))
+                return false;
+
+            (*cur)[1] = cur->vars_size();
+
+            return true;
         }
 
-        llvm::Type *operator()(ast::datatype const &t)
+        bool operator()(ast::root_decls const &x)
         {
-            auto i = types.find(t.value.id);
-            if (i == types.end())
-                error("invalid datatype " + t.value.id);
+            _code.push_back(src_code);
+            _code.push_back(0);
+            _code.push_back(bytecode::JMP);
+            _code.push_back(0);
 
-            return i->second;
+            for (auto const &i : x)
+                if (!boost::apply_visitor(*this, i))
+                {
+                    _code.clear();
+                    return false;
+                }
+
+            _code[1] = _code.size();
+
+            return true;
+        }
+
+        std::shared_ptr<compiler::block>
+        getfn(string const &id) const
+        {
+            auto f = _fns.find(id);
+            if (f == _fns.end())
+                return nullptr;
+            else
+                return f->second;
+        }
+
+        bool dump(string f)
+        {
+            auto file = fopen(f.c_str(), "wb");
+            if (file == nullptr)
+            {
+                std::cout << "error creating file " << f << std::endl;
+                return false;
+            }
+
+            for (auto i : _code)
+                fwrite((const void *)&i, sizeof(int), 1, file);
+
+            fclose(file);
+
+            return true;
         }
 
         template <typename T>
-        llvm::Value *operator()(T)
+        bool operator()(T)
         {
-            error(io::format("compiler not yet implemented for '", typeid(T).name(), "'"));
-            return nullptr;
+            throw std::runtime_error("not yet implemented for " + std::string(typeid(T).name()));
+            return false;
         }
     };
 }

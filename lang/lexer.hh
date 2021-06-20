@@ -198,6 +198,8 @@ namespace src::lang
                     return tokentype::else_;
                 if (_ident == "for")
                     return tokentype::for_;
+                if (_ident == "while")
+                    return tokentype::while_;
                 if (_ident == "ret")
                     return tokentype::ret;
                 if (_ident == "fn")

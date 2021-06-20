@@ -452,7 +452,7 @@ namespace src::lang
 
             ast::while_loop loop;
 
-            // eat 'for'
+            // eat 'while'
             eat();
 
             // eat expr
