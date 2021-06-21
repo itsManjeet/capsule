@@ -12,74 +12,71 @@ namespace src::lang
     {
     private:
         lexer<iterator> _lexer;
-        int curtok, peektok;
+        token curtok, peektok;
 
-        std::map<int, int> prec = {
-            {or_, 2},
-            {and_, 3},
-            {not_, 4},
-            {'=', 10},
-            {eq, 10},
-            {ne, 10},
-            {'<', 20},
-            {le, 20},
-            {'>', 20},
-            {ge, 20},
-            {'+', 30},
-            {'-', 30},
-            {'/', 40},
-            {'*', 40},
-            {'%', 40},
-            {'(', 50},
-            {'[', 50},
-            {'.', 50},
+        std::map<token, int> prec = {
+            {token::OR, 2},
+            {token::AND, 3},
+            {token::NOT, 4},
+            {token::EQUAL, 10},
+            {token::EQ, 10},
+            {token::NE, 10},
+            {token::LT, 20},
+            {token::LE, 20},
+            {token::GT, 20},
+            {token::GE, 20},
+            {token::PLUS, 30},
+            {token::MINUS, 30},
+            {token::DIV, 40},
+            {token::MUL, 40},
+            {token::LPAREN, 50},
+            {token::LBRACK, 50},
+            {token::DOT, 50},
         };
 
-        bool is_infix(int c)
-        {
-            return c == '[' ||
-                   c == '(' ||
-                   c == '.' ||
-                   c == '=';
-        }
+        std::vector<token> infix = {
+            token::LBRACK,
+            token::LPAREN,
+            token::DOT,
+            token::EQUAL,
+        };
 
-        bool is_oper(int c)
-        {
-            return c == '+' ||
-                   c == '-' ||
-                   c == '/' ||
-                   c == '*' ||
-                   c == '=' ||
-                   c == '>' ||
-                   c == '<' ||
-                   c == eq ||
-                   c == ne ||
-                   c == le ||
-                   c == ge ||
-                   c == and_ ||
-                   c == or_;
-        }
+        std::vector<token> operators = {
+            token::PLUS,
+            token::MINUS,
+            token::DIV,
+            token::MUL,
+            token::LT,
+            token::EQUAL,
+            token::GT,
+            token::EQ,
+            token::NE,
+            token::GE,
+            token::LE,
+            token::AND,
+            token::OR,
+        };
 
-        int get_prec(int t)
+        int get_prec(token t)
         {
             int tp = prec[t];
-            io::debug(level::trace, "found prec ", tp, " for ", std::to_string(t), " | ", (char)(t));
+            io::debug(level::trace, "found prec ", tp, " for ", _lexer.to_string(t));
             return tp <= 0 ? -1 : tp;
         }
 
         void eat()
         {
-            io::debug(level::trace, "eating ", tokentostr(curtok), (curtok == ident ? ":" + _lexer.ident() : ""));
+            io::debug(level::trace, "eating ", _lexer.to_string(curtok));
             curtok = _lexer.eat_token();
         }
 
-        void check(int t)
+        void check(token t)
         {
             if (curtok != t)
-                _lexer.throw_error("expected '" + tokentostr(t) + "' but got '" + tokentostr(curtok) + "'");
+                _lexer.throw_error("expected '" + _lexer.to_string(t) + "' but got '" + _lexer.to_string(curtok) + "'");
         }
 
-        void expect(int t)
+        void expect(token t)
         {
             check(t);
             eat();
@@ -91,7 +88,7 @@ namespace src::lang
             io::debug(level::trace, "parsing identifier");
             ast::ident ident;
 
-            check(tokentype::ident);
+            check(token::IDENT);
             ident.id = _lexer.ident();
             eat();
 
@@ -120,10 +117,10 @@ namespace src::lang
             variable.ident_ = parse_ident();
 
             // eat ':'
-            expect(':');
+            expect(token::COLON);
 
-            while (curtok == tokentype::ref ||
-                   curtok == tokentype::ptr)
+            while (curtok == token::REF ||
+                   curtok == token::PTR)
             {
                 variable.args.push_back(curtok);
                 eat();
@@ -133,7 +130,7 @@ namespace src::lang
             variable.type_ = parse_type();
 
             // eat -('[' int ']')
-            if (curtok == '[')
+            if (curtok == token::LBRACK)
             {
                 // eat '['
                 eat();
@@ -142,7 +139,7 @@ namespace src::lang
                 variable.size = parse_num();
 
                 // eat ']'
-                expect(']');
+                expect(token::RBRACK);
             }
 
             return variable;
@@ -157,19 +154,19 @@ namespace src::lang
             io::debug(level::trace, "parsing root decl");
             switch (curtok)
             {
-            case tokentype::use:
+            case token::USE:
                 return parse_use();
 
-            case tokentype::struct_:
+            case token::STRUCT:
                 return parse_struct();
 
-            case tokentype::fn:
+            case token::FN:
             {
                 // eat proto
                 auto proto = parse_proto();
 
                 // eat ';'
-                if (curtok == ';')
+                if (curtok == token::SEMICOLON)
                 {
                     eat();
                     return proto;
@@ -180,6 +177,7 @@ namespace src::lang
             }
 
             _lexer.throw_error("unknown starting declaration");
+            return ast::fn{};
         }
 
         /// use ::= 'use' str ';'
@@ -195,7 +193,7 @@ namespace src::lang
             use.path = parse_str();
 
             // eat ';'
-            expect(';');
+            expect(token::SEMICOLON);
 
             return use;
         }
@@ -213,26 +211,26 @@ namespace src::lang
             struct_.id = parse_ident();
 
             // eat '{'
-            expect('{');
+            expect(token::LBRACE);
 
             // eat -(variable % ',')
-            while (curtok != '}')
+            while (curtok != token::RBRACE)
             {
                 // eat variable
                 struct_.vars.push_back(parse_variable());
 
-                if (curtok == '}')
+                if (curtok == token::RBRACE)
                     break;
 
                 // eat ','
-                expect(',');
+                expect(token::COMMA);
             }
 
             // eat '}'
-            expect('}');
+            expect(token::RBRACE);
 
             // eat ';'
-            expect(';');
+            expect(token::SEMICOLON);
 
             return struct_;
         }
@@ -245,38 +243,38 @@ namespace src::lang
             ast::proto proto;
 
             // eat 'fn'
-            expect(tokentype::fn);
+            expect(token::FN);
 
             // eat ident
-            check(tokentype::ident);
+            check(token::IDENT);
             proto.id = parse_ident();
 
             // eat '('
-            expect('(');
+            expect(token::LPAREN);
 
-            while (curtok != ')')
+            while (curtok != token::RPAREN)
             {
-                if (curtok == tokentype::vari)
+                if (curtok == token::VARI)
                 {
                     proto.is_variadic = true;
                     eat();
                     break;
                 }
                 proto.args.push_back(parse_variable());
-                if (curtok == ')')
+                if (curtok == token::RPAREN)
                     break;
 
-                expect(',');
+                expect(token::COMMA);
             }
 
             // eat ')'
-            expect(')');
+            expect(token::RPAREN);
 
             // eat '->'
-            expect(tokentype::to);
+            expect(token::TO);
 
             // eat type
-            check(tokentype::ident);
+            check(token::IDENT);
             proto.type_ = parse_type();
 
             return proto;
@@ -303,25 +301,25 @@ namespace src::lang
             io::debug(level::trace, "parsing statement");
             switch (curtok)
             {
-            case let:
+            case token::LET:
                 return parse_let();
 
-            case if_:
+            case token::IF:
                 return parse_condition();
 
-            case for_:
+            case token::FOR:
                 return parse_for_loop();
 
-            case while_:
+            case token::WHILE:
                 return parse_while_loop();
 
-            case ret:
+            case token::RET:
                 return parse_ret();
 
-            case '{':
+            case token::LBRACE:
                 return parse_block();
 
-            case ';':
+            case token::SEMICOLON:
                 return ast::nil{};
             }
 
@@ -336,11 +334,11 @@ namespace src::lang
             // eat '{'
             eat();
 
-            while (curtok != '}')
+            while (curtok != token::RBRACE)
                 block.push_back(parse_stmt());
 
             // eat '}'
-            expect('}');
+            expect(token::RBRACE);
 
             return block;
         }
@@ -352,15 +350,15 @@ namespace src::lang
             ast::let let;
 
             // eat 'let'
-            expect(tokentype::let);
+            expect(token::LET);
 
             // eat variable
             let.var = parse_variable();
 
-            if (curtok == '=')
+            if (curtok == token::EQUAL)
             {
                 // eat '='
-                expect('=');
+                expect(token::EQUAL);
 
                 // eat expr
                 let.val = parse_expr(-1);
@@ -371,7 +369,7 @@ namespace src::lang
             }
 
             // eat ';'
-            expect(';');
+            expect(token::SEMICOLON);
 
             return let;
         }
@@ -384,10 +382,10 @@ namespace src::lang
             // eat return
             eat();
 
-            if (curtok != ';')
+            if (curtok != token::SEMICOLON)
                 ret.val = parse_expr(-1);
 
-            expect(';');
+            expect(token::SEMICOLON);
 
             return ret;
         }
@@ -406,7 +404,7 @@ namespace src::lang
             // eat stmt
             condition.then_ = parse_stmt();
 
-            if (curtok == tokentype::else_)
+            if (curtok == token::ELSE)
             {
                 // eat 'else'
                 eat();
@@ -471,7 +469,7 @@ namespace src::lang
             ast::expr_stmt expr_stmt;
             expr_stmt.expr_ = parse_expr(-1);
 
-            expect(';');
+            expect(token::SEMICOLON);
 
             return expr_stmt;
         }
@@ -483,9 +481,10 @@ namespace src::lang
 
             auto lhs = parse_prefix();
 
-            while (curtok != ';' && prec < get_prec(curtok))
+            while (curtok != token::SEMICOLON && prec < get_prec(curtok))
             {
-                if (!is_infix(curtok) && !is_oper(curtok))
+                if (std::find(infix.begin(), infix.end(), curtok) == infix.end() &&
+                    std::find(operators.begin(), operators.end(), curtok) == operators.end())
                     return lhs;
 
                 // eat infix
@@ -503,26 +502,27 @@ namespace src::lang
             io::debug(level::trace, "parsing prefix");
             switch (curtok)
             {
-            case number:
+            case token::NUM:
                 return parse_num();
 
-            case str:
+            case token::STR:
                 return parse_str();
 
-            case ident:
+            case token::IDENT:
                 return parse_ident();
 
-            case '[':
+            case token::LBRACK:
                 return parse_array();
 
-            case ptr:
-            case ref:
-            case '-':
-            case not_:
+            case token::PTR:
+            case token::REF:
+            case token::MINUS:
+            case token::NOT:
                 return parse_unary();
             }
 
-            _lexer.throw_error("unexpected prefix '" + std::string(1, (char)curtok) + "'");
+            _lexer.throw_error("unexpected prefix '" + _lexer.to_string(curtok) + "'");
+            return ast::nil{};
         }
 
         /// unary ::= <oper> expr
@@ -569,17 +569,17 @@ namespace src::lang
             // eat '['
             eat();
 
-            while (curtok != ']')
+            while (curtok != token::RBRACK)
             {
                 array.push_back(parse_expr(-1));
-                if (curtok == ']')
+                if (curtok == token::RBRACK)
                     break;
 
-                expect(',');
+                expect(token::COMMA);
             }
 
             // eat ']'
-            expect(']');
+            expect(token::RBRACK);
             return array;
         }
 
@@ -588,23 +588,22 @@ namespace src::lang
             io::debug(level::trace, "parsing infix");
             switch (curtok)
             {
-            case '(':
+            case token::RPAREN:
                 return parse_call(lhs);
-            case '=':
+            case token::EQUAL:
                 return parse_assign(lhs);
-            case '[':
+            case token::RBRACK:
                 return parse_index(lhs);
-
-            default:
-                int t = curtok;
-                eat();
-
-                auto rhs = parse_expr(get_prec(t));
-                return ast::binary{
-                    .oper = (char)t,
-                    .lhs = lhs,
-                    .rhs = rhs};
             }
+
+            token t = curtok;
+            eat();
+
+            auto rhs = parse_expr(get_prec(t));
+            return ast::binary{
+                .oper = t,
+                .lhs = lhs,
+                .rhs = rhs};
         }
 
         /// call ::= lhs '(' -[expr % ','] ')'
@@ -615,18 +614,18 @@ namespace src::lang
 
             call.id = lhs;
             // eat '('
-            expect('(');
+            expect(token::LPAREN);
 
-            while (curtok != ')')
+            while (curtok != token::RPAREN)
             {
                 call.args.push_back(parse_expr(-1));
-                if (curtok == ')')
+                if (curtok == token::RPAREN)
                     break;
 
-                expect(',');
+                expect(token::COMMA);
             }
 
-            expect(')');
+            expect(token::RPAREN);
 
             return call;
         }
@@ -655,12 +654,12 @@ namespace src::lang
             index.id = lhs;
 
             // eat '['
-            expect('[');
+            expect(token::LBRACK);
 
             index.val = parse_expr(-1);
 
             // eat ']'
-            expect(']');
+            expect(token::RBRACK);
 
             return index;
         }
@@ -676,7 +675,7 @@ namespace src::lang
         ast::root_decls parse()
         {
             ast::root_decls decls;
-            while (curtok != tokentype::eof)
+            while (curtok != token::_EOF)
                 decls.push_back(parse_root_decl());
 
             return decls;

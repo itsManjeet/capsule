@@ -52,6 +52,10 @@ int main(int ac, char **av)
         .arg(arg::create("lex")
             .long_id("lex")
             .about("perform lexical analysis of input stream"))
+        
+        .arg(arg::create("emit-bytecode")
+            .long_id("emit-bytecode")
+            .about("Emit byte codes"))
 
         .sub(app::create("run")
             .about("interpreter bytecodes")
@@ -112,20 +116,13 @@ int main(int ac, char **av)
                 if (cc.checkflag("lex"))
                 {
                     io::debug(level::debug, "Lexical Analysis mode on");
-                    int t;
+                    src::lang::token t;
                     do
                     {
                         t = lexer.eat_token();
-                        if (t == src::lang::ident)
-                            io::print("[ident:", lexer.ident(), "]");
-                        else if (t == src::lang::number)
-                            io::print("[num:", lexer.num(), "]");
-                        else if (t == src::lang::str)
-                            io::print("[str:", lexer.ident(), "]");
-                        else
-                            io::print("[", src::lang::tokentostr(t), "]");
-                    } while (t != src::lang::eof);
-
+                        io::print("[",lexer.to_string(t),"]");
+                    } while (t != src::lang::token::_EOF);
+                    io::println("");
                     return 0;
                 }
                 auto parser = src::lang::parser<iterator>(lexer);
@@ -136,7 +133,7 @@ int main(int ac, char **av)
                 {
                     ast = parser.parse();
                 }
-                catch (std::runtime_error const &e)
+                catch (src::lang::lexer<iterator>::exception e)
                 {
                     io::error("Parsing failed ", e.what());
                     return 0;
@@ -145,6 +142,9 @@ int main(int ac, char **av)
                 auto compiler = src::compiler::codegen();
                 if (!compiler(ast))
                     return 1;
+
+                if (cc.checkflag("emit-bytecode"))
+                    compiler.emit(std::cout);
 
                 if (!compiler.dump(cc.value("output","a.out")))
                     return 1;

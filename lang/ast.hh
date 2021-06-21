@@ -36,14 +36,14 @@ namespace src::lang::ast
 
     struct binary
     {
-        char oper;
+        token oper;
         expr lhs;
         expr rhs;
     };
 
     struct unary
     {
-        char oper;
+        token oper;
         expr lhs;
     };
 
@@ -77,7 +77,7 @@ namespace src::lang::ast
     struct variable
     {
         datatype type_;
-        std::vector<int> args;
+        std::vector<token> args;
         ident ident_;
         unsigned int size = 1;
     };

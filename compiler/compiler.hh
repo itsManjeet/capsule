@@ -1,9 +1,11 @@
 #ifndef __COMPILER__
 #define __COMPILER__
 
+#include <io.hh>
 #include <utils/define.hh>
 #include <boost/variant.hpp>
 
+#include <set>
 #include <vector>
 #include <map>
 #include <string>
@@ -18,8 +20,12 @@ namespace src::compiler
     using std::string;
 
     using src::lang::bytecode;
-    using src::lang::tokentype;
+    using src::lang::token;
 
+    using color = rlx::io::color;
+    using level = rlx::io::debug_level;
+
+    namespace io = rlx::io;
     namespace ast = src::lang::ast;
 
     class block
@@ -35,6 +41,8 @@ namespace src::compiler
     public:
         block(std::vector<int> &code, uint ac)
             : _code(code),
+              _address(code.size()),
+              _size(0),
               _ac(ac)
         {
         }
@@ -99,6 +107,104 @@ namespace src::compiler
         {
             _calls[addr] = id;
         }
+
+        void emit(std::ostream &out) const
+        {
+            std::vector<int>::const_iterator pc = _code.begin() + _address;
+            std::vector<string> locals(_vars.size());
+            for (auto const &p : _vars)
+            {
+                locals[p.second] = p.first;
+                out << ".local " << p.first << ", #" << p.second << std::endl;
+            }
+
+            std::map<size_t, string> lines;
+            std::set<size_t> jumps;
+
+            while (pc != (_code.begin() + _address + _size))
+            {
+                // io::println("PC: ", src::lang::bytecode_to_str(bytecode(*pc)), " address: ", _address);
+                string line;
+                size_t addr = pc - _code.begin();
+                switch (*pc)
+                {
+                case bytecode::NEG:
+                case bytecode::NOT:
+                case bytecode::ADD:
+                case bytecode::SUB:
+                case bytecode::MUL:
+                case bytecode::DIV:
+                case bytecode::EQ:
+                case bytecode::NE:
+                case bytecode::LT:
+                case bytecode::LE:
+                case bytecode::GT:
+                case bytecode::GE:
+                case bytecode::AND:
+                case bytecode::OR:
+                case bytecode::RET:
+                    line += io::format("\t", src::lang::bytecode_to_str(bytecode(*pc)));
+                    ++pc;
+                    break;
+
+                case bytecode::LOAD:
+                case bytecode::STORE:
+                    line += io::format("\t", src::lang::bytecode_to_str(bytecode(*pc))," ");
+                    ++pc;
+                    line += locals[*pc++];
+                    break;
+
+                case bytecode::INT:
+                case bytecode::ADJ_STK:
+                    line += io::format("\t", src::lang::bytecode_to_str(bytecode(*pc)), " ");
+                    ++pc;
+                    line += std::to_string(*pc++);
+                    break;
+
+                case bytecode::JMP:
+                case bytecode::JMP_IF:
+                    line += io::format("\t", src::lang::bytecode_to_str(bytecode(*pc))," ");
+                    pc++;
+                    {
+                        size_t pos = ((pc)-_code.begin()) + *pc++;
+                        if (pos == _code.size())
+                            line += "\n";
+                        else
+                            line += std::to_string(pos);
+                        jumps.insert(pos);
+                    }
+                    break;
+
+                case bytecode::CALL:
+                    line += io::format("\t", src::lang::bytecode_to_str(bytecode(*pc)), " ");
+                    pc++;
+                    {
+                        int nargs = *pc++;
+                        std::size_t jmp = *pc++;
+                        line += std::to_string(nargs) + ", ";
+                        assert(_calls.find(jmp) != _calls.end());
+                        line += _calls.find(jmp)->second;
+                    }
+                    break;
+                default:
+                    assert(0);
+                }
+
+                lines[addr] = line;
+            }
+
+            out << "entry: " << std::endl;
+            for (auto const &i : lines)
+            {
+                size_t pos = i.first;
+                if (jumps.find(pos) != jumps.end())
+                    out << pos << ':' << std::endl;
+
+                std::cout << i.second << std::endl;
+            }
+
+            out << std::endl;
+        }
     };
 
     class codegen
@@ -116,6 +222,8 @@ namespace src::compiler
             : cur(0)
         {
         }
+
+        DEFINE_GET_METHOD(std::vector<int>, code);
 
         bool operator()(ast::nil)
         {
@@ -149,56 +257,62 @@ namespace src::compiler
             }
 
             cur->append(bytecode::LOAD, *p);
-            return false;
+            return true;
         }
 
         bool operator()(ast::binary const &x)
         {
             assert(cur != 0);
             if (!boost::apply_visitor(*this, x.lhs))
+            {
+                io::debug(level::debug, "lhs failed ", x.lhs.type().name());
                 return false;
+            }
 
             if (!boost::apply_visitor(*this, x.rhs))
+            {
+                io::debug(level::debug, "rhs failed ", x.rhs.type().name());
                 return false;
+            }
 
             switch (x.oper)
             {
-            case '+':
+            case token::PLUS:
                 cur->append(bytecode::ADD);
                 break;
-            case '-':
+            case token::MINUS:
                 cur->append(bytecode::SUB);
                 break;
-            case '*':
+            case token::MUL:
                 cur->append(bytecode::MUL);
                 break;
-            case '/':
+            case token::DIV:
                 cur->append(bytecode::DIV);
                 break;
 
-            case tokentype::eq:
+            case token::EQ:
                 cur->append(bytecode::EQ);
                 break;
-            case tokentype::ne:
+            case token::NE:
                 cur->append(bytecode::NE);
                 break;
-            case tokentype::le:
+            case token::LE:
                 cur->append(bytecode::LE);
                 break;
-            case tokentype::ge:
+            case token::GE:
                 cur->append(bytecode::GE);
                 break;
-            case '<':
+            case token::LT:
                 cur->append(bytecode::LT);
                 break;
-            case '>':
+            case token::GT:
                 cur->append(bytecode::GT);
                 break;
 
-            case tokentype::and_:
+            case token::AND:
                 cur->append(bytecode::AND);
                 break;
-            case tokentype::or_:
+            case token::OR:
                 cur->append(bytecode::OR);
                 break;
 
@@ -218,10 +332,10 @@ namespace src::compiler
 
             switch (x.oper)
             {
-            case '-':
+            case token::MINUS:
                 cur->append(bytecode::NEG);
                 break;
-            case tokentype::not_:
+            case token::NOT:
                 cur->append(bytecode::NOT);
                 break;
 
@@ -359,6 +473,11 @@ namespace src::compiler
             return true;
         }
 
+        bool operator()(ast::expr_stmt const &x)
+        {
+            return boost::apply_visitor(*this, x.expr_);
+        }
+
         bool operator()(ast::ret const &x)
         {
             assert(cur != 0);
@@ -377,9 +496,9 @@ namespace src::compiler
                 return false;
             }
 
-            auto p = _fns[x.proto_.id.id];
-            p.reset(new compiler::block(_code, x.proto_.args.size()));
-            cur = p.get();
+            _fns[x.proto_.id.id].reset();
+            _fns[x.proto_.id.id] = std::make_shared<compiler::block>(_code, x.proto_.args.size());
+            cur = _fns[x.proto_.id.id].get();
             cur_fn = x.proto_.id.id;
 
             cur->append(bytecode::ADJ_STK, 0);
@@ -438,6 +557,16 @@ namespace src::compiler
             fclose(file);
 
             return true;
+        }
+
+        void emit(std::ostream &out)
+        {
+            for (auto p : _fns)
+            {
+                assert(p.second != nullptr);
+                out << p.second->address() << ": fn " << p.first << std::endl;
+                p.second->emit(out);
+            }
         }
 
         template <typename T>
