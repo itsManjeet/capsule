@@ -33,7 +33,7 @@
 <br />
 <p align="center">
   <a href="https://github.com/rlxos/src">
-    <img src="https://raw.githubusercontent.com/src/assets/main/logo.png" alt="Logo" width="80" height="80">
+    <img src="https://raw.githubusercontent.com/src/assets/main/logo.svg" alt="Logo" width="80" height="80">
   </a>
 
   <h3 align="center">src</h3>
