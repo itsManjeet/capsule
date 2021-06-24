@@ -149,21 +149,15 @@ namespace src::compiler
 
                 case bytecode::LOAD:
                 case bytecode::STORE:
-                case bytecode::STORE_MEM:
                     line += io::format("\t", src::lang::bytecode_to_str(bytecode(*pc)), " ");
                     ++pc;
                     line += locals[*pc++];
                     break;
 
-                case bytecode::LOAD_MEM:
-                    line += io::format("\t", src::lang::bytecode_to_str(bytecode(*pc)), " ");
-                    ++pc;
-                    line += std::to_string(*pc++);
-                    line += " " + std::to_string(*pc++);
-                    break;
-
                 case bytecode::INT:
+                case bytecode::PTR:
                 case bytecode::ADJ_STK:
+                case bytecode::ALLOC:
                     line += io::format("\t", src::lang::bytecode_to_str(bytecode(*pc)), " ");
                     ++pc;
                     line += std::to_string(*pc++);
@@ -257,7 +251,7 @@ namespace src::compiler
                 _data.push_back(c);
 
             auto end = _data.size();
-            cur->append(bytecode::STORE_MEM, start, end);
+            cur->append(bytecode::ALLOC, end - start);
 
             return true;
         }
@@ -434,7 +428,11 @@ namespace src::compiler
 
             cur->insert(id);
             auto loc = cur->size();
-            cur->append(bytecode::STORE, *cur->lookup(id));
+            if (cur[loc-2] == bytecode::INT)
+                cur->append(bytecode::STORE, *cur->lookup(id));
+            else if (cur[loc-2] == bytecode::ALLOC)
+                cur->append(bytecode::)
+            
             return true;
         }
 

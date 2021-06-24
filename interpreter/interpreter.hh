@@ -11,6 +11,7 @@ namespace src::interpreter
     {
     private:
         std::vector<int> _stack;
+        std::vector<char> _data;
         int execute(
             std::vector<int> const &code,
             std::vector<int>::const_iterator pc,
@@ -93,9 +94,17 @@ namespace src::interpreter
                     *stack_ptr++ = frame_ptr[*pc++];
                     break;
 
+                case PTR:
+                    *stack_ptr++ = _data[*pc++];
+                    break;
+
                 case STORE:
                     --stack_ptr;
                     frame_ptr[*pc++] = stack_ptr[0];
+                    break;
+                
+                case ALLOC:
+                    *stack_ptr++ = *pc++;
                     break;
 
                 case INT:
