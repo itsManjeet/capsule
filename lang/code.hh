@@ -31,6 +31,9 @@ namespace src::lang
         LOAD,
         STORE,
 
+        LOAD_MEM,
+        STORE_MEM,
+        
         INT,
 
         JMP_IF,
@@ -78,6 +81,10 @@ namespace src::lang
             return "load";
         case STORE:
             return "store";
+        case LOAD_MEM:
+            return "load_mem";
+        case STORE_MEM:
+            return "store_mem";
 
         case INT:
             return "int";

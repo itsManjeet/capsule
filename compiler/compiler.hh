@@ -149,9 +149,17 @@ namespace src::compiler
 
                 case bytecode::LOAD:
                 case bytecode::STORE:
-                    line += io::format("\t", src::lang::bytecode_to_str(bytecode(*pc))," ");
+                case bytecode::STORE_MEM:
+                    line += io::format("\t", src::lang::bytecode_to_str(bytecode(*pc)), " ");
                     ++pc;
                     line += locals[*pc++];
+                    break;
+
+                case bytecode::LOAD_MEM:
+                    line += io::format("\t", src::lang::bytecode_to_str(bytecode(*pc)), " ");
+                    ++pc;
+                    line += std::to_string(*pc++);
+                    line += " " + std::to_string(*pc++);
                     break;
 
                 case bytecode::INT:
@@ -163,7 +171,7 @@ namespace src::compiler
 
                 case bytecode::JMP:
                 case bytecode::JMP_IF:
-                    line += io::format("\t", src::lang::bytecode_to_str(bytecode(*pc))," ");
+                    line += io::format("\t", src::lang::bytecode_to_str(bytecode(*pc)), " ");
                     pc++;
                     {
                         size_t pos = ((pc)-_code.begin()) + *pc++;
@@ -214,6 +222,7 @@ namespace src::compiler
         std::map<string, std::shared_ptr<compiler::block>> _fns;
         string cur_fn;
         std::vector<int> _code;
+        std::vector<char> _data;
 
     public:
         typedef bool result_type;
@@ -242,7 +251,15 @@ namespace src::compiler
         bool operator()(string const &x)
         {
             assert(cur != 0);
-            return false;
+            auto start = _data.size();
+
+            for (auto c : x)
+                _data.push_back(c);
+
+            auto end = _data.size();
+            cur->append(bytecode::STORE_MEM, start, end);
+
+            return true;
         }
 
         bool operator()(ast::ident const &x)
@@ -416,6 +433,7 @@ namespace src::compiler
                 return false;
 
             cur->insert(id);
+            auto loc = cur->size();
             cur->append(bytecode::STORE, *cur->lookup(id));
             return true;
         }
@@ -465,6 +483,31 @@ namespace src::compiler
             cur->append(bytecode::JMP_IF, 0);
             auto _exit = cur->size() - 1;
             if (!boost::apply_visitor(*this, x.body))
+                return false;
+
+            cur->append(bytecode::JMP, int(pos - 1) - int(cur->size()));
+            (*cur)[_exit] = cur->size() - _exit;
+
+            return true;
+        }
+
+        bool operator()(ast::for_loop const &x)
+        {
+            assert(cur != 0);
+            if (!boost::apply_visitor(*this, x.init))
+                return false;
+
+            auto pos = cur->size();
+            if (!boost::apply_visitor(*this, x.cond))
+                return false;
+
+            cur->append(bytecode::JMP_IF, 0);
+            auto _exit = cur->size() - 1;
+
+            if (!boost::apply_visitor(*this, x.body))
+                return false;
+
+            if (!boost::apply_visitor(*this, x.inc))
                 return false;
 
             cur->append(bytecode::JMP, int(pos - 1) - int(cur->size()));
@@ -566,6 +609,11 @@ namespace src::compiler
                 assert(p.second != nullptr);
                 out << p.second->address() << ": fn " << p.first << std::endl;
                 p.second->emit(out);
+
+                out << "data: " << std::endl;
+                for(auto i : _data)
+                    out << i;
+                out << std::endl;
             }
         }
 

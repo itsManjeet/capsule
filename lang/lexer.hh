@@ -318,7 +318,7 @@ namespace src::lang
 
                 _ident = id.substr(0, id.length());
                 io::debug(level::trace, "got string ", _ident);
-                return token::IDENT;
+                return token::STR;
             }
 
             auto symbol_match = [&](std::string const &x) -> bool

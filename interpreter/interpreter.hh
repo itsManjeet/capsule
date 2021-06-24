@@ -44,13 +44,10 @@ namespace src::interpreter
                     stack_ptr[-1] *= stack_ptr[0];
                     break;
 
-                    // case DIV:
-                    //     --stack_ptr;
-                    //     if (stack_ptr[0] == 0)
-                    //         throw std::runtime_error("[Arithematic Error]: Divide by zero");
-
-                    //     stack_ptr[-1] = (int) (stack_ptr[-1] / stack_ptr[0]);
-                    //     break;
+                case DIV:
+                    --stack_ptr;
+                    stack_ptr[-1] = static_cast<int>(stack_ptr[-1] / stack_ptr[0]);
+                    break;
 
                 case EQ:
                     --stack_ptr;
@@ -139,6 +136,9 @@ namespace src::interpreter
                 case RET:
                     return stack_ptr[-1];
 
+                default:
+                    io::error("unsupported bytecode: ", std::to_string(*(pc-1)));
+                    return 1;
                 }
             }
         }

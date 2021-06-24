@@ -588,7 +588,7 @@ namespace src::lang
             io::debug(level::trace, "parsing infix");
             switch (curtok)
             {
-            case token::RPAREN:
+            case token::LPAREN:
                 return parse_call(lhs);
             case token::EQUAL:
                 return parse_assign(lhs);
@@ -599,6 +599,7 @@ namespace src::lang
             token t = curtok;
             eat();
 
+            io::debug(level::trace, "parsing binary");
             auto rhs = parse_expr(get_prec(t));
             return ast::binary{
                 .oper = t,
