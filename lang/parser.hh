@@ -107,79 +107,6 @@ namespace src::lang
             return type_;
         }
 
-        /// variable ::= ident ':' -(ptr|ref) datatype -('[' int ']')
-        ast::variable parse_variable()
-        {
-            io::debug(level::trace, "parsing variable");
-
-            ast::variable variable;
-            // eat ident
-            variable.ident_ = parse_ident();
-
-            // eat ':'
-            expect(token::COLON);
-
-            while (curtok == token::REF ||
-                   curtok == token::PTR)
-            {
-                variable.args.push_back(curtok);
-                eat();
-            }
-
-            // eat datatype
-            variable.type_ = parse_type();
-
-            // eat -('[' int ']')
-            if (curtok == token::LBRACK)
-            {
-                // eat '['
-                eat();
-
-                // eat int
-                variable.size = parse_num();
-
-                // eat ']'
-                expect(token::RBRACK);
-            }
-
-            return variable;
-        }
-
-        /// root_decl ::= proto ';'
-        ///           ::= proto block
-        ///           ::= 'use' str ';'
-        ///           ::= 'struct' ident '{' (variables % ',') '}' ';'
-        ast::root_decl parse_root_decl()
-        {
-            io::debug(level::trace, "parsing root decl");
-            switch (curtok)
-            {
-            case token::USE:
-                return parse_use();
-
-            case token::STRUCT:
-                return parse_struct();
-
-            case token::FN:
-            {
-                // eat proto
-                auto proto = parse_proto();
-
-                // eat ';'
-                if (curtok == token::SEMICOLON)
-                {
-                    eat();
-                    return proto;
-                }
-
-                return parse_fn(proto);
-            }
-            }
-
-            _lexer.throw_error("unknown starting declaration");
-            return ast::fn{};
-        }
-
         /// use ::= 'use' str ';'
         ast::use parse_use()
         {
@@ -196,43 +123,6 @@ namespace src::lang
             expect(token::SEMICOLON);
 
             return use;
-        }
-
-        /// struct ::= 'struct' ident '{' -(variable % ',') '}' ';'
-        ast::struct_ parse_struct()
-        {
-            io::debug(level::trace, "parsing struct");
-            ast::struct_ struct_;
-
-            // eat 'struct'
-            eat();
-
-            // eat ident
-            struct_.id = parse_ident();
-
-            // eat '{'
-            expect(token::LBRACE);
-
-            // eat -(variable % ',')
-            while (curtok != token::RBRACE)
-            {
-                // eat variable
-                struct_.vars.push_back(parse_variable());
-
-                if (curtok == token::RBRACE)
-                    break;
-
-                // eat ','
-                expect(token::COMMA);
-            }
-
-            // eat '}'
-            expect(token::RBRACE);
-
-            // eat ';'
-            expect(token::SEMICOLON);
-
-            return struct_;
         }
 
         /// proto ::=  'fn' ident '(' -(args % ',') ',' '...' ')' '->' datatype
@@ -260,7 +150,7 @@ namespace src::lang
                     eat();
                     break;
                 }
-                proto.args.push_back(parse_variable());
+                proto.args.push_back(parse_ident());
                 if (curtok == token::RPAREN)
                     break;
 
@@ -269,13 +159,6 @@ namespace src::lang
 
             // eat ')'
             expect(token::RPAREN);
-
-            // eat '->'
-            expect(token::TO);
-
-            // eat type
-            check(token::IDENT);
-            proto.type_ = parse_type();
 
             return proto;
         }
@@ -301,6 +184,12 @@ namespace src::lang
             io::debug(level::trace, "parsing statement");
             switch (curtok)
             {
+            case token::USE:
+                return parse_use();
+
+            case token::FN:
+                return parse_fn(parse_proto());
+
             case token::LET:
                 return parse_let();
 
@@ -312,6 +201,16 @@ namespace src::lang
 
             case token::WHILE:
                 return parse_while_loop();
+
+            case token::BREAK:
+                eat();
+                eat();
+                return ast::break_{};
+
+            case token::CONTINUE:
+                eat();
+                eat();
+                return ast::continue_{};
 
             case token::RET:
                 return parse_ret();
@@ -353,7 +252,7 @@ namespace src::lang
             expect(token::LET);
 
             // eat variable
-            let.var = parse_variable();
+            let.var = parse_ident();
 
             if (curtok == token::EQUAL)
             {
@@ -672,12 +571,12 @@ namespace src::lang
             eat();
         }
 
-        /// prog ::= *root_decl
-        ast::root_decls parse()
+        /// prog ::= *stmts
+        ast::block parse()
         {
-            ast::root_decls decls;
+            ast::block decls;
             while (curtok != token::_EOF)
-                decls.push_back(parse_root_decl());
+                decls.push_back(parse_stmt());
 
             return decls;
         }

@@ -23,6 +23,8 @@ namespace src::lang
         FOR,
         WHILE,
         RET,
+        BREAK,
+        CONTINUE,
 
         TO,
         VARI,
@@ -116,6 +118,8 @@ namespace src::lang
             {"and", token::AND},
             {"or", token::OR},
             {"not", token::NOT},
+            {"break", token::BREAK},
+            {"continue", token::CONTINUE},
         };
 
         std::map<string, token> symbols = {

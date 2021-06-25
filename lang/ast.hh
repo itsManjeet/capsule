@@ -74,14 +74,6 @@ namespace src::lang::ast
         ident value;
     };
 
-    struct variable
-    {
-        datatype type_;
-        std::vector<token> args;
-        ident ident_;
-        unsigned int size = 1;
-    };
-
     struct expr_stmt
     {
         expr expr_;
@@ -89,7 +81,7 @@ namespace src::lang::ast
 
     struct let
     {
-        variable var;
+        ident var;
         expr val;
     };
 
@@ -98,22 +90,34 @@ namespace src::lang::ast
         expr val;
     };
 
+    struct break_
+    {
+    };
+    struct continue_
+    {
+    };
+
     struct condition;
     struct for_loop;
     struct while_loop;
     struct proto;
-    struct fn;
     struct block;
+    struct use;
+    struct fn;
 
     typedef boost::variant<
         nil,
         expr_stmt,
         let,
         ret,
+        break_,
+        continue_,
         boost::recursive_wrapper<condition>,
         boost::recursive_wrapper<for_loop>,
         boost::recursive_wrapper<while_loop>,
-        boost::recursive_wrapper<block>>
+        boost::recursive_wrapper<block>,
+        boost::recursive_wrapper<fn>,
+        boost::recursive_wrapper<use>>
         stmt;
 
     struct block : std::vector<stmt>
@@ -145,9 +149,8 @@ namespace src::lang::ast
 
     struct proto
     {
-        datatype type_;
         ident id;
-        std::vector<variable> args;
+        std::vector<ident> args;
         bool is_variadic = false;
     };
 
@@ -157,16 +160,6 @@ namespace src::lang::ast
         block body;
     };
 
-    struct struct_
-    {
-        ident id;
-        std::vector<variable> vars;
-    };
-
-    typedef boost::variant<proto, fn, use, struct_>
-        root_decl;
-
-    typedef std::vector<root_decl> root_decls;
 }
 
 #endif

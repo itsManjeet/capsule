@@ -1,8 +1,0 @@
-fn main(ac: i32) -> i32 {
-    let x:i32 = 5;
-    for let i:i32 = 0; i <= 5; i = i + 1; {
-        x = x + 1;
-    }
-
-    ret x;
-}

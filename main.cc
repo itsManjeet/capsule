@@ -1,6 +1,5 @@
 #include "lang/lexer.hh"
 #include "lang/parser.hh"
-#include "compiler/compiler.hh"
 #include "interpreter/interpreter.hh"
 
 #include <io.hh>
@@ -43,112 +42,69 @@ int main(int ac, char **av)
                          return 0;
                      }))
 
-        .arg(arg::create("output")
-            .long_id("output")
-            .short_id('o')
-            .about("specify output name")
-            .required(true))
-
-        .arg(arg::create("lex")
-            .long_id("lex")
-            .about("perform lexical analysis of input stream"))
-        
-        .arg(arg::create("emit-bytecode")
-            .long_id("emit-bytecode")
-            .about("Emit byte codes"))
-
-        .sub(app::create("run")
-            .about("interpreter bytecodes")
-            .fn([](context const& cc) -> int
-            {
-                if (cc.args().size() == 0)
-                {
-                    io::error("no input file provided");
-                    return 1;
-                }
-
-                auto filename = cc.args()[0];
-
-                FILE* file = fopen(filename.c_str(), "rb");
-                if (file == nullptr)
-                {
-                    io::error("failed to read file");
-                    return 1;
-                }
-
-                int magic_no, code_size, bytecode;
-                fread(&magic_no, sizeof(int), 1, file);
-                if (magic_no != src_code)
-                {
-                    io::error("not a src byte code file");
-                    return 1;
-                }
-
-                fread(&code_size, sizeof(int), 1, file);
-                
-                std::vector<int> code;
-                for(int i = 0; i < code_size; i++)
-                {
-                    fread(&bytecode, sizeof(int), 1, file);
-                    code.push_back(bytecode);
-                }
-
-                auto interpreter = src::interpreter::machine();
-                return interpreter.execute(code);
-            }))
-
+        .arg(arg::create("interactive").long_id("interactive").short_id('i').about("start src in interactive mode"))
 
         .fn([](context const &cc) -> int
             {
-                if (cc.args().size() == 0)
+                using ast = src::lang::ast::block;
+
+                bool is_interactive = cc.checkflag("interactive");
+
+                if (!is_interactive && cc.args().size() == 0)
+                    is_interactive = true;
+
+                auto context = src::interpreter::context();
+
+                do
                 {
-                    io::error("no input file provided");
-                    return 1;
-                }
+                    string input;
 
-                auto filename = cc.args()[0];
-                auto input = readfile(filename);
-
-                iterator start = input.begin(),
-                         end = input.end();
-
-                auto lexer = src::lang::lexer<iterator>(start, end);
-                if (cc.checkflag("lex"))
-                {
-                    io::debug(level::debug, "Lexical Analysis mode on");
-                    src::lang::token t;
-                    do
+                    if (is_interactive)
                     {
-                        t = lexer.eat_token();
-                        io::print("[",lexer.to_string(t),"]");
-                    } while (t != src::lang::token::_EOF);
-                    io::println("");
-                    return 0;
-                }
-                auto parser = src::lang::parser<iterator>(lexer);
+                        std::cout << ">> ";
+                        if (!getline(std::cin, input))
+                            continue;
+                    }
+                    else
+                        input = readfile(cc.args()[0]);
 
-                src::lang::ast::root_decls ast;
+                    iterator
+                        start =
+                            input.begin(),
+                        end =
+                            input.end();
 
-                try
-                {
-                    ast = parser.parse();
-                }
-                catch (src::lang::lexer<iterator>::exception e)
-                {
-                    io::error("Parsing failed ", e.what());
-                    return 0;
-                }
+                    auto lexer = src::lang::lexer<iterator>(start, end);
+                    auto parser = src::lang::parser(lexer);
+                    auto interpreter = src::interpreter::eval(&context);
+                    ast _ast;
+                    try
+                    {
+                        _ast = parser.parse();
+                        auto value = interpreter(_ast);
+                        if (is_interactive)
+                            io::println(boost::apply_visitor(src::interpreter::printer(), value));
+                    }
+                    catch (src::lang::lexer<iterator>::exception e)
+                    {
+                        io::message(color::RED, "Parsing failed", e.what());
+                        if (!is_interactive)
+                            return 1;
+                    }
+                    catch (src::interpreter::eval::exception e)
+                    {
+                        io::message(color::RED, "InterpreterError", e.what());
+                        if (!is_interactive)
+                            return 1;
+                    }
+                    catch (src::interpreter::context::exception e)
+                    {
+                        io::message(color::RED, "ContextError", e.what());
+                        if (!is_interactive)
+                            return 1;
+                    }
 
-                auto compiler = src::compiler::codegen();
-                if (!compiler(ast))
-                    return 1;
-
-                if (cc.checkflag("emit-bytecode"))
-                    compiler.emit(std::cout);
-
-                if (!compiler.dump(cc.value("output","a.out")))
-                    return 1;
-                
+                } while (is_interactive);
                 return 0;
             })
 
