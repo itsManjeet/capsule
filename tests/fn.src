@@ -1,0 +1,5 @@
+fn add(a, b) {
+    ret a + b;
+}
+
+add(8,9);

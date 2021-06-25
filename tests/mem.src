@@ -1,0 +1,5 @@
+fn main(ac: i32) -> i32 {
+    let x:i32 = "helllo";
+
+    ret 0;
+}

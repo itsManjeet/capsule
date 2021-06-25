@@ -1,6 +1,6 @@
 #include "lang/lexer.hh"
 #include "lang/parser.hh"
-#include "compiler/compiler.hh"
+#include "interpreter/interpreter.hh"
 
 #include <io.hh>
 #include <cli/cli.hh>
@@ -42,95 +42,69 @@ int main(int ac, char **av)
                          return 0;
                      }))
 
-        .arg(arg::create("output").long_id("output").short_id('o').about("specify output name").required(true))
-
-        .arg(arg::create("lex").long_id("lex").about("perform lexical analysis of input stream"))
-
-        .arg(arg::create("emit-ir").long_id("emit-ir").about("emit llvm itermediate representation"))
-
-        .arg(arg::create("emit-bc").long_id("emit-bc").about("emit bytecode"))
-
-        .arg(arg::create("gcc-flags").long_id("gcc-flags").about("add gcc flags for compilation").required(true))
-
-        .arg(arg::create("target").long_id("target").about("specify target triple").required(true))
+        .arg(arg::create("interactive").long_id("interactive").short_id('i').about("start src in interactive mode"))
 
         .fn([](context const &cc) -> int
             {
-                if (cc.args().size() == 0)
+                using ast = src::lang::ast::block;
+
+                bool is_interactive = cc.checkflag("interactive");
+
+                if (!is_interactive && cc.args().size() == 0)
+                    is_interactive = true;
+
+                auto context = src::interpreter::context();
+
+                do
                 {
-                    io::error("no input file provided");
-                    return 1;
-                }
+                    string input;
 
-                auto filename = cc.args()[0];
-                auto input = readfile(filename);
-
-                iterator start = input.begin(),
-                         end = input.end();
-
-                auto lexer = src::lang::lexer<iterator>(start, end);
-                if (cc.checkflag("lex"))
-                {
-                    io::debug(level::debug, "Lexical Analysis mode on");
-                    int t;
-                    do
+                    if (is_interactive)
                     {
-                        t = lexer.eat_token();
-                        if (t == src::lang::ident)
-                            io::print("[ident:", lexer.ident(), "]");
-                        else if (t == src::lang::number)
-                            io::print("[num:", lexer.num(), "]");
-                        else if (t == src::lang::str)
-                            io::print("[str:", lexer.ident(), "]");
-                        else
-                            io::print("[", src::lang::tokentostr(t), "]");
-                    } while (t != src::lang::eof);
+                        std::cout << ">> ";
+                        if (!getline(std::cin, input))
+                            continue;
+                    }
+                    else
+                        input = readfile(cc.args()[0]);
 
-                    return 0;
-                }
-                auto parser = src::lang::parser<iterator>(lexer);
+                    iterator
+                        start =
+                            input.begin(),
+                        end =
+                            input.end();
 
-                src::lang::ast::root_decls ast;
-
-                try
-                {
-                    ast = parser.parse();
-                }
-                catch (std::runtime_error const &e)
-                {
-                    io::error("Parsing failed ", e.what());
-                    return 0;
-                }
-
-                auto compiler = src::backend::compiler(filename);
-
-                try
-                {
-                    io::debug(level::debug, "visiting ast nodes");
-                    compiler(ast);
-
-                    if (cc.checkflag("emit-ir"))
+                    auto lexer = src::lang::lexer<iterator>(start, end);
+                    auto parser = src::lang::parser(lexer);
+                    auto interpreter = src::interpreter::eval(&context);
+                    ast _ast;
+                    try
                     {
-                        compiler.module_->print(llvm::errs(), nullptr);
-                        return 0;
+                        _ast = parser.parse();
+                        auto value = interpreter(_ast);
+                        if (is_interactive)
+                            io::println(boost::apply_visitor(src::interpreter::printer(), value));
+                    }
+                    catch (src::lang::lexer<iterator>::exception e)
+                    {
+                        io::message(color::RED, "Parsing failed", e.what());
+                        if (!is_interactive)
+                            return 1;
+                    }
+                    catch (src::interpreter::eval::exception e)
+                    {
+                        io::message(color::RED, "InterpreterError", e.what());
+                        if (!is_interactive)
+                            return 1;
+                    }
+                    catch (src::interpreter::context::exception e)
+                    {
+                        io::message(color::RED, "ContextError", e.what());
+                        if (!is_interactive)
+                            return 1;
                     }
 
-                    io::debug(level::debug, "compiling to object file");
-                    std::string objfile = filename+".o";
-                    compiler.compile(objfile, cc.value("target", ""), cc.value("cpu", "generic"), cc.value("features", ""));
-                    if (rlx::utils::exec::command("gcc  " + cc.value("gcc-flags", "") + " " + objfile + " -o " + cc.value("output", "a.out")))
-                    {
-                        io::error("failed to generate executable");
-                        return 1;
-                    }
-                    std::filesystem::remove(objfile);
-                }
-                catch (const std::exception &e)
-                {
-                    std::cerr << e.what() << '\n';
-                    return 1;
-                }
-
+                } while (is_interactive);
                 return 0;
             })
 

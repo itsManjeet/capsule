@@ -2,108 +2,160 @@
 #define __LEXER__
 
 #include <string>
+#include <map>
 #include <rlx.hh>
 #include <utils/utils.hh>
 
 namespace src::lang
 {
     namespace io = rlx::io;
+
+    using std::string;
     using color = rlx::io::color;
     using level = rlx::io::debug_level;
 
-    enum tokentype
+    enum class token : char
     {
-        eof = -1,
+        _EOF,
 
-        if_ = 5,
-        else_,
-        for_,
-        while_,
-        ret,
+        IF,
+        ELSE,
+        FOR,
+        WHILE,
+        RET,
+        BREAK,
+        CONTINUE,
 
-        to,
-        vari,
+        TO,
+        VARI,
 
-        fn,
-        let,
-        use,
-        ptr,
-        ref,
-        struct_,
-        and_,
-        or_,
-        not_,
+        FN,
+        LET,
+        USE,
+        PTR,
+        REF,
+        STRUCT,
+        AND,
+        OR,
+        NOT,
 
-        eq,
-        ne,
-        le,
-        ge,
+        PLUS,
+        MINUS,
+        MUL,
+        DIV,
+        DOT,
+        EQUAL,
 
-        ident,
-        str,
-        number,
+        LPAREN,
+        RPAREN,
+        LBRACK,
+        RBRACK,
+        LBRACE,
+        RBRACE,
+
+        EQ,
+        NE,
+        LT,
+        LE,
+        GT,
+        GE,
+
+        IDENT,
+        STR,
+        NUM,
+
+        COLON,
+        SEMICOLON,
+        COMMA,
+
     };
 
-    inline std::string tokentostr(int t)
+    template <typename E>
+    constexpr typename std::underlying_type<E>::type _T(E e) noexcept
     {
-        switch (t)
-        {
-        case eof:
-            return "EOF";
-        case if_:
-            return "if";
-        case else_:
-            return "else";
-        case for_:
-            return "for";
-
-        case while_:
-            return "while";
-
-        case ret:
-            return "ret";
-        case fn:
-            return "fn";
-        case let:
-            return "let";
-
-        case ptr:
-            return "ptr";
-        case ref:
-            return "ref";
-
-        case struct_:
-            return "struct";
-
-        case and_:
-            return "and";
-        case or_:
-            return "or";
-        case not_:
-            return "not";
-
-        case ident:
-            return "ident";
-        case str:
-            return "str";
-        case number:
-            return "num";
-        default:
-            return std::string(1, (char)t);
-        }
+        return static_cast<typename std::underlying_type<E>::type>(e);
     }
+
     template <typename iterator>
     class lexer
     {
+
+    public:
+        class exception : public std::exception
+        {
+            string _what;
+
+        public:
+            exception(string w)
+                : _what(w)
+            {
+            }
+
+            const char *what()
+            {
+                return _what.c_str();
+            }
+        };
+
     private:
         std::string _ident;
         long _num;
 
         iterator _iter, _start, _end;
 
+        std::map<string, token> keywords = {
+            {"if", token::IF},
+            {"else", token::ELSE},
+            {"for", token::FOR},
+            {"while", token::WHILE},
+            {"ret", token::RET},
+            {"fn", token::FN},
+            {"let", token::LET},
+            {"use", token::USE},
+            {"ptr", token::PTR},
+            {"ref", token::REF},
+            {"struct", token::STRUCT},
+            {"and", token::AND},
+            {"or", token::OR},
+            {"not", token::NOT},
+            {"break", token::BREAK},
+            {"continue", token::CONTINUE},
+        };
+
+        std::map<string, token> symbols = {
+            {"==", token::EQ},
+            {"!=", token::NE},
+            {">=", token::GE},
+            {"<=", token::LE},
+            {"->", token::TO},
+            {"...", token::VARI},
+        };
+
+        std::map<char, token> knowns = {
+            {'+', token::PLUS},
+            {'-', token::MINUS},
+            {'*', token::MUL},
+            {'/', token::DIV},
+            {'.', token::DOT},
+            {'=', token::EQUAL},
+
+            {'(', token::LPAREN},
+            {')', token::RPAREN},
+            {'[', token::LBRACK},
+            {']', token::RBRACK},
+            {'{', token::LBRACE},
+            {'}', token::RBRACE},
+            {'<', token::LT},
+            {'>', token::GT},
+            {':', token::COLON},
+            {';', token::SEMICOLON},
+            {',', token::COMMA},
+        };
+
     public:
-        lexer(iterator start, iterator end)
-            : _iter(start), _start(start), _end(end)
+        lexer(iterator start, iterator end) : _iter(start),
+                                              _start(start),
+                                              _end(end)
         {
         }
 
@@ -114,23 +166,20 @@ namespace src::lang
         {
             int line;
             iterator line_start = get_pos(err_pos, line);
+
             if (err_pos != _end)
             {
                 io::println(get_line(line_start));
 
-                for (; line_start != err_pos; ++line_start)
+                for (; line_start != err_pos - 1; ++line_start)
                     io::print(' ');
 
                 io::println("^");
-                io::error(mesg, color::CYAN, " : ", color::RESET, color::BOLD, color::MAGENTA, " line ", color::RESET, color::BOLD, color::BLUE, line);
             }
             else
-            {
                 io::info("unexpected end of file");
-                io::error(mesg, color::CYAN, " : ", color::RESET, color::BOLD, color::MAGENTA, " line ", color::RESET, color::BOLD, color::BLUE, line);
-            }
 
-            throw std::runtime_error("failed");
+            throw lexer::exception(io::format(mesg, color::CYAN, " : ", color::RESET, color::BOLD, color::MAGENTA, " line ", color::RESET, color::BOLD, color::BLUE, line));
         }
 
         iterator get_pos(iterator err_pos, int &line) const
@@ -177,7 +226,22 @@ namespace src::lang
             return throw_error(mesg, _iter);
         }
 
-        int eat_token()
+        string to_string(token t) const
+        {
+            for (auto const &i : keywords)
+                if (i.second == t)
+                    return i.first;
+            for (auto const &i : symbols)
+                if (i.second == t)
+                    return i.first;
+            for (auto const &i : knowns)
+                if (i.second == t)
+                    return string(1, i.first);
+
+            return string(1, _T(t));
+        }
+
+        token eat_token()
         {
             while (isspace(*_iter))
                 _iter++;
@@ -192,34 +256,10 @@ namespace src::lang
                     ++_iter;
 
                 _ident = std::string(pos, _iter);
-                if (_ident == "if")
-                    return tokentype::if_;
-                if (_ident == "else")
-                    return tokentype::else_;
-                if (_ident == "for")
-                    return tokentype::for_;
-                if (_ident == "ret")
-                    return tokentype::ret;
-                if (_ident == "fn")
-                    return tokentype::fn;
-                if (_ident == "let")
-                    return tokentype::let;
-                if (_ident == "ptr")
-                    return tokentype::ptr;
-                if (_ident == "ref")
-                    return tokentype::ref;
-                if (_ident == "and")
-                    return tokentype::and_;
-                if (_ident == "or")
-                    return tokentype::or_;
-                if (_ident == "not")
-                    return tokentype::not_;
-                if (_ident == "use")
-                    return tokentype::use;
-                if (_ident == "struct")
-                    return tokentype::struct_;
+                if (keywords.find(_ident) != keywords.end())
+                    return keywords[_ident];
 
-                return tokentype::ident;
+                return token::IDENT;
             }
 
             // number ::= [0-9]+
@@ -231,7 +271,7 @@ namespace src::lang
                 } while (isdigit(*_iter));
 
                 _num = std::stol(std::string(pos, _iter));
-                return tokentype::number;
+                return token::NUM;
             }
 
             // str ::= '"' .*? '"'
@@ -251,6 +291,12 @@ namespace src::lang
                             break;
                         case 'r':
                             id += '\r';
+                            break;
+                        case 't':
+                            id += '\r';
+                            break;
+                        case 'a':
+                            id += '\a';
                             break;
                         case '"':
                             id += '\"';
@@ -276,7 +322,7 @@ namespace src::lang
 
                 _ident = id.substr(0, id.length());
                 io::debug(level::trace, "got string ", _ident);
-                return tokentype::str;
+                return token::STR;
             }
 
             auto symbol_match = [&](std::string const &x) -> bool
@@ -292,33 +338,22 @@ namespace src::lang
                 return false;
             };
 
-            if (symbol_match("=="))
-                return tokentype::eq;
-
-            if (symbol_match("!="))
-                return tokentype::ne;
-
-            if (symbol_match(">="))
-                return tokentype::ge;
-
-            if (symbol_match("<="))
-                return tokentype::le;
-
-            if (symbol_match("->"))
-                return tokentype::to;
-
-            if (symbol_match("..."))
-                return tokentype::vari;
+            for (auto const &i : symbols)
+                if (symbol_match(i.first))
+                    return i.second;
 
             if (pos == _end)
             {
                 _iter++;
-                return tokentype::eof;
+                return token::_EOF;
             }
 
             ++_iter;
 
-            return *pos;
+            if (knowns.find(*pos) == knowns.end())
+                throw_error("unknown symbol found");
+
+            return knowns[*pos];
         }
     };
 }
