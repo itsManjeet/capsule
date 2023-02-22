@@ -1,0 +1,5 @@
+let x = 10;
+for x > 0 {
+    let z = "Hello" + "world";
+    set x = x - 1;
+}
