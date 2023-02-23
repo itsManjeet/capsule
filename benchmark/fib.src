@@ -1,0 +1,9 @@
+let fib = fun (n) {
+    if n <= 1 {
+        return n;
+    }
+    gc ();
+    return fib (n-1) + fib (n-2);
+};
+
+println (fib (35));
