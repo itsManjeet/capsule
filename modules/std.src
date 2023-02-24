@@ -1,0 +1,17 @@
+let foreach = fun (container, callback) {
+    let iter = 0;
+    for iter < container.len() {
+        callback (container[iter]);
+        set iter = iter + 1;
+    }
+};
+
+
+list.bind ("foreach", foreach);
+str.bind ("foreach", foreach);
+
+let srclang_run_tests = fun (tests) {
+    println ("TOTAL TESTS: ");
+    println ("RUNNING TESTS: ", tests);
+
+};
