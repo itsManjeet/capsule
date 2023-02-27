@@ -1,0 +1,14 @@
+println (type(10));
+println (type(10.012));
+println (type(true));
+println (type(false));
+println (type("Hello World"));
+println (type('a'));
+println (type(int));
+println (type(float));
+println (type(str));
+println (type(bool));
+println (type(type));
+println (int == float);
+println (int == int);
+println (int == type (10));

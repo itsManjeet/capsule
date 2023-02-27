@@ -1,0 +1,11 @@
+println (10.00);
+println (10.00 + 30.39);
+println (30.95 - 40.29);
+println (40.17 / 13.763);
+println (10.123 == 10.123);
+println (44.050 != 10.374);
+println (19.45 > 405.01);
+println (19.45 < 405.01);
+println (19.45 <= 405.01);
+println (19.45 >= 405.01);
+println (not 29.04);

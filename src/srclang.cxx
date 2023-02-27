@@ -73,16 +73,25 @@ struct Token {
     X(LE)                   \
     X(GT)                   \
     X(GE)                   \
+    X(AND)                  \
+    X(OR)                   \
+    X(LAND)                 \
+    X(LOR)                  \
+    X(LSHIFT)               \
+    X(RSHIFT)               \
+    X(MOD)                  \
     X(BREAK)                \
     X(CONTINUE)             \
     X(FUN)                  \
     X(CALL)                 \
     X(PACK)                 \
     X(INDEX)                \
+    X(SET)                  \
     X(POP)                  \
     X(RET)                  \
     X(JNZ)                  \
     X(JMP)                  \
+    X(IMPL)                 \
     X(HLT)
 
 enum class OpCode : uint8_t {
@@ -776,6 +785,20 @@ struct Compiler {
             return *iter++;
         };
 
+        /// comment ::= '//' (.*) '\n'
+        if (*iter == '/' && *(iter + 1) == '/') {
+            iter += 2;
+            while (*iter != '\n') {
+                if (iter == end) {
+                    peek.type = TokenType::Eof;
+                    return true;
+                }
+                iter++;
+            }
+            iter++;
+            return eat();
+        }
+
         /// string ::= '"' ... '"'
         if (*iter == '"') {
             iter++;
@@ -797,6 +820,7 @@ struct Compiler {
 
         /// char :: '\'' <char> '\''
         if (*iter == '\'') {
+            iter++;
             bool status = true;
             peek.literal = escape(iter, status);
             if (!status) return false;
@@ -806,17 +830,18 @@ struct Compiler {
             }
             iter++;
             peek.type = TokenType::Character;
+            return true;
         }
 
         /// reserved ::=
-        for (string k : {"set", "let", "fun", "native", "return", "if", "else",
-                         "for", "break", "continue", "import", "global",
+        for (string k : {"let", "fun", "native", "return", "if", "else", "for",
+                         "break", "continue", "import", "global", "impl",
 
                          // specical operators
                          "#!", "not",
 
                          // multi char operators
-                         "==", "!=", "<=", ">="}) {
+                         "==", "!=", "<=", ">=", ">>", "<<"}) {
             auto dist = distance(k.begin(), k.end());
             if (equal(iter, iter + dist, k.begin(), k.end()) &&
                 !isalnum(*(iter + dist))) {
@@ -848,7 +873,12 @@ struct Compiler {
         if (isdigit(*iter)) {
             do {
                 iter++;
-            } while (isdigit(*iter) || *iter == '.');
+            } while (isdigit(*iter) || *iter == '.' || *iter == '_');
+            if (*iter == 'b' ||
+                *iter ==
+                    'h') {  // include 'b' for binary and 'h' for hexadecimal
+                iter++;
+            }
             peek.literal = string_view(peek.pos, iter);
             peek.type = TokenType::Number;
             return true;
@@ -857,12 +887,33 @@ struct Compiler {
         return false;
     }
 
+    enum Precedence : int {
+        P_None,
+        P_Assignment,
+        P_Or,
+        P_And,
+        P_Lor,
+        P_Land,
+        P_Equality,
+        P_Comparison,
+        P_Shift,
+        P_Term,
+        P_Factor,
+        P_Unary,
+        P_Call,
+        P_Primary,
+    };
     int precedence(string tok) {
         static map<string, int> _prec = {
-            {":=", 10}, {"=", 10}, {"or", 20}, {"and", 30}, {"==", 40},
-            {"!=", 40}, {">", 50}, {"<", 50},  {">=", 50},  {"<=", 50},
-            {"+", 60},  {"-", 60}, {"*", 70},  {"/", 70},   {"not", 80},
-            {"-", 80},  {"$", 80}, {".", 90},  {"[", 90},   {"(", 90},
+            {":=", P_Assignment}, {"=", P_Assignment},  {"or", P_Or},
+            {"and", P_And},       {"&", P_Land},        {"|", P_Lor},
+            {"==", P_Equality},   {"!=", P_Equality},   {">", P_Comparison},
+            {"<", P_Comparison},  {">=", P_Comparison}, {"<=", P_Comparison},
+            {">>", P_Shift},      {"<<", P_Shift},      {"+", P_Term},
+            {"-", P_Term},        {"*", P_Factor},      {"/", P_Factor},
+            {"%", P_Factor},      {"not", P_Unary},     {"-", P_Unary},
+            {"$", P_Unary},       {".", P_Call},        {"[", P_Call},
+            {"(", P_Call},
         };
         auto i = _prec.find(tok);
         if (i == _prec.end()) {
@@ -871,7 +922,7 @@ struct Compiler {
         return i->second;
     }
 
-    int emit() {}
+    int emit() { return 0; }
 
     template <typename T, typename... Ts>
     int emit(T t, Ts... ts) {
@@ -882,6 +933,12 @@ struct Compiler {
 
     bool number() {
         bool is_float = false;
+        int base = 10;
+        string number_value;
+        if (cur.literal.starts_with("0") && cur.literal.length() > 1) {
+            base = 8;
+            cur.literal = cur.literal.substr(1);
+        }
         for (auto i : cur.literal) {
             if (i == '.') {
                 if (is_float) {
@@ -889,20 +946,34 @@ struct Compiler {
                     return false;
                 }
                 is_float = true;
+            } else if (i == '_') {
+                continue;
+            } else if (i == 'b') {
+                base = 2;
+            } else if (i == 'h') {
+                base = 16;
+            } else {
+                number_value += i;
             }
         }
         Value val;
-        if (is_float) {
-            val = SRCLANG_VALUE_DECIMAL(stod(cur.literal));
-        } else {
-            val = SRCLANG_VALUE_INTEGER(stol(cur.literal));
+        try {
+            if (is_float) {
+                val = SRCLANG_VALUE_DECIMAL(stod(number_value));
+            } else {
+                val = SRCLANG_VALUE_INTEGER(stoi(number_value, 0, base));
+            }
+        } catch (std::invalid_argument const& e) {
+            error("Invalid numerical value " + string(e.what()), cur.pos);
+            return false;
         }
+
         constants.push_back(val);
         emit(OpCode::CONST, constants.size() - 1);
         return expect(TokenType::Number);
     }
 
-    bool identifier() {
+    bool identifier(bool can_assign) {
         auto iter = find(SRCLANG_VALUE_TYPE_ID.begin(),
                          SRCLANG_VALUE_TYPE_ID.end(), cur.literal);
         if (iter != SRCLANG_VALUE_TYPE_ID.end()) {
@@ -915,8 +986,15 @@ struct Compiler {
             error("undefined variable '" + cur.literal + "'", cur.pos);
             return false;
         }
-        emit(OpCode::LOAD, symbol->scope, symbol->index);
-        return eat();
+        if (!eat()) return false;
+
+        if (can_assign && consume("=")) {
+            if (!expression()) return false;
+            emit(OpCode::STORE, symbol->scope, symbol->index);
+        } else {
+            emit(OpCode::LOAD, symbol->scope, symbol->index);
+        }
+        return true;
     }
 
     bool string_() {
@@ -934,7 +1012,7 @@ struct Compiler {
     }
 
     bool unary(OpCode op) {
-        if (!expression(80)) {
+        if (!expression(P_Unary)) {
             return false;
         }
         emit(op);
@@ -1004,11 +1082,35 @@ struct Compiler {
         emit(OpCode::FUN);
         return true;
     }
+
+    /// impl ::= 'impl' <identifier> 'for' <type>
+    bool impl() {
+        if (!check(TokenType::Identifier)) return false;
+        auto id = cur.literal;
+        constants.push_back(SRCLANG_VALUE_STRING(strdup(id.c_str())));
+        emit(OpCode::CONST, constants.size() - 1);
+        if (!identifier(false)) return false;
+
+        if (!expect("for")) return false;
+        ValueType ty;
+
+        try {
+            ty = type(cur.literal);
+            emit(OpCode::LOAD, Symbol::Scope::TYPE, int(ty));
+        } catch (exception const& exc) {
+            error(exc.what(), cur.pos);
+            return false;
+        }
+        if (!eat()) return false;
+        emit(OpCode::IMPL);
+        return true;
+    }
+
     /// list ::= '[' (<expression> % ',') ']'
     bool list() {
         int size = 0;
         while (!consume("]")) {
-            if (!expression(-1)) {
+            if (!expression()) {
                 return false;
             }
             size++;
@@ -1019,13 +1121,13 @@ struct Compiler {
         return true;
     }
 
-    bool prefix() {
+    bool prefix(bool can_assign) {
         if (cur.type == TokenType::Number) {
             return number();
         } else if (cur.type == TokenType::String) {
             return string_();
         } else if (cur.type == TokenType::Identifier) {
-            return identifier();
+            return identifier(can_assign);
         } else if (cur.type == TokenType::Character) {
             return char_();
         } else if (consume("not")) {
@@ -1039,13 +1141,15 @@ struct Compiler {
         } else if (consume("[")) {
             return list();
         } else if (consume("(")) {
-            if (!expression(-1)) {
+            if (!expression()) {
                 return false;
             }
             return consume(")");
         }
 
-        error("Unknown expression type", cur.pos);
+        error(
+            "Unknown expression type '" + SRCLANG_TOKEN_ID[int(cur.type)] + "'",
+            cur.pos);
         return false;
     }
 
@@ -1067,7 +1171,7 @@ struct Compiler {
         int count = 0;
         while (!consume(")")) {
             count++;
-            if (!expression(-1)) {
+            if (!expression()) {
                 return false;
             }
             if (consume(")")) break;
@@ -1078,15 +1182,20 @@ struct Compiler {
     }
 
     /// index ::= <expression> '[' <expession> ']'
-    bool index() {
-        if (!expression(-1)) return false;
+    bool index(bool can_assign) {
+        if (!expression()) return false;
         if (!expect("]")) return false;
-        emit(OpCode::INDEX, 0);
+        if (can_assign && consume("=")) {
+            if (!expression()) return false;
+            emit(OpCode::SET);
+        } else {
+            emit(OpCode::INDEX, 0);
+        }
         return true;
     }
 
     /// subscript ::= <expression> '.' <expression>
-    bool subscript() {
+    bool subscript(bool can_assign) {
         if (!check(TokenType::Identifier)) return false;
 
         auto string_value = SRCLANG_VALUE_STRING(strdup(cur.literal.c_str()));
@@ -1095,16 +1204,27 @@ struct Compiler {
         emit(OpCode::CONST, constants.size() - 1);
         if (!eat()) return false;
 
-        emit(OpCode::INDEX, 0);
+        if (can_assign && consume("=")) {
+            if (!expression()) return false;
+            emit(OpCode::SET);
+        } else {
+            emit(OpCode::INDEX, 0);
+        }
+
         return true;
     }
 
-    bool infix() {
+    bool infix(bool can_assign) {
         static map<string, OpCode> binop = {
-            {"+", OpCode::ADD}, {"-", OpCode::SUB}, {"/", OpCode::DIV},
-            {"*", OpCode::MUL}, {"==", OpCode::EQ}, {"!=", OpCode::NE},
-            {"<", OpCode::LT},  {">", OpCode::GT},  {">=", OpCode::GE},
-            {"<=", OpCode::LE},
+            {"+", OpCode::ADD},     {"-", OpCode::SUB},
+            {"/", OpCode::DIV},     {"*", OpCode::MUL},
+            {"==", OpCode::EQ},     {"!=", OpCode::NE},
+            {"<", OpCode::LT},      {">", OpCode::GT},
+            {">=", OpCode::GE},     {"<=", OpCode::LE},
+            {"and", OpCode::AND},   {"or", OpCode::OR},
+            {"|", OpCode::LOR},     {"&", OpCode::LAND},
+            {">>", OpCode::LSHIFT}, {"<<", OpCode::RSHIFT},
+            {"%", OpCode::MOD},
         };
 
         if (consume("=")) {
@@ -1112,9 +1232,9 @@ struct Compiler {
         } else if (consume("(")) {
             return call();
         } else if (consume(".")) {
-            return subscript();
+            return subscript(can_assign);
         } else if (consume("[")) {
-            return index();
+            return index(can_assign);
         } else if (binop.find(cur.literal) != binop.end()) {
             string op = cur.literal;
             if (!eat()) return false;
@@ -1124,14 +1244,15 @@ struct Compiler {
         error("unexpected infix operation", cur.pos);
         return false;
     }
-    bool expression(int prec) {
-        if (!prefix()) {
+    bool expression(int prec = P_Assignment) {
+        bool can_assign = prec <= 10;
+        if (!prefix(can_assign)) {
             return false;
         }
 
         while ((cur.literal != ";" && cur.literal != "{") &&
                prec < precedence(cur.literal)) {
-            if (!infix()) {
+            if (!infix(can_assign)) {
                 return false;
             }
         }
@@ -1210,9 +1331,8 @@ struct Compiler {
         return expect("]");
     }
 
-    /// set ::= 'set' 'global'? <identifier> '=' <expression>
     /// let ::= 'let' 'global'? <identifier> '=' <expression>
-    bool variable(bool create_new) {
+    bool let() {
         bool is_global = symbol_table->parent == nullptr;
         if (consume("global")) is_global = true;
 
@@ -1223,18 +1343,11 @@ struct Compiler {
         string id = cur.literal;
         auto s = is_global ? global : symbol_table;
         auto symbol = s->resolve(id);
-        if (create_new) {
-            if (symbol.has_value()) {
-                error("Variable already defined '" + id + "'", cur.pos);
-                return false;
-            }
-            symbol = s->define(id);
-        } else {
-            if (!symbol.has_value()) {
-                error("Variable undefined '" + id + "'", cur.pos);
-                return false;
-            }
+        if (symbol.has_value()) {
+            error("Variable already defined '" + id + "'", cur.pos);
+            return false;
         }
+        symbol = s->define(id);
 
         eat();
 
@@ -1242,7 +1355,7 @@ struct Compiler {
             return false;
         }
 
-        if (!expression(-1)) {
+        if (!expression()) {
             return false;
         }
 
@@ -1251,7 +1364,7 @@ struct Compiler {
     }
 
     bool return_() {
-        if (!expression(-1)) {
+        if (!expression()) {
             return false;
         }
         emit(OpCode::RET);
@@ -1287,7 +1400,7 @@ struct Compiler {
     /// loop ::= 'for' <expression> <block>
     bool loop() {
         auto loop_start = inst()->size();
-        if (!expression(-1)) return false;
+        if (!expression()) return false;
 
         auto loop_exit = emit(OpCode::JNZ, 0);
         if (!block()) return false;
@@ -1367,12 +1480,13 @@ struct Compiler {
         emit(OpCode::FUN);
         emit(OpCode::CALL, 0);
         eat();
+        emit(OpCode::POP);
         return true;
     }
 
     /// condition ::= 'if' <expression> <block> (else statement)?
     bool condition() {
-        if (!expression(-1)) {
+        if (!expression()) {
             return false;
         }
         auto false_pos = emit(OpCode::JNZ, 0);
@@ -1398,6 +1512,18 @@ struct Compiler {
 
         return true;
     }
+
+    ValueType type(string literal) {
+        auto type = literal;
+        auto iter = find(SRCLANG_VALUE_TYPE_ID.begin(),
+                         SRCLANG_VALUE_TYPE_ID.end(), type);
+        if (iter == SRCLANG_VALUE_TYPE_ID.end()) {
+            throw runtime_error("Invalid type '" + type + "'");
+        }
+        return SRCLANG_VALUE_AS_TYPE(
+            SRCLANG_VALUE_TYPES[distance(SRCLANG_VALUE_TYPE_ID.begin(), iter)]);
+    };
+
     /// native ::= 'native' <identifier> ( (<type> % ',') ) <type>
     bool native() {
         if (!check(TokenType::Identifier)) return false;
@@ -1413,23 +1539,12 @@ struct Compiler {
 
         if (!eat()) return false;
 
-        auto get_type = [&](string literal) -> ValueType {
-            auto type = literal;
-            auto iter = find(SRCLANG_VALUE_TYPE_ID.begin(),
-                             SRCLANG_VALUE_TYPE_ID.end(), type);
-            if (iter == SRCLANG_VALUE_TYPE_ID.end()) {
-                throw runtime_error("Invalid type '" + type + "'");
-            }
-            return SRCLANG_VALUE_AS_TYPE(SRCLANG_VALUE_TYPES[distance(
-                SRCLANG_VALUE_TYPE_ID.begin(), iter)]);
-        };
-
         if (!expect("(")) return false;
 
         while (!consume(")")) {
             if (!check(TokenType::Identifier)) return false;
             try {
-                types.push_back(get_type(cur.literal));
+                types.push_back(type(cur.literal));
             } catch (runtime_error const& e) {
                 error(e.what(), cur.pos);
                 return false;
@@ -1441,7 +1556,7 @@ struct Compiler {
         }
         if (!check(TokenType::Identifier)) return false;
         try {
-            ret_type = get_type(cur.literal);
+            ret_type = type(cur.literal);
             if (!eat()) return false;
         } catch (runtime_error const& e) {
             error(e.what(), cur.pos);
@@ -1463,10 +1578,8 @@ struct Compiler {
     ///           ::= ';'
     ///           ::= expression ';'
     bool statement() {
-        if (consume("set"))
-            return variable(false);
-        else if (consume("let"))
-            return variable(true);
+        if (consume("let"))
+            return let();
         else if (consume("return"))
             return return_();
         else if (consume(";"))
@@ -1483,13 +1596,15 @@ struct Compiler {
         } else if (consume("continue")) {
             emit(OpCode::CONTINUE, 0);
             return true;
+        } else if (consume("impl")) {
+            return impl();
         } else if (consume("#!")) {
             return compiler_options();
         } else if (consume("native")) {
             return native();
         }
 
-        if (!expression(-1)) {
+        if (!expression()) {
             return false;
         }
         emit(OpCode::POP);
@@ -1663,11 +1778,12 @@ struct Interpreter {
     }
 
     bool unary(Value a, OpCode op) {
+        if (OpCode::NOT == op) {
+            *sp++ = SRCLANG_VALUE_BOOL(is_falsy(a));
+            return true;
+        }
         if (srclang_value_get_type(a) == ValueType::Integer) {
             switch (op) {
-                case OpCode::NOT:
-                    *sp++ = SRCLANG_VALUE_INTEGER(!SRCLANG_VALUE_AS_INTEGER(a));
-                    break;
                 case OpCode::NEG:
                     *sp++ = SRCLANG_VALUE_INTEGER(-SRCLANG_VALUE_AS_INTEGER(a));
                     break;
@@ -1679,10 +1795,10 @@ struct Interpreter {
                         "'");
                     return false;
             }
-        } else if (srclang_value_get_type(a) == ValueType::Boolean) {
+        } else if (srclang_value_get_type(a) == ValueType::Decimal) {
             switch (op) {
-                case OpCode::NOT:
-                    *sp++ = SRCLANG_VALUE_BOOL(!SRCLANG_VALUE_AS_BOOL(a));
+                case OpCode::NEG:
+                    *sp++ = SRCLANG_VALUE_DECIMAL(-SRCLANG_VALUE_AS_DECIMAL(a));
                     break;
                 default:
                     error(
@@ -1733,8 +1849,79 @@ struct Interpreter {
     }
 
     bool binary(Value lhs, Value rhs, OpCode op) {
-        if (SRCLANG_VALUE_IS_INTEGER(lhs)) {
+        if (op == OpCode::NE &&
+            SRCLANG_VALUE_GET_TYPE(lhs) != SRCLANG_VALUE_GET_TYPE(rhs)) {
+            *sp++ = SRCLANG_VALUE_TRUE;
+            return true;
+        }
+
+        auto type = SRCLANG_VALUE_GET_TYPE(lhs);
+
+        if (SRCLANG_VALUE_IS_CHAR(lhs)) {
+            auto a = SRCLANG_VALUE_AS_CHAR(lhs);
+            if (!SRCLANG_VALUE_IS_CHAR(rhs)) {
+                error("can't apply binary operation '" +
+                      SRCLANG_OPCODE_ID[static_cast<int>(op)] + "' for '" +
+                      SRCLANG_VALUE_TYPE_ID[int(SRCLANG_VALUE_GET_TYPE(lhs))] +
+                      "' and '" +
+                      SRCLANG_VALUE_TYPE_ID[int(SRCLANG_VALUE_GET_TYPE(rhs))] +
+                      "'");
+                return false;
+            }
+            auto b = SRCLANG_VALUE_AS_CHAR(rhs);
+            switch (op) {
+                case OpCode::ADD: {
+                    char* buf = new char[2];
+                    buf[0] = a;
+                    buf[1] = b;
+                    *sp++ = SRCLANG_VALUE_STRING(buf);
+                    add_object(*(sp - 1));
+                } break;
+                case OpCode::EQ:
+                    *sp++ = a == b ? SRCLANG_VALUE_TRUE : SRCLANG_VALUE_FALSE;
+                    break;
+                case OpCode::NE:
+                    *sp++ = a != b ? SRCLANG_VALUE_TRUE : SRCLANG_VALUE_FALSE;
+                    break;
+                default:
+                    error("ERROR: unexpected binary operator '" +
+                          SRCLANG_OPCODE_ID[static_cast<int>(op)] + "'");
+                    return false;
+            }
+        } else if (SRCLANG_VALUE_IS_TYPE(lhs)) {
+            auto a = SRCLANG_VALUE_AS_TYPE(lhs);
+            if (!SRCLANG_VALUE_IS_TYPE(rhs)) {
+                error("can't apply binary operation '" +
+                      SRCLANG_OPCODE_ID[static_cast<int>(op)] + "' for '" +
+                      SRCLANG_VALUE_TYPE_ID[int(SRCLANG_VALUE_GET_TYPE(lhs))] +
+                      "' and '" +
+                      SRCLANG_VALUE_TYPE_ID[int(SRCLANG_VALUE_GET_TYPE(rhs))] +
+                      "'");
+                return false;
+            }
+            auto b = SRCLANG_VALUE_AS_TYPE(rhs);
+            switch (op) {
+                case OpCode::EQ:
+                    *sp++ = SRCLANG_VALUE_BOOL(a == b);
+                    break;
+                case OpCode::NE:
+                    *sp++ = SRCLANG_VALUE_BOOL(a != b);
+                    break;
+                    error("ERROR: unexpected binary operator '" +
+                          SRCLANG_OPCODE_ID[static_cast<int>(op)] + "'");
+                    return false;
+            }
+        } else if (SRCLANG_VALUE_IS_INTEGER(lhs)) {
             auto a = SRCLANG_VALUE_AS_INTEGER(lhs);
+            if (!SRCLANG_VALUE_IS_INTEGER(rhs)) {
+                error("can't apply binary operation '" +
+                      SRCLANG_OPCODE_ID[static_cast<int>(op)] + "' for '" +
+                      SRCLANG_VALUE_TYPE_ID[int(SRCLANG_VALUE_GET_TYPE(lhs))] +
+                      "' and '" +
+                      SRCLANG_VALUE_TYPE_ID[int(SRCLANG_VALUE_GET_TYPE(rhs))] +
+                      "'");
+                return false;
+            }
             auto b = SRCLANG_VALUE_AS_INTEGER(rhs);
             switch (op) {
                 case OpCode::ADD:
@@ -1767,44 +1954,50 @@ struct Interpreter {
                 case OpCode::GE:
                     *sp++ = a >= b ? SRCLANG_VALUE_TRUE : SRCLANG_VALUE_FALSE;
                     break;
+                case OpCode::LSHIFT:
+                    *sp++ = SRCLANG_VALUE_INTEGER(a >> b);
+                    break;
+                case OpCode::RSHIFT:
+                    *sp++ = SRCLANG_VALUE_INTEGER(a << b);
+                    break;
+                case OpCode::MOD:
+                    *sp++ = SRCLANG_VALUE_INTEGER(a % b);
+                    break;
+                case OpCode::LOR:
+                    *sp++ = SRCLANG_VALUE_INTEGER(a | b);
+                    break;
+                case OpCode::LAND:
+                    *sp++ = SRCLANG_VALUE_INTEGER(a & b);
+                    break;
                 default:
                     error("ERROR: unexpected binary operator '" +
                           SRCLANG_OPCODE_ID[static_cast<int>(op)] + "'");
                     return false;
             }
-        } else if (SRCLANG_VALUE_IS_CHAR(lhs)) {
-            auto a = SRCLANG_VALUE_AS_CHAR(lhs);
-            auto b = SRCLANG_VALUE_AS_CHAR(rhs);
+        } else if (SRCLANG_VALUE_IS_BOOL(lhs)) {
+            bool a = SRCLANG_VALUE_AS_BOOL(lhs);
+            if (!SRCLANG_VALUE_IS_BOOL(rhs)) {
+                error("can't apply binary operation '" +
+                      SRCLANG_OPCODE_ID[static_cast<int>(op)] + "' for '" +
+                      SRCLANG_VALUE_TYPE_ID[int(SRCLANG_VALUE_GET_TYPE(lhs))] +
+                      "' and '" +
+                      SRCLANG_VALUE_TYPE_ID[int(SRCLANG_VALUE_GET_TYPE(rhs))] +
+                      "'");
+                return false;
+            }
+            bool b = SRCLANG_VALUE_AS_BOOL(rhs);
             switch (op) {
-                case OpCode::ADD:
-                    *sp++ = SRCLANG_VALUE_CHAR(a + b);
-                    break;
-                case OpCode::SUB:
-                    *sp++ = SRCLANG_VALUE_CHAR(a - b);
-                    break;
-                case OpCode::MUL:
-                    *sp++ = SRCLANG_VALUE_CHAR(a * b);
-                    break;
-                case OpCode::DIV:
-                    *sp++ = SRCLANG_VALUE_CHAR(a / b);
-                    break;
                 case OpCode::EQ:
-                    *sp++ = a == b ? SRCLANG_VALUE_TRUE : SRCLANG_VALUE_FALSE;
+                    *sp++ = SRCLANG_VALUE_BOOL(a == b);
                     break;
                 case OpCode::NE:
-                    *sp++ = a != b ? SRCLANG_VALUE_TRUE : SRCLANG_VALUE_FALSE;
+                    *sp++ = SRCLANG_VALUE_BOOL(a != b);
                     break;
-                case OpCode::LT:
-                    *sp++ = a < b ? SRCLANG_VALUE_TRUE : SRCLANG_VALUE_FALSE;
+                case OpCode::AND:
+                    *sp++ = SRCLANG_VALUE_BOOL(a && b);
                     break;
-                case OpCode::LE:
-                    *sp++ = a <= b ? SRCLANG_VALUE_TRUE : SRCLANG_VALUE_FALSE;
-                    break;
-                case OpCode::GT:
-                    *sp++ = a > b ? SRCLANG_VALUE_TRUE : SRCLANG_VALUE_FALSE;
-                    break;
-                case OpCode::GE:
-                    *sp++ = a >= b ? SRCLANG_VALUE_TRUE : SRCLANG_VALUE_FALSE;
+                case OpCode::OR:
+                    *sp++ = SRCLANG_VALUE_BOOL(a || b);
                     break;
                 default:
                     error("ERROR: unexpected binary operator '" +
@@ -1813,6 +2006,15 @@ struct Interpreter {
             }
         } else if (SRCLANG_VALUE_IS_DECIMAL(lhs)) {
             auto a = SRCLANG_VALUE_AS_DECIMAL(lhs);
+            if (!SRCLANG_VALUE_IS_DECIMAL(rhs)) {
+                error("can't apply binary operation '" +
+                      SRCLANG_OPCODE_ID[static_cast<int>(op)] + "' for '" +
+                      SRCLANG_VALUE_TYPE_ID[int(SRCLANG_VALUE_GET_TYPE(lhs))] +
+                      "' and '" +
+                      SRCLANG_VALUE_TYPE_ID[int(SRCLANG_VALUE_GET_TYPE(rhs))] +
+                      "'");
+                return false;
+            }
             auto b = SRCLANG_VALUE_AS_DECIMAL(rhs);
             switch (op) {
                 case OpCode::ADD:
@@ -1853,33 +2055,89 @@ struct Interpreter {
         } else if (srclang_value_get_type(lhs) == ValueType::String) {
             char* a =
                 reinterpret_cast<char*>(SRCLANG_VALUE_AS_OBJECT(lhs)->pointer);
-            string b;
-            if (SRCLANG_VALUE_GET_TYPE(rhs) == ValueType::String) {
-                b = reinterpret_cast<char*>(
-                    SRCLANG_VALUE_AS_OBJECT(rhs)->pointer);
-            } else if (SRCLANG_VALUE_GET_TYPE(rhs) == ValueType::Char) {
-                b = string(1, SRCLANG_VALUE_AS_CHAR(rhs));
-            } else {
-                b = SRCLANG_VALUE_GET_STRING(rhs);
+            if (SRCLANG_VALUE_GET_TYPE(rhs) != ValueType::String) {
+                error("can't apply binary operation '" +
+                      SRCLANG_OPCODE_ID[static_cast<int>(op)] + "' for '" +
+                      SRCLANG_VALUE_TYPE_ID[int(SRCLANG_VALUE_GET_TYPE(lhs))] +
+                      "' and '" +
+                      SRCLANG_VALUE_TYPE_ID[int(SRCLANG_VALUE_GET_TYPE(rhs))] +
+                      "'");
+                return false;
             }
+            char* b =
+                reinterpret_cast<char*>(SRCLANG_VALUE_AS_OBJECT(rhs)->pointer);
 
             switch (op) {
                 case OpCode::ADD: {
-                    int size = strlen(a) + b.length() + 1;
+                    int size = strlen(a) + strlen(b) + 1;
                     char* buf = new char[size];
-                    snprintf(buf, size, "%s%s", a, b.c_str());
+                    snprintf(buf, size, "%s%s", a, b);
                     buf[size] = '\0';
                     auto val = SRCLANG_VALUE_STRING(buf);
                     add_object(val);
                     *sp++ = val;
                 } break;
+                case OpCode::EQ: {
+                    *sp++ = strcmp(a, b) == 0 ? SRCLANG_VALUE_TRUE
+                                              : SRCLANG_VALUE_FALSE;
+                } break;
+                case OpCode::NE: {
+                    *sp++ = strcmp(a, b) != 0 ? SRCLANG_VALUE_TRUE
+                                              : SRCLANG_VALUE_FALSE;
+                } break;
+                case OpCode::GT:
+                    *sp++ = SRCLANG_VALUE_BOOL(strlen(a) > strlen(b));
+                    break;
+                case OpCode::LT:
+                    *sp++ = SRCLANG_VALUE_BOOL(strlen(a) < strlen(b));
+                    break;
                 default:
                     error("ERROR: unexpected binary operator '" +
-                          SRCLANG_OPCODE_ID[static_cast<int>(op)] + "'");
+                          SRCLANG_OPCODE_ID[static_cast<int>(op)] + "' for '" +
+                          SRCLANG_VALUE_TYPE_ID[int(
+                              SRCLANG_VALUE_GET_TYPE(lhs))] +
+                          "'");
+                    return false;
+            }
+        } else if (SRCLANG_VALUE_GET_TYPE(lhs) == ValueType::List) {
+            auto a = reinterpret_cast<SrcLangList*>(
+                SRCLANG_VALUE_AS_OBJECT(lhs)->pointer);
+            if (SRCLANG_VALUE_GET_TYPE(rhs) != ValueType::List) {
+                error("can't apply binary operation '" +
+                      SRCLANG_OPCODE_ID[static_cast<int>(op)] + "' for '" +
+                      SRCLANG_VALUE_TYPE_ID[int(SRCLANG_VALUE_GET_TYPE(lhs))] +
+                      "' and '" +
+                      SRCLANG_VALUE_TYPE_ID[int(SRCLANG_VALUE_GET_TYPE(rhs))] +
+                      "'");
+                return false;
+            }
+
+            auto b = reinterpret_cast<SrcLangList*>(
+                SRCLANG_VALUE_AS_OBJECT(rhs)->pointer);
+            switch (op) {
+                case OpCode::ADD: {
+                    auto c = new SrcLangList(a->begin(), a->end());
+                    c->insert(c->end(), b->begin(), b->end());
+                    *sp++ = SRCLANG_VALUE_LIST(c);
+                    add_object(*(sp - 1));
+                } break;
+                case OpCode::GT:
+                    *sp++ = SRCLANG_VALUE_BOOL(a->size() > b->size());
+                    break;
+                case OpCode::LT:
+                    *sp++ = SRCLANG_VALUE_BOOL(a->size() < b->size());
+                    break;
+                default:
+                    error("ERROR: unexpected binary operator '" +
+                          SRCLANG_OPCODE_ID[static_cast<int>(op)] + "' for '" +
+                          SRCLANG_VALUE_TYPE_ID[int(
+                              SRCLANG_VALUE_GET_TYPE(lhs))] +
+                          "'");
                     return false;
             }
         } else {
-            error("ERROR: unsupported binary operator for type '" +
+            error("ERROR: unsupported binary operator '" +
+                  SRCLANG_OPCODE_ID[int(op)] + "' for type '" +
                   SRCLANG_VALUE_TYPE_ID[static_cast<int>(
                       srclang_value_get_type(lhs))] +
                   "'");
@@ -1929,19 +2187,25 @@ struct Interpreter {
     }
 
     bool call_typecast_int(uint8_t count) {
-        if (count != 1 || !SRCLANG_VALUE_IS_OBJECT(*(sp - count)) ||
-            SRCLANG_VALUE_AS_OBJECT(*(sp - count))->type != ValueType::String) {
+        if (count != 1) {
             error("invalid typecast");
             return false;
         }
         Value val = *(sp - count);
         sp -= count + 1;
-        try {
-            *sp++ = SRCLANG_VALUE_INTEGER(
-                stoi((char*)(SRCLANG_VALUE_AS_OBJECT(val)->pointer)));
-        } catch (...) {
-            error("invalid typecast");
-            return false;
+        if (SRCLANG_VALUE_IS_OBJECT(val) &&
+            SRCLANG_VALUE_AS_OBJECT(val)->type == ValueType::String) {
+            try {
+                *sp++ = SRCLANG_VALUE_INTEGER(
+                    stoi((char*)(SRCLANG_VALUE_AS_OBJECT(val)->pointer)));
+            } catch (...) {
+                error("invalid typecast");
+                return false;
+            }
+        } else if (SRCLANG_VALUE_IS_CHAR(val)) {
+            *sp++ = SRCLANG_VALUE_INTEGER(int(SRCLANG_VALUE_AS_CHAR(val)));
+        } else if (SRCLANG_VALUE_IS_DECIMAL(val)) {
+            *sp++ = SRCLANG_VALUE_INTEGER(int(SRCLANG_VALUE_AS_DECIMAL(val)));
         }
         return true;
     }
@@ -1990,6 +2254,16 @@ struct Interpreter {
         return true;
     }
 
+    bool call_typecast_error(uint8_t count) {
+        string buf;
+        for (auto i = sp - count; i != sp; i++) {
+            buf += srclang_value_print(*i);
+        }
+        sp -= count + 1;
+        *sp++ = SRCLANG_VALUE_ERROR(strdup(buf.c_str()));
+        return true;
+    }
+
     bool call_typecast_bool(uint8_t count) {
         if (count != 1) {
             error("invalid typecast");
@@ -2027,6 +2301,8 @@ struct Interpreter {
                 return call_typecast_bool(count);
             case ValueType::String:
                 return call_typecast_string(count);
+            case ValueType::Error:
+                return call_typecast_error(count);
             // case ValueType::Function:
             //     return call_typecast_function(count);
             default:
@@ -2070,6 +2346,11 @@ struct Interpreter {
                     types[j] = &ffi_type_slong;
 
                 } break;
+                case ValueType::Char: {
+                    values[j] = &(*i);
+                    (*(char*)(values[j])) >>= 3;
+                    types[j] = &ffi_type_uint8;
+                } break;
                 case ValueType::Decimal: {
                     values[j] = &(*i);
                     types[j] = &ffi_type_double;
@@ -2095,6 +2376,9 @@ struct Interpreter {
         switch (native->ret) {
             case ValueType::Boolean:
                 result_value = SRCLANG_VALUE_BOOL(result != 0);
+                break;
+            case ValueType::Char:
+                result_value = SRCLANG_VALUE_CHAR(result);
                 break;
             case ValueType::Integer:
                 result_value = SRCLANG_VALUE_INTEGER(result);
@@ -2173,10 +2457,12 @@ struct Interpreter {
                     cout << "[" << srclang_value_print(*i) << "] ";
                 }
                 cout << endl;
+                cout << ">> ";
                 ByteCode<Byte, Value>::debug(
                     *cur()->fun->instructions.get(), constants,
                     distance(cur()->fun->instructions->begin(), ip()), cout);
-                cout << endl << endl;
+                cout << endl;
+                cin.get();
             }
             auto inst = static_cast<OpCode>(*ip()++);
             switch (inst) {
@@ -2195,7 +2481,14 @@ struct Interpreter {
                 case OpCode::LT:
                 case OpCode::LE:
                 case OpCode::GT:
-                case OpCode::GE: {
+                case OpCode::GE:
+                case OpCode::LSHIFT:
+                case OpCode::RSHIFT:
+                case OpCode::AND:
+                case OpCode::OR:
+                case OpCode::LAND:
+                case OpCode::LOR:
+                case OpCode::MOD: {
                     auto b = *--sp;
                     auto a = *--sp;
                     if (!binary(a, b, inst)) {
@@ -2217,10 +2510,10 @@ struct Interpreter {
 
                     switch (scope) {
                         case Symbol::Scope::LOCAL:
-                            *(cur()->bp + pos) = *--sp;
+                            *(cur()->bp + pos) = *(sp - 1);
                             break;
                         case Symbol::Scope::GLOBAL:
-                            globals[pos] = *--sp;
+                            globals[pos] = *(sp - 1);
                             break;
                     }
                 } break;
@@ -2340,6 +2633,78 @@ struct Interpreter {
                             return false;
                         }
                     }
+                } break;
+
+                case OpCode::SET: {
+                    auto val = *--sp;
+                    auto pos = *--sp;
+                    auto container = *--sp;
+                    if (SRCLANG_VALUE_GET_TYPE(container) ==
+                            ValueType::String &&
+                        SRCLANG_VALUE_GET_TYPE(pos) == ValueType::Integer) {
+                        auto idx = SRCLANG_VALUE_AS_INTEGER(pos);
+                        char* buf =
+                            (char*)SRCLANG_VALUE_AS_OBJECT(container)->pointer;
+                        int size = strlen(buf);
+                        if (idx < 0 || size <= idx) {
+                            error("out of bound");
+                            return false;
+                        }
+                        if (SRCLANG_VALUE_IS_CHAR(val)) {
+                            buf = (char*)realloc(buf, size);
+                            if (buf == nullptr) {
+                                error("out of memory");
+                                return false;
+                            }
+                            buf[idx] = SRCLANG_VALUE_AS_CHAR(val);
+                        } else if (SRCLANG_VALUE_GET_TYPE(val) ==
+                                   ValueType::String) {
+                            char* b =
+                                (char*)SRCLANG_VALUE_AS_OBJECT(val)->pointer;
+                            size_t b_size = strlen(b);
+                            buf = (char*)realloc(buf, size + b_size);
+                            strcat(buf, b);
+                        } else {
+                            error("can't SET '" +
+                                  SRCLANG_VALUE_TYPE_ID[int(
+                                      SRCLANG_VALUE_GET_TYPE(val))] +
+                                  "' to string");
+                            return true;
+                        }
+                    } else if (SRCLANG_VALUE_GET_TYPE(container) ==
+                                   ValueType::List &&
+                               SRCLANG_VALUE_GET_TYPE(pos) ==
+                                   ValueType::Integer) {
+                        auto list = reinterpret_cast<SrcLangList*>(
+                            SRCLANG_VALUE_AS_OBJECT(container)->pointer);
+                        list->at(SRCLANG_VALUE_AS_INTEGER(pos)) = val;
+                    } else {
+                        error("invalid SET operation for '" +
+                              SRCLANG_VALUE_TYPE_ID[int(
+                                  SRCLANG_VALUE_GET_TYPE(container))] +
+                              "' and '" +
+                              SRCLANG_VALUE_TYPE_ID[int(
+                                  SRCLANG_VALUE_GET_TYPE(pos))] +
+                              "'");
+                        return false;
+                    }
+                    *sp++ = container;
+                } break;
+
+                case OpCode::IMPL: {
+                    auto ty = *--sp;
+                    auto val = *--sp;
+                    auto id = *--sp;
+                    if (!SRCLANG_VALUE_IS_TYPE(ty) ||
+                        !(SRCLANG_VALUE_IS_OBJECT(id) &&
+                          SRCLANG_VALUE_AS_OBJECT(id)->type ==
+                              ValueType::String)) {
+                        error("Invalid implementation");
+                        return false;
+                    }
+                    char* property_id = reinterpret_cast<char*>(
+                        SRCLANG_VALUE_AS_OBJECT(id)->pointer);
+                    properites[SRCLANG_VALUE_AS_TYPE(ty)][property_id] = val;
                 } break;
 
                 case OpCode::RET: {
@@ -2530,16 +2895,13 @@ int main(int argc, char** argv) {
     for (auto const& i : builtins) memory_manager.heap.push_back(i);
 
     bool debug = false;
-    bool run_test = false;
     for (int i = 1; i < argc; i++) {
         string arg(argv[i]);
         if (arg[0] == '-') {
             arg = arg.substr(1);
             if (arg == "debug")
                 debug = true;
-            else if (arg == "test") {
-                run_test = true;
-            } else {
+            else {
                 cerr << "ERROR: unknown flag '-" << arg << "'" << endl;
                 return 1;
             }
@@ -2625,42 +2987,4 @@ int main(int argc, char** argv) {
         }
 
     } while (is_interactive);
-
-    if (run_test) {
-        auto debug_info = make_shared<DebugInfo>();
-        debug_info->filename = "<test>";
-        debug_info->position = 0;
-        auto run_tests_fun = symbol_table.store.find("srclang_run_tests");
-        if (run_tests_fun == symbol_table.store.end()) {
-            cerr << "ERROR: no callback for srclang_run_tests()" << endl;
-            return 1;
-        }
-        ByteCode<Byte, Value> bytecode{make_unique<Instructions<Byte>>(),
-                                       constants};
-        int size = 0;
-        bytecode.instructions->emit(debug_info.get(), 0, OpCode::LOAD,
-                                    run_tests_fun->second.scope,
-                                    run_tests_fun->second.index);
-        for (auto const& i : symbol_table.store) {
-            if (i.first.starts_with("Test_") &&
-                i.second.scope == Symbol::Scope::GLOBAL) {
-                bytecode.instructions->emit(debug_info.get(), 0, OpCode::LOAD,
-                                            i.second.scope, i.second.index);
-                size++;
-            }
-        }
-        bytecode.instructions->emit(debug_info.get(), 0, OpCode::PACK, size);
-        bytecode.instructions->emit(debug_info.get(), 0, OpCode::CALL, 1);
-        bytecode.instructions->emit(debug_info.get(), 0, OpCode::HLT);
-        if (debug) {
-            cout << "== TEST ==" << endl;
-            cout << bytecode;
-        }
-        Interpreter<Byte> interpreter{bytecode, globals, debug_info,
-                                      &memory_manager};
-        interpreter.debug = debug;
-        if (!interpreter.run()) {
-            return 1;
-        }
-    }
 }

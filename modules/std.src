@@ -1,17 +1,18 @@
+let tolower = fun (c) {
+    if int(c) >= 65 and int(c) <= 90 {
+        return char(int(c) + 32);
+    }
+    return c;
+};
+
 let foreach = fun (container, callback) {
     let iter = 0;
     for iter < container.len() {
-        callback (container[iter]);
-        set iter = iter + 1;
+        callback (container[iter], iter);
+        iter = iter + 1;
     }
 };
 
+impl foreach for list;
+impl foreach for str;
 
-list.bind ("foreach", foreach);
-str.bind ("foreach", foreach);
-
-let srclang_run_tests = fun (tests) {
-    println ("TOTAL TESTS: ");
-    println ("RUNNING TESTS: ", tests);
-
-};

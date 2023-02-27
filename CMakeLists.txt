@@ -13,3 +13,14 @@ find_library(DL dl REQUIRED)
 add_executable(${PROJECT_NAME} src/srclang.cxx)
 target_link_libraries(${PROJECT_NAME} ffi dl -static -rdynamic)
 # target_compile_definitions(${PROJECT_NAME} PUBLIC -DSRCLANG_GC_DEBUG)
+if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+enable_testing()
+file(GLOB_RECURSE TestFiles "tests/*.src")
+foreach(testFile ${TestFiles})
+    get_filename_component(testName ${testFile} NAME_WE)
+    add_test(NAME ${testName}
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+        COMMAND ./tests/run_test.sh ${testFile})
+endforeach()
+
+endif ()
