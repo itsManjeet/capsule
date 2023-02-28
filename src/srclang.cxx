@@ -504,7 +504,7 @@ template <typename Byte, typename Constant>
 struct ByteCode {
     unique_ptr<Instructions<Byte>> instructions;
     vector<Constant> constants;
-    using Iterator = vector<Constant>::iterator;
+    using Iterator = typename vector<Constant>::iterator;
 
     static int debug(Instructions<Byte> const& instructions,
                      vector<Constant> const& constants, int offset,
@@ -543,6 +543,8 @@ struct ByteCode {
                 int count = instructions[offset++];
                 os << " '" << count << "'";
             } break;
+            default:
+                break;
         }
 
         return offset;
@@ -628,7 +630,7 @@ struct Compiler {
     }
 
     ByteCode<Byte, Value> code() {
-        return ByteCode{move(instructions.back()), constants};
+        return ByteCode<Byte, Value>{move(instructions.back()), constants};
     }
 
     Instructions<Byte>* inst() { return instructions.back().get(); }
@@ -1393,6 +1395,8 @@ struct Compiler {
                 case OpCode::CALL: {
                     i++;
                 } break;
+                default:
+                    break;
             }
         }
     }
@@ -1660,7 +1664,7 @@ const vector<Value> builtins = {
 template <typename Byte>
 struct Interpreter {
     struct Frame {
-        vector<Byte>::iterator ip;
+        typename vector<Byte>::iterator ip;
         Function<Byte, Value>* fun;
         vector<Value>::iterator bp;
     };
@@ -1708,7 +1712,7 @@ struct Interpreter {
     vector<Value>& globals;
     vector<Value>& constants;
     vector<Frame> frames;
-    vector<Frame>::iterator fp;
+    typename vector<Frame>::iterator fp;
     vector<shared_ptr<DebugInfo>> debug_info;
     bool debug;
 
@@ -1758,9 +1762,9 @@ struct Interpreter {
         memory_manager->heap.push_back(val);
     }
 
-    vector<Byte>::iterator& ip() { return (fp - 1)->ip; }
+    typename vector<Byte>::iterator& ip() { return (fp - 1)->ip; }
 
-    vector<Frame>::iterator cur() { return (fp - 1); }
+    typename vector<Frame>::iterator cur() { return (fp - 1); }
 
     void gc() {
 #ifdef SRCLANG_GC_DEBUG
@@ -1907,6 +1911,7 @@ struct Interpreter {
                 case OpCode::NE:
                     *sp++ = SRCLANG_VALUE_BOOL(a != b);
                     break;
+                default:
                     error("ERROR: unexpected binary operator '" +
                           SRCLANG_OPCODE_ID[static_cast<int>(op)] + "'");
                     return false;
@@ -2433,6 +2438,12 @@ struct Interpreter {
                     return call_native(callee, count);
                 case ValueType::Bounded:
                     return call_bounded(callee, count);
+                default:
+                    error("ERROR: can't call object of type '" +
+                          SRCLANG_VALUE_TYPE_ID[static_cast<int>(
+                              srclang_value_get_type(callee))] +
+                          "'");
+                    return false;
             }
         }
         error("ERROR: can't call value of type '" +
@@ -2515,6 +2526,10 @@ struct Interpreter {
                         case Symbol::Scope::GLOBAL:
                             globals[pos] = *(sp - 1);
                             break;
+                        default:
+                            error("Invalid STORE operation on '" +
+                                  SRCLANG_SYMBOL_ID[int(scope)] + "'");
+                            return false;
                     }
                 } break;
 
@@ -2626,6 +2641,8 @@ struct Interpreter {
                                             return "<bounded>";
                                         }));
                                 } break;
+                                default:
+                                    break;
                             }
                             *sp++ = value;
                         } else {
@@ -2768,8 +2785,9 @@ SRCLANG_BUILTIN(len) {
             return SRCLANG_VALUE_INTEGER(
                 ((vector<Value>*)SRCLANG_VALUE_AS_OBJECT(args[0])->pointer)
                     ->size());
+        default:
+            return SRCLANG_VALUE_INTEGER(sizeof(Value));
     }
-    return SRCLANG_VALUE_INTEGER(sizeof(Value));
 }
 
 SRCLANG_BUILTIN(append) {
@@ -2802,8 +2820,13 @@ SRCLANG_BUILTIN(append) {
             }
             return SRCLANG_VALUE_STRING(str);
         } break;
+        default:
+            return SRCLANG_VALUE_ERROR(strdup(
+                ("invalid append operation on '" +
+                 SRCLANG_VALUE_TYPE_ID[int(SRCLANG_VALUE_GET_TYPE(args[0]))] +
+                 "'")
+                    .c_str()));
     }
-    throw runtime_error("invalid append operation");
 }
 
 SRCLANG_BUILTIN(range) {
@@ -2852,8 +2875,13 @@ SRCLANG_BUILTIN(pop) {
             str[len - 1] = '\0';
             return SRCLANG_VALUE_STRING(str);
         } break;
+        default:
+            return SRCLANG_VALUE_ERROR(strdup(
+                ("invalid pop operation on '" +
+                 SRCLANG_VALUE_TYPE_ID[int(SRCLANG_VALUE_GET_TYPE(args[0]))] +
+                 "'")
+                    .c_str()));
     }
-    throw runtime_error("invalid pop operation");
 }
 
 SRCLANG_BUILTIN(bind) {
@@ -2881,6 +2909,15 @@ SRCLANG_BUILTIN(clone) {
                     new SrcLangList(list->begin(), list->end());
                 return SRCLANG_VALUE_LIST(new_list);
             };
+            default:
+                if (SRCLANG_VALUE_IS_OBJECT(args[0])) {
+                    return SRCLANG_VALUE_ERROR(
+                        strdup(("invalid clone operation on '" +
+                                SRCLANG_VALUE_TYPE_ID[int(
+                                    SRCLANG_VALUE_GET_TYPE(args[0]))] +
+                                "'")
+                                   .c_str()));
+                }
         }
     }
     return args[0];
