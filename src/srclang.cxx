@@ -2192,7 +2192,9 @@ struct Interpreter {
         vector<Value> args(sp - count, sp);
         sp -= count + 1;
         try {
-            *sp++ = builtin(args, this);
+            auto result = builtin(args, this);
+            if (SRCLANG_VALUE_IS_OBJECT(result)) add_object(result);
+            *sp++ = result;
         } catch (runtime_error const& e) {
             error(e.what());
             return false;
