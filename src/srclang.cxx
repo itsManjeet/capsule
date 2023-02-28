@@ -19,6 +19,16 @@ using namespace std;
 
 #define SRCLANG_VERSION 20230221
 
+const auto LOGO = R"(
+                       .__                         
+  _____________   ____ |  | _____    ____    ____  
+ /  ___/\_  __ \_/ ___\|  | \__  \  /    \  / ___\ 
+ \___ \  |  | \/\  \___|  |__/ __ \|   |  \/ /_/  >
+/____  > |__|    \___  >____(____  /___|  /\___  / 
+     \/              \/          \/     \//_____/  
+
+)";
+
 using Iterator = string::iterator;
 using Byte = uint8_t;
 
@@ -1714,7 +1724,7 @@ struct Interpreter {
     vector<Frame> frames;
     typename vector<Frame>::iterator fp;
     vector<shared_ptr<DebugInfo>> debug_info;
-    bool debug;
+    bool debug, break_;
 
     void error(string const& mesg) {
         if (debug_info.size() == 0) {
@@ -2473,7 +2483,8 @@ struct Interpreter {
                     *cur()->fun->instructions.get(), constants,
                     distance(cur()->fun->instructions->begin(), ip()), cout);
                 cout << endl;
-                cin.get();
+
+                if (break_) cin.get();
             }
             auto inst = static_cast<OpCode>(*ip()++);
             switch (inst) {
@@ -2932,12 +2943,15 @@ int main(int argc, char** argv) {
     for (auto const& i : builtins) memory_manager.heap.push_back(i);
 
     bool debug = false;
+    bool break_ = false;
     for (int i = 1; i < argc; i++) {
         string arg(argv[i]);
         if (arg[0] == '-') {
             arg = arg.substr(1);
             if (arg == "debug")
                 debug = true;
+            else if (arg == "break")
+                break_ = true;
             else {
                 cerr << "ERROR: unknown flag '-" << arg << "'" << endl;
                 return 1;
@@ -2958,6 +2972,13 @@ int main(int argc, char** argv) {
         input = string((istreambuf_iterator<char>(reader)),
                        (istreambuf_iterator<char>()));
         is_interactive = false;
+    } else {
+        is_interactive = true;
+        cout << LOGO << endl;
+        cout << " * VERSION       : " << SRCLANG_VERSION << endl;
+        cout << " * DOCUMENTATION : https://srclang.rlxos.dev/" << endl;
+        cout << " PRESS [CTRL+C] to exit" << endl;
+        cout << endl;
     }
     vector<Value> globals(20);
     {
@@ -3019,8 +3040,16 @@ int main(int argc, char** argv) {
         interpreter.next_gc =
             std::get<double>(compiler.options["GC_INITIAL_TRIGGER"]);
         interpreter.debug = debug;
+        interpreter.break_ = break_;
         if (!interpreter.run()) {
-            continue;
+            if (is_interactive)
+                continue;
+            else
+                return 1;
+        }
+
+        if (is_interactive) {
+            cout << ":: " << SRCLANG_VALUE_GET_STRING(*interpreter.sp) << endl;
         }
 
     } while (is_interactive);
