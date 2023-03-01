@@ -46,8 +46,8 @@ jobs:
           })
 
      - name: create tag
-      uses: actions/github-script@v6
-      with:
+       uses: actions/github-script@v6
+       with:
         script: |
           github.rest.git.createRef({
             owner: context.repo.owner,
