@@ -44,6 +44,17 @@ jobs:
             ref: 'tags/latest',
             sha: context.sha
           })
+
+     - name: create tag
+      uses: actions/github-script@v6
+      with:
+        script: |
+          github.rest.git.createRef({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            ref: 'refs/tags/latest',
+            sha: context.sha
+          })
       
     - name: Create Release
       id: create_release

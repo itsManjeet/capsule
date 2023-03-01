@@ -1,3 +1,5 @@
+native memcmp(str, str, int) int;
+
 let tolower = fun (c) {
     if int(c) >= 65 and int(c) <= 90 {
         return char(int(c) + 32);
@@ -5,14 +7,64 @@ let tolower = fun (c) {
     return c;
 };
 
+let toupper = fun (c) {
+    if int(c) >= 97 and int(c) <= 122 {
+        return char(int(c) - 32);
+    }
+    return c;
+};
+
+let starts_with = fun (s1, pre) {
+    if s1.len() < pre.len() {
+        return false;
+    }
+
+    return s1[0:pre.len()] == pre;
+};
+impl starts_with for str;
+
+let ends_with = fun (s1, post) {
+    if s1.len() < post.len() {
+        return false;
+    }
+    return s1[s1.len()-post.len():s1.len()] == post;
+};
+impl ends_with for str;
+
 let foreach = fun (container, callback) {
     let iter = 0;
-    for iter < container.len() {
-        callback (container[iter], iter);
+    if (type(container) == map) {
+      let keys = range(container);
+      for iter < keys.len() {
+        callback (keys[iter], container[keys[iter]]);
         iter = iter + 1;
+      }  
+    } else if (type(container) == str or type(container) == list) {
+        for iter < container.len() {
+            callback (container[iter], iter);
+            iter = iter + 1;
+        }
     }
 };
 
 impl foreach for list;
 impl foreach for str;
+impl foreach for map;
+
+let lower = fun (s) {
+    s.foreach (fun (c, i) {
+        s[i] = tolower(c);
+    });
+    return s;
+};
+impl lower for str;
+
+
+let upper = fun (s) {
+    s.foreach (fun (c, i) {
+        s[i] = toupper(c);
+    });
+    return s;
+};
+impl upper for str;
 

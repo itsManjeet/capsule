@@ -1,14 +1,10 @@
 #![SEARCH_PATH("./modules")]
 
 import "std";
-let x = "Hello";
-let lower = fun (s) {
-    s.foreach (fun (c, i) {
-        s[i] = tolower(c);
-    });
-};
 
-impl lower for str;
+let x = {"Hello": "World" + " World"};
+x.World = 10;
 
-
-println(x.lower());
+x.foreach(fun (key, value) {
+    println (key, ":", value);
+});

@@ -95,6 +95,7 @@ struct Token {
     X(FUN)                  \
     X(CALL)                 \
     X(PACK)                 \
+    X(MAP)                  \
     X(INDEX)                \
     X(SET)                  \
     X(POP)                  \
@@ -120,6 +121,7 @@ const vector<string> SRCLANG_OPCODE_ID = {
     X(BUILTIN)                    \
     X(GLOBAL)                     \
     X(LOCAL)                      \
+    X(FREE)                       \
     X(TYPE)
 
 struct Symbol {
@@ -240,7 +242,10 @@ typedef uint64_t Value;
 
 #define SRCLANG_VALUE_LIST(list)                                              \
     SRCLANG_VALUE_HEAP_OBJECT(ValueType::List, (void*)list, ([](void* ptr) {  \
-                                  if (ptr != nullptr) delete[] (char*)ptr;    \
+                                  if (ptr != nullptr) {                       \
+                                      ((SrcLangList*)ptr)->clear();           \
+                                      delete (SrcLangList*)ptr;               \
+                                  }                                           \
                               }),                                             \
                               ([](void* ptr) -> string {                      \
                                   stringstream ss;                            \
@@ -255,6 +260,27 @@ typedef uint64_t Value;
                                   ss << "]";                                  \
                                   return ss.str();                            \
                               }))
+
+#define SRCLANG_VALUE_MAP(map)                                                \
+    SRCLANG_VALUE_HEAP_OBJECT(                                                \
+        ValueType::Map, (void*)map, ([](void* ptr) {                          \
+            if (ptr != nullptr) {                                             \
+                ((SrcLangMap*)ptr)->clear();                                  \
+                delete (SrcLangMap*)ptr;                                      \
+            }                                                                 \
+        }),                                                                   \
+        ([](void* ptr) -> string {                                            \
+            stringstream ss;                                                  \
+            SrcLangMap m = *reinterpret_cast<SrcLangMap*>(ptr);               \
+            ss << "{";                                                        \
+            string sep;                                                       \
+            for (auto i : m) {                                                \
+                ss << sep << i.first << ":" << srclang_value_print(i.second); \
+                sep = ", ";                                                   \
+            }                                                                 \
+            ss << "}";                                                        \
+            return ss.str();                                                  \
+        }))
 
 #define SRCLANG_VALUE_ERROR(err)                  \
     SRCLANG_VALUE_HEAP_OBJECT(                    \
@@ -300,8 +326,9 @@ typedef uint64_t Value;
 #define SRCLANG_VALUE_NULL \
     ((Value)(uint64_t)(SRCLANG_VALUE_QNAN | SRCLANG_VALUE_TAG_NULL))
 
-#define SRCLANG_BUILTIN(id) \
-    Value builtin_##id(vector<Value>& args, Interpreter<Byte>* interpreter)
+#define SRCLANG_BUILTIN(id)                       \
+    Value builtin_##id(vector<Value> const& args, \
+                       Interpreter<Byte>* interpreter)
 
 #define SRCLANG_VALUE_GET_TYPE(val) srclang_value_get_type(val)
 #define SRCLANG_VALUE_GET_STRING(val) srclang_value_print(val)
@@ -325,6 +352,7 @@ typedef uint64_t Value;
                                  SRCLANG_VALUE_TYPE_ID[int(ty)] + "'");
 
 typedef vector<Value> SrcLangList;
+typedef map<string, Value> SrcLangMap;
 static inline double srclang_value_to_decimal(Value value) {
     double num;
     memcpy(&num, &value, sizeof(Value));
@@ -406,6 +434,7 @@ string srclang_value_print(Value val) {
 struct SymbolTable {
     SymbolTable* parent{nullptr};
     map<string, Symbol> store;
+    vector<Symbol> free;
 
     Symbol define(string name) {
         store[name] =
@@ -419,69 +448,32 @@ struct SymbolTable {
         return store[name];
     }
 
+    Symbol define(Symbol other) {
+        free.push_back(other);
+        auto sym = Symbol{other.name, Symbol::FREE, (int)free.size() - 1};
+        store[other.name] = sym;
+        return sym;
+    }
+
     optional<Symbol> resolve(string name) {
         auto iter = store.find(name);
         if (iter != store.end()) {
             return iter->second;
         }
         if (parent != nullptr) {
-            return parent->resolve(name);
+            auto sym = parent->resolve(name);
+            if (sym == nullopt) {
+                return sym;
+            }
+
+            if (sym->scope == Symbol::Scope::GLOBAL ||
+                sym->scope == Symbol::Scope::BUILTIN ||
+                sym->scope == Symbol::Scope::TYPE) {
+                return sym;
+            }
+            return define(*sym);
         }
         return nullopt;
-    }
-};
-
-struct MemoryManager {
-    using Heap = vector<Value>;
-    Heap heap;
-
-    MemoryManager() = default;
-
-    ~MemoryManager() {
-        for (auto i = heap.begin(); i != heap.end(); i++) {
-            if (SRCLANG_VALUE_IS_OBJECT(*i)) {
-                auto obj = SRCLANG_VALUE_AS_OBJECT(*i);
-                obj->destructor(obj->pointer);
-                delete obj;
-            }
-        }
-    }
-
-    void mark(Heap::iterator start, Heap::iterator end) {
-        for (auto i = start; i != end; i++) {
-            if (SRCLANG_VALUE_IS_OBJECT(*i)) {
-                auto obj = SRCLANG_VALUE_AS_OBJECT(*i);
-                obj->marked = true;
-#ifdef SRCLANG_GC_DEBUG
-                cout << "  marked "
-                     << uintptr_t(SRCLANG_VALUE_AS_OBJECT(*i)->pointer) << endl;
-#endif
-                if (obj->type == ValueType::List) {
-                    mark(
-                        reinterpret_cast<vector<Value>*>(obj->pointer)->begin(),
-                        reinterpret_cast<vector<Value>*>(obj->pointer)->end());
-                }
-            }
-        }
-    }
-
-    void sweep() {
-        for (auto i = heap.begin(); i != heap.end(); i++) {
-            if (SRCLANG_VALUE_IS_OBJECT(*i)) {
-                auto obj = SRCLANG_VALUE_AS_OBJECT(*i);
-                if (obj->marked) {
-                    obj->marked = false;
-                } else {
-#ifdef SRCLANG_GC_DEBUG
-                    cout << "   deallocating " << uintptr_t(obj->pointer)
-                         << endl;
-#endif
-                    obj->destructor(obj->pointer);
-                    delete obj;
-                    heap.erase(i);
-                }
-            }
-        }
     }
 };
 
@@ -533,7 +525,8 @@ struct ByteCode {
 
             } break;
             case OpCode::INDEX:
-            case OpCode::PACK: {
+            case OpCode::PACK:
+            case OpCode::MAP: {
                 os << " " << (int)instructions[offset++];
             } break;
             case OpCode::CONTINUE:
@@ -582,9 +575,80 @@ template <typename Byte, typename Constant>
 struct Function {
     FunctionType type;
     unique_ptr<Instructions<Byte>> instructions;
+    vector<Value> free{0};
     int nlocals;
     int nparams;
     shared_ptr<DebugInfo> debug_info;
+};
+
+struct MemoryManager {
+    using Heap = vector<Value>;
+    Heap heap;
+
+    MemoryManager() = default;
+
+    ~MemoryManager() {
+        sweep();
+    }
+    void mark(Value val) {
+        if (SRCLANG_VALUE_IS_OBJECT(val)) {
+            auto obj = SRCLANG_VALUE_AS_OBJECT(val);
+            obj->marked = true;
+#ifdef SRCLANG_GC_DEBUG
+            cout << "  marked "
+                 << uintptr_t(SRCLANG_VALUE_AS_OBJECT(val)->pointer) << "'"
+                 << SRCLANG_VALUE_GET_STRING(val) << "'" << endl;
+#endif
+            if (obj->type == ValueType::List) {
+                mark(reinterpret_cast<vector<Value>*>(obj->pointer)->begin(),
+                     reinterpret_cast<vector<Value>*>(obj->pointer)->end());
+            } else if (obj->type == ValueType::Function) {
+                mark(reinterpret_cast<Function<Byte, Value>*>(obj->pointer)
+                         ->free.begin(),
+                     reinterpret_cast<Function<Byte, Value>*>(obj->pointer)
+                         ->free.end());
+            } else if (obj->type == ValueType::Map) {
+                for (auto i =
+                         reinterpret_cast<SrcLangMap*>(obj->pointer)->begin();
+                     i != reinterpret_cast<SrcLangMap*>(obj->pointer)->end();
+                     i++) {
+                    mark(i->second);
+                }
+            }
+        }
+    }
+
+    void mark(Heap::iterator start, Heap::iterator end) {
+        for (auto i = start; i != end; i++) {
+            mark(*i);
+        }
+    }
+
+    void sweep() {
+        heap.erase(
+            std::remove_if(heap.begin(), heap.end(),
+                           [](auto value) {
+                               if (SRCLANG_VALUE_IS_OBJECT(value)) {
+                                   auto obj = SRCLANG_VALUE_AS_OBJECT(value);
+                                   if (obj->marked) {
+                                       obj->marked = false;
+                                       return false;
+                                   } else {
+#ifdef SRCLANG_GC_DEBUG
+                                       cout << "   deallocating "
+                                            << uintptr_t(obj->pointer) << "'"
+                                            << SRCLANG_VALUE_GET_STRING(value)
+                                            << "'" << endl;
+#endif
+                                       obj->destructor(obj->pointer);
+                                       delete obj;
+                                       return true;
+                                   }
+                               }
+                               return false;
+                           }),
+            heap.end());
+    }
 };
 
 template <typename Byte>
@@ -847,7 +911,7 @@ struct Compiler {
 
         /// reserved ::=
         for (string k : {"let", "fun", "native", "return", "if", "else", "for",
-                         "break", "continue", "import", "global", "impl",
+                         "break", "continue", "import", "global", "impl", "as",
 
                          // specical operators
                          "#!", "not",
@@ -1073,6 +1137,8 @@ struct Compiler {
         debug_info = old_debug_info;
 
         int nlocals = symbol_table->store.size();
+        auto free_symbols = symbol_table->free;
+
         auto fun_instructions = pop_scope();
         if (fun_instructions->last_instruction == OpCode::POP) {
             fun_instructions->pop_back();
@@ -1083,24 +1149,33 @@ struct Compiler {
             fun_instructions->emit(fun_debug_info.get(), line, OpCode::RET);
         }
 
-        auto fun = new Function<Byte, Value>{FunctionType::Function,
-                                             move(fun_instructions), nlocals,
-                                             nparam, fun_debug_info};
+        auto fun = new Function<Byte, Value>{
+            FunctionType::Function, move(fun_instructions), {}, nlocals, nparam,
+            fun_debug_info};
         auto fun_value = SRCLANG_VALUE_FUNCTION(fun);
         memory_manager->heap.push_back(fun_value);
         constants.push_back(fun_value);
 
+        for (auto const& i : free_symbols) {
+            emit(OpCode::LOAD, i.scope, i.index);
+        }
+
         emit(OpCode::CONST, constants.size() - 1);
-        emit(OpCode::FUN);
+        emit(OpCode::FUN, free_symbols.size());
         return true;
     }
 
-    /// impl ::= 'impl' <identifier> 'for' <type>
+    /// impl ::= 'impl' ("as" <string>) <identifier> 'for' <type>
     bool impl() {
-        if (!check(TokenType::Identifier)) return false;
-        auto id = cur.literal;
-        constants.push_back(SRCLANG_VALUE_STRING(strdup(id.c_str())));
-        emit(OpCode::CONST, constants.size() - 1);
+        if (consume("as")) {
+            if (!string_()) return false;
+        } else {
+            if (!check(TokenType::Identifier)) return false;
+            auto id = cur.literal;
+            constants.push_back(SRCLANG_VALUE_STRING(strdup(id.c_str())));
+            emit(OpCode::CONST, constants.size() - 1);
+        }
+
         if (!identifier(false)) return false;
 
         if (!expect("for")) return false;
@@ -1133,6 +1208,21 @@ struct Compiler {
         return true;
     }
 
+    /// map ::= '{' ((<string> ':' <expression>) % ',') '}'
+    bool map_() {
+        int size = 0;
+        while (!consume("}")) {
+            if (!string_()) return false;
+            if (!expect(":")) return false;
+            if (!expression()) return false;
+            size++;
+            if (consume("}")) break;
+            if (!consume(",")) return false;
+        }
+        emit(OpCode::MAP, size);
+        return true;
+    }
+
     bool prefix(bool can_assign) {
         if (cur.type == TokenType::Number) {
             return number();
@@ -1152,6 +1242,8 @@ struct Compiler {
             return function();
         } else if (consume("[")) {
             return list();
+        } else if (consume("{")) {
+            return map_();
         } else if (consume("(")) {
             if (!expression()) {
                 return false;
@@ -1193,15 +1285,20 @@ struct Compiler {
         return true;
     }
 
-    /// index ::= <expression> '[' <expession> ']'
+    /// index ::= <expression> '[' <expession> (':' <expression>)? ']'
     bool index(bool can_assign) {
+        int count = 1;
         if (!expression()) return false;
+        if (consume(":")) {
+            count += 1;
+            if (!expression()) return false;
+        }
         if (!expect("]")) return false;
-        if (can_assign && consume("=")) {
+        if (can_assign && consume("=") && count == 1) {
             if (!expression()) return false;
             emit(OpCode::SET);
         } else {
-            emit(OpCode::INDEX, 0);
+            emit(OpCode::INDEX, count);
         }
         return true;
     }
@@ -1220,7 +1317,7 @@ struct Compiler {
             if (!expression()) return false;
             emit(OpCode::SET);
         } else {
-            emit(OpCode::INDEX, 0);
+            emit(OpCode::INDEX, 1);
         }
 
         return true;
@@ -1484,14 +1581,14 @@ struct Compiler {
                                OpCode::RET);
         }
 
-        auto fun = new Function<Byte, Value>{FunctionType::Function,
-                                             move(instructions), 0, 0,
-                                             compiler.global_debug_info};
+        auto fun = new Function<Byte, Value>{
+            FunctionType::Function,    move(instructions), {}, 0, 0,
+            compiler.global_debug_info};
         auto val = SRCLANG_VALUE_FUNCTION(fun);
         memory_manager->heap.push_back(val);
         constants.push_back(val);
         emit(OpCode::CONST, constants.size() - 1);
-        emit(OpCode::FUN);
+        emit(OpCode::FUN, 0);
         emit(OpCode::CALL, 0);
         eat();
         emit(OpCode::POP);
@@ -1665,7 +1762,7 @@ enum Builtins {
 #undef X
 };
 
-const vector<Value> builtins = {
+vector<Value> builtins = {
 #define X(id) SRCLANG_VALUE_BUILTIN(id),
     SRCLANG_BUILTIN_LIST
 #undef X
@@ -1750,8 +1847,12 @@ struct Interpreter {
         sp = stack.begin();
         fp = frames.begin();
         this->debug_info.push_back(debug_info);
-        auto fun = new Function<Byte, Value>{
-            FunctionType::Function, move(code.instructions), 0, 0, debug_info};
+        auto fun = new Function<Byte, Value>{FunctionType::Function,
+                                             move(code.instructions),
+                                             {},
+                                             0,
+                                             0,
+                                             debug_info};
         fp->fun = move(fun);
         fp->ip = fp->fun->instructions->begin();
         fp->bp = sp;
@@ -1772,7 +1873,7 @@ struct Interpreter {
         memory_manager->heap.push_back(val);
     }
 
-    typename vector<Byte>::iterator& ip() { return (fp - 1)->ip; }
+    constexpr typename vector<Byte>::iterator& ip() { return (fp - 1)->ip; }
 
     typename vector<Frame>::iterator cur() { return (fp - 1); }
 
@@ -1784,6 +1885,7 @@ struct Interpreter {
         memory_manager->mark(stack.begin(), sp);
         memory_manager->mark(globals.begin(), globals.end());
         memory_manager->mark(constants.begin(), constants.end());
+        memory_manager->mark(builtins.begin(), builtins.end());
         memory_manager->sweep();
 #ifdef SRCLANG_GC_DEBUG
         cout << "gc end:" << endl;
@@ -1796,7 +1898,7 @@ struct Interpreter {
             *sp++ = SRCLANG_VALUE_BOOL(is_falsy(a));
             return true;
         }
-        if (srclang_value_get_type(a) == ValueType::Integer) {
+        if (SRCLANG_VALUE_IS_INTEGER(a)) {
             switch (op) {
                 case OpCode::NEG:
                     *sp++ = SRCLANG_VALUE_INTEGER(-SRCLANG_VALUE_AS_INTEGER(a));
@@ -1809,7 +1911,7 @@ struct Interpreter {
                         "'");
                     return false;
             }
-        } else if (srclang_value_get_type(a) == ValueType::Decimal) {
+        } else if (SRCLANG_VALUE_IS_DECIMAL(a)) {
             switch (op) {
                 case OpCode::NEG:
                     *sp++ = SRCLANG_VALUE_DECIMAL(-SRCLANG_VALUE_AS_DECIMAL(a));
@@ -1868,8 +1970,6 @@ struct Interpreter {
             *sp++ = SRCLANG_VALUE_TRUE;
             return true;
         }
-
-        auto type = SRCLANG_VALUE_GET_TYPE(lhs);
 
         if (SRCLANG_VALUE_IS_CHAR(lhs)) {
             auto a = SRCLANG_VALUE_AS_CHAR(lhs);
@@ -2191,12 +2291,12 @@ struct Interpreter {
             reinterpret_cast<Builtin>(SRCLANG_VALUE_AS_OBJECT(callee)->pointer);
         vector<Value> args(sp - count, sp);
         sp -= count + 1;
-        try {
-            auto result = builtin(args, this);
-            if (SRCLANG_VALUE_IS_OBJECT(result)) add_object(result);
-            *sp++ = result;
-        } catch (runtime_error const& e) {
-            error(e.what());
+        auto result = builtin(args, this);
+        if (SRCLANG_VALUE_IS_OBJECT(result)) add_object(result);
+        *sp++ = result;
+        if (SRCLANG_VALUE_IS_OBJECT(result) &&
+            SRCLANG_VALUE_AS_OBJECT(result)->type == ValueType::Error) {
+            error((char*)SRCLANG_VALUE_AS_OBJECT(result)->pointer);
             return false;
         }
 
@@ -2436,6 +2536,30 @@ struct Interpreter {
         return call(count + 1);
     }
 
+    bool get_property(ValueType type, string id, Value container,
+                      Value& value) {
+        if (properites[type].find(id) == properites[type].end()) {
+            error("no property '" + string(id) + "' for type '" +
+                  SRCLANG_VALUE_TYPE_ID[int(type)] + "'");
+            return false;
+        }
+        value = properites[type][id];
+        switch (SRCLANG_VALUE_GET_TYPE(value)) {
+            case ValueType::Function:
+            case ValueType::Builtin:
+            case ValueType::Native:
+            case ValueType::Bounded: {
+                auto bounded_value = new BoundedValue{container, value};
+                value = SRCLANG_VALUE_HEAP_OBJECT(
+                    ValueType::Bounded, bounded_value, ([](void* ptr) {}),
+                    ([](void* ptr) -> string { return "<bounded>"; }));
+            } break;
+            default:
+                break;
+        }
+        return true;
+    }
+
     bool call(uint8_t count) {
         auto callee = *(sp - 1 - count);
         if (SRCLANG_VALUE_IS_TYPE(callee)) {
@@ -2562,6 +2686,9 @@ struct Interpreter {
                         case Symbol::Scope::TYPE:
                             *sp++ = SRCLANG_VALUE_TYPES[pos];
                             break;
+                        case Symbol::Scope::FREE:
+                            *sp++ = cur()->fun->free[pos];
+                            break;
                         default:
                             error("ERROR: can't load value of scope '" +
                                   SRCLANG_SYMBOL_ID[int(scope)] + "'");
@@ -2571,6 +2698,14 @@ struct Interpreter {
                 } break;
 
                 case OpCode::FUN: {
+                    int nfree = *ip()++;
+                    auto fun_value = *--sp;
+                    auto fun = (Function<Byte, Value>*)(SRCLANG_VALUE_AS_OBJECT(
+                                                            fun_value)
+                                                            ->pointer);
+                    fun->free = vector<Value>(sp - nfree, sp);
+                    sp -= nfree;
+                    *sp++ = fun_value;
                 } break;
 
                 case OpCode::CALL: {
@@ -2593,9 +2728,39 @@ struct Interpreter {
                     *sp++ = list_value;
                 } break;
 
+                case OpCode::MAP: {
+                    auto size = *ip()++;
+                    auto map = new SrcLangMap();
+                    for (auto i = sp - (size * 2); i != sp; i += 2) {
+                        map->insert(
+                            {(char*)SRCLANG_VALUE_AS_OBJECT(*(i))->pointer,
+                             *(i + 1)});
+                    }
+                    sp -= (size * 2);
+                    *sp++ = SRCLANG_VALUE_MAP(map);
+                    add_object(*(sp - 1));
+                } break;
+
                 case OpCode::INDEX: {
                     auto count = *ip()++;
-                    auto pos = *--sp;
+                    Value pos, end_idx;
+                    switch (count) {
+                        case 1:
+                            pos = *--sp;
+                            break;
+                        case 2:
+                            end_idx = *--sp;
+                            pos = *--sp;
+                            if (!(SRCLANG_VALUE_IS_INTEGER(pos) &&
+                                  SRCLANG_VALUE_IS_INTEGER(end_idx))) {
+                                error("invalid INDEX for range");
+                                return false;
+                            }
+                            break;
+                        default:
+                            error("invalid INDEX count");
+                            return false;
+                    }
                     auto container = *--sp;
                     if (SRCLANG_VALUE_GET_TYPE(container) ==
                             ValueType::String &&
@@ -2603,13 +2768,41 @@ struct Interpreter {
                         char* buffer =
                             (char*)SRCLANG_VALUE_AS_OBJECT(container)->pointer;
                         int index = SRCLANG_VALUE_AS_INTEGER(pos);
-                        if (strlen(buffer) <= index || index < 0) {
-                            error("ERROR: out-of-index trying to access '" +
-                                  to_string(index) + "' from string of size '" +
-                                  to_string(strlen(buffer)) + "'");
-                            return false;
+                        int len = strlen(buffer);
+                        switch (count) {
+                            case 1: {
+                                if (strlen(buffer) <= index || index < 0) {
+                                    error(
+                                        "ERROR: out-of-index trying to access "
+                                        "'" +
+                                        to_string(index) +
+                                        "' from string of size '" +
+                                        to_string(strlen(buffer)) + "'");
+                                    return false;
+                                }
+                                *sp++ = SRCLANG_VALUE_CHAR(buffer[index]);
+                            } break;
+                            case 2: {
+                                int end = SRCLANG_VALUE_AS_INTEGER(end_idx);
+                                if (index < 0) index = len + index;
+                                if (end < 0) end = len + end;
+                                if (end - index < 0 || end - index >= len) {
+                                    error("Out-of-range");
+                                    return false;
+                                }
+                                char* buf =
+                                    strndup(buffer + index, end - index);
+                                buf[end - index] = '\0';
+                                *sp++ = SRCLANG_VALUE_STRING(buf);
+
+                                add_object(*(sp - 1));
+                            } break;
+                            default:
+                                error(
+                                    "Invalid INDEX range operation for string");
+                                return false;
                         }
-                        *sp++ = SRCLANG_VALUE_CHAR(buffer[index]);
+
                     } else if (SRCLANG_VALUE_GET_TYPE(container) ==
                                    ValueType::List &&
                                SRCLANG_VALUE_GET_TYPE(pos) ==
@@ -2619,43 +2812,67 @@ struct Interpreter {
                                  ->pointer;
 
                         int index = SRCLANG_VALUE_AS_INTEGER(pos);
-                        if (list.size() <= index || index < 0) {
-                            error("out-of-index trying to access '" +
-                                  to_string(index) + "' from list of size '" +
-                                  to_string(list.size()) + "'");
-                            return false;
+                        switch (count) {
+                            case 1:
+                                if (list.size() <= index || index < 0) {
+                                    error("out-of-index trying to access '" +
+                                          to_string(index) +
+                                          "' from list of size '" +
+                                          to_string(list.size()) + "'");
+                                    return false;
+                                }
+                                *sp++ = list[index];
+                                break;
+                            case 2: {
+                                int end = SRCLANG_VALUE_AS_INTEGER(end_idx);
+                                if (index < 0) index = list.size() + index;
+                                if (end < 0) end = list.size() + end;
+                                if (end - index < 0) {
+                                    error("Invalid range value");
+                                    return false;
+                                }
+                                auto values = new SrcLangList(end - index);
+                                for (int i = index; i < end; i++) {
+                                    values->at(i) =
+                                        builtin_clone({list[i]}, this);
+                                }
+                                *sp++ = SRCLANG_VALUE_LIST(values);
+                                add_object(*(sp - 1));
+
+                            } break;
+                            default:
+                                error("Invalid INDEX range operation for list");
+                                return false;
                         }
-                        *sp++ = list[index];
+
+                    } else if (SRCLANG_VALUE_GET_TYPE(container) ==
+                                   ValueType::Map &&
+                               SRCLANG_VALUE_GET_TYPE(pos) ==
+                                   ValueType::String) {
+                        auto map = *reinterpret_cast<SrcLangMap*>(
+                            SRCLANG_VALUE_AS_OBJECT(container)->pointer);
+                        auto buf = reinterpret_cast<char*>(
+                            SRCLANG_VALUE_AS_OBJECT(pos)->pointer);
+                        auto idx = map.find(buf);
+                        if (idx == map.end()) {
+                            auto res = SRCLANG_VALUE_NULL;
+                            if (!get_property(ValueType::Map, buf, container,
+                                              res)) {
+                                return false;
+                            }
+                            *sp++ = res;
+                        } else {
+                            *sp++ = idx->second;
+                        }
                     } else {
                         if (SRCLANG_VALUE_GET_TYPE(pos) == ValueType::String) {
                             auto property =
                                 (char*)(SRCLANG_VALUE_AS_OBJECT(pos)->pointer);
                             auto type_id = SRCLANG_VALUE_GET_TYPE(container);
-                            if (properites[type_id].find(property) ==
-                                properites[type_id].end()) {
-                                error("no property '" + string(property) +
-                                      "' for type '" +
-                                      SRCLANG_VALUE_TYPE_ID[int(type_id)] +
-                                      "'");
+                            Value value = SRCLANG_VALUE_NULL;
+                            if (!get_property(type_id, property, container,
+                                              value)) {
                                 return false;
-                            }
-                            auto value = properites[type_id][property];
-                            switch (SRCLANG_VALUE_GET_TYPE(value)) {
-                                case ValueType::Function:
-                                case ValueType::Builtin:
-                                case ValueType::Native:
-                                case ValueType::Bounded: {
-                                    auto bounded_value =
-                                        new BoundedValue{container, value};
-                                    value = SRCLANG_VALUE_HEAP_OBJECT(
-                                        ValueType::Bounded, bounded_value,
-                                        ([](void* ptr) {}),
-                                        ([](void* ptr) -> string {
-                                            return "<bounded>";
-                                        }));
-                                } break;
-                                default:
-                                    break;
                             }
                             *sp++ = value;
                         } else {
@@ -2708,6 +2925,15 @@ struct Interpreter {
                         auto list = reinterpret_cast<SrcLangList*>(
                             SRCLANG_VALUE_AS_OBJECT(container)->pointer);
                         list->at(SRCLANG_VALUE_AS_INTEGER(pos)) = val;
+                    } else if (SRCLANG_VALUE_GET_TYPE(container) ==
+                                   ValueType::Map &&
+                               SRCLANG_VALUE_GET_TYPE(pos) ==
+                                   ValueType::String) {
+                        auto map = reinterpret_cast<SrcLangMap*>(
+                            SRCLANG_VALUE_AS_OBJECT(container)->pointer);
+                        auto buf = reinterpret_cast<char*>(
+                            SRCLANG_VALUE_AS_OBJECT(pos)->pointer);
+                        map->insert({buf, val});
                     } else {
                         error("invalid SET operation for '" +
                               SRCLANG_VALUE_TYPE_ID[int(
@@ -2783,7 +3009,7 @@ SRCLANG_BUILTIN(println) {
     for (auto const& i : args) {
         cout << srclang_value_print(i);
     }
-    cout << endl;
+    cout << '\n';
     return SRCLANG_VALUE_INTEGER(args.size());
 }
 
@@ -2843,6 +3069,17 @@ SRCLANG_BUILTIN(append) {
 }
 
 SRCLANG_BUILTIN(range) {
+    if (args.size() == 1 && SRCLANG_VALUE_GET_TYPE(args[0]) == ValueType::Map) {
+        auto map = reinterpret_cast<SrcLangMap*>(
+            SRCLANG_VALUE_AS_OBJECT(args[0])->pointer);
+        auto keys = new SrcLangList();
+        for (auto i = map->begin(); i != map->end(); i++) {
+            auto v = SRCLANG_VALUE_STRING(strdup(i->first.c_str()));
+            keys->push_back(v);
+        }
+        auto list = SRCLANG_VALUE_LIST(keys);
+        return list;
+    }
     SRCLANG_CHECK_ARGS_RANGE(1, 3);
     SRCLANG_CHECK_ARGS_TYPE(0, ValueType::Integer);
     int start = 0;
