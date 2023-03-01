@@ -16,18 +16,19 @@ Srclang is a simple and easy-to-learn dynamically typed scripting programming la
 
 Data in srclang can be stored in the following forms.
 
-| Type     | ID       | About                                              | Example                             |
-| -------- | -------- | -------------------------------------------------- | ----------------------------------- |
-| Null     | null_t   | blank memory block                                 | `null`                              |
-| Integer  | int      | Signed Integer −2,147,483,647 -> 2,147,483,647     | `1035`                              |
-| Decimal  | float    | Floating point value in range 1.7E-308 to 1.7E+308 | `10.35`                             |
-| Boolean  | bool     | true or false                                      | `true`                              |
-| String   | string   | Immutable string buffer                            | `"Hello World"`                     |
-| Array    | array    | Mutable list of data                               | `[10, "hey", true]`                 |
+| Type     | ID       | About                                              | Example                      |
+| -------- | -------- | -------------------------------------------------- | ---------------------------- |
+| Null     | null_t   | blank memory block                                 | `null`                       |
+| Integer  | int      | Signed Integer −2,147,483,647 -> 2,147,483,647     | `1035`                       |
+| Decimal  | float    | Floating point value in range 1.7E-308 to 1.7E+308 | `10.35`                      |
+| Boolean  | bool     | true or false                                      | `true`                       |
+| String   | string   | Immutable string buffer                            | `"Hello World"`              |
+| List     | list     | Mutable list of data                               | `[10, "hey", true]`          |
+| Map      | map      | Mutable map of data                                | `{"key": value}`             |
 | Function | function | List of instructions                               | `fun (a, b) { ret a + b; };` |
-| Type     | type     | Holds the information of srclang block type        | `<type int>`                        |
-| Error    | error    | Holds error message                                | `Undefined variable`                |
-| Native   | native   | symbol representing the c function                 | `fun (string, ...) int`   |
+| Type     | type     | Holds the information of srclang block type        | `<type int>`                 |
+| Error    | error    | Holds error message                                | `Undefined variable`         |
+| Native   | native   | symbol representing the c function                 | `fun (string, ...) int`      |
 
 
 ## Flow
@@ -98,8 +99,8 @@ Srclang supports the following operations on data
 | Float     | + - * / == != < > >= <= %  &&  \|\| () |
 | String    | + == != > < [] ()                      |
 | Boolean   | && \|\|  ==  != ()                     |
-| Array     | + == != > < [] ()                      |
-| Map       | + == != > < [] .                       |
+| List      | > < [] ()                              |
+| Map       | []  .                                  |
 | Error     | == != ()                               |
 | Function  | ()                                     |
 | Type      | == != ()                               |
