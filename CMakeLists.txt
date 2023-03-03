@@ -9,9 +9,10 @@ set(POSITION_INDEPENDENT_CODE ON)
 
 find_library(FFI ffi REQUIRED)
 find_library(DL dl REQUIRED)
+find_library(TCC tcc REQUIRED)
 
 add_executable(${PROJECT_NAME} src/srclang.cxx)
-target_link_libraries(${PROJECT_NAME} ffi dl -static -rdynamic)
+target_link_libraries(${PROJECT_NAME} ffi dl tcc -static -rdynamic)
 # target_compile_definitions(${PROJECT_NAME} PUBLIC -DSRCLANG_GC_DEBUG)
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
 enable_testing()

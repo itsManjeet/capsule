@@ -1,5 +1,6 @@
 #include <dlfcn.h>
 #include <ffi.h>
+#include <libtcc.h>
 
 #include <cstring>
 #include <filesystem>
@@ -36,6 +37,7 @@ using Byte = uint8_t;
     X(Reserved)                 \
     X(Character)                \
     X(Identifier)               \
+    X(CString)                  \
     X(String)                   \
     X(Number)                   \
     X(Eof)
@@ -587,9 +589,7 @@ struct MemoryManager {
 
     MemoryManager() = default;
 
-    ~MemoryManager() {
-        sweep();
-    }
+    ~MemoryManager() { sweep(); }
     void mark(Value val) {
         if (SRCLANG_VALUE_IS_OBJECT(val)) {
             auto obj = SRCLANG_VALUE_AS_OBJECT(val);
@@ -673,16 +673,21 @@ struct Compiler {
     vector<string> loaded_imports;
     vector<unique_ptr<Instructions<Byte>>> instructions;
     using OptionType = variant<string, double, bool>;
+    using Options = map<string, OptionType>;
     DebugInfo* debug_info;
     shared_ptr<DebugInfo> global_debug_info;
-    map<string, OptionType> options = {
+    TCCState* state;
+    Options options = {
         {"VERSION", double(SRCLANG_VERSION)},
         {"GC_HEAP_GROW_FACTOR", double(2)},
         {"GC_INITIAL_TRIGGER", double(30)},
         {"SEARCH_PATH", string("/usr/lib/srclang/")},
         {"LOAD_LIBC", true},
         {"LIBC", "libc.so.6"},
+        {"C_LIBRARY", ""},
+        {"C_INCLUDE", ""},
     };
+    string cstring;
 
     Compiler(Iterator start, Iterator end, string filename, SymbolTable* global,
              vector<Value>& constants, MemoryManager* memory_manager)
@@ -891,6 +896,23 @@ struct Compiler {
             iter++;
             peek.type = TokenType::String;
 
+            return true;
+        }
+
+        /// cstring ::= '`' ... '`'
+        if (*iter == '`') {
+            iter++;
+            peek.literal.clear();
+            do {
+                iter++;
+                if (iter == end) {
+                    error("unterminated cstring", cur.pos);
+                    return false;
+                }
+            } while (*iter != '`');
+            peek.type = TokenType::CString;
+            peek.literal = string(peek.pos + 1, iter);
+            *iter++;
             return true;
         }
 
@@ -1434,6 +1456,12 @@ struct Compiler {
         } else if (option_id == "SEARCH_PATH") {
             options[option_id] =
                 get<string>(options[option_id]) + (":" + get<string>(value));
+        } else if (option_id == "C_LIBRARY") {
+            tcc_add_library(state, get<string>(value).c_str());
+        } else if (option_id == "C_LIBRARY_PATH") {
+            tcc_add_library_path(state, get<string>(value).c_str());
+        } else if (option_id == "C_INCLUDE") {
+            tcc_add_include_path(state, get<string>(value).c_str());
         } else {
             options[option_id] = value;
         }
@@ -1713,6 +1741,9 @@ struct Compiler {
             return compiler_options();
         } else if (consume("native")) {
             return native();
+        } else if (cur.type == TokenType::CString) {
+            cstring += cur.literal + "\n";
+            return eat();
         }
 
         if (!expression()) {
@@ -1732,10 +1763,28 @@ struct Compiler {
     }
 
     bool compile() {
+        state = tcc_new();
+        if (state == nullptr) {
+            error("failed to create new tcc state", cur.pos);
+            return false;
+        }
+        tcc_set_output_type(state, TCC_OUTPUT_MEMORY);
+
         if (!program()) {
             return false;
         }
         emit(OpCode::HLT);
+
+        if (tcc_compile_string(state, cstring.data()) == -1) {
+            error("failed to compile c code", cur.pos);
+            return false;
+        }
+
+        if (tcc_relocate(state, TCC_RELOCATE_AUTO) == -1) {
+            error("failed to relocate c code", cur.pos);
+            return false;
+        }
+
         return true;
     }
 };
@@ -1822,6 +1871,7 @@ struct Interpreter {
     typename vector<Frame>::iterator fp;
     vector<shared_ptr<DebugInfo>> debug_info;
     bool debug, break_;
+    TCCState* state;
 
     void error(string const& mesg) {
         if (debug_info.size() == 0) {
@@ -2436,10 +2486,15 @@ struct Interpreter {
                   to_string(count) + "' provided");
             return false;
         }
-        void* handler = dlsym(nullptr, native->id.c_str());
+
+        void* handler = nullptr;
+        handler = tcc_get_symbol(state, native->id.c_str());
         if (handler == nullptr) {
-            error(dlerror());
-            return false;
+            handler = dlsym(nullptr, native->id.c_str());
+            if (handler == nullptr) {
+                error(dlerror());
+                return false;
+            }
         }
 
         ffi_cif cif;
@@ -3272,20 +3327,22 @@ int main(int argc, char** argv) {
             }
         }
 
-        Interpreter<Byte> interpreter{code, globals, compiler.global_debug_info,
-                                      &memory_manager};
+        Interpreter<Byte> interpreter(code, globals, compiler.global_debug_info,
+                                      &memory_manager);
         interpreter.GC_HEAP_GROW_FACTOR =
             std::get<double>(compiler.options["GC_HEAP_GROW_FACTOR"]);
         interpreter.next_gc =
             std::get<double>(compiler.options["GC_INITIAL_TRIGGER"]);
         interpreter.debug = debug;
         interpreter.break_ = break_;
+        interpreter.state = compiler.state;
         if (!interpreter.run()) {
             if (is_interactive)
                 continue;
             else
                 return 1;
         }
+        tcc_delete(compiler.state);
 
         if (is_interactive) {
             cout << ":: " << SRCLANG_VALUE_GET_STRING(*interpreter.sp) << endl;
