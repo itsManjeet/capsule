@@ -1,16 +1,17 @@
 #!/bin/bash
 
-SRCLANG=${SRCLANG:-'./build/srclang'}
-${SRCLANG} ${1} > ${1}.test
+SRCLANG=${1}
+TEST_FILE=${2}
+${SRCLANG} ${TEST_FILE} > ${TEST_FILE}.test
 if [[ $? == 0 ]] ; then
-    outfile=${1}.out
+    outfile=${TEST_FILE}.out
 else
-    outfile=${1}.err
+    outfile=${TEST_FILE}.err
 fi
 
-diff -u "${1}.test" "${outfile}"
+diff -u "${TEST_FILE}.test" "${outfile}"
 if [[ $? != 0 ]] ; then
-    rm ${1}.test
+    rm ${TEST_FILE}.test
     exit 1
 fi
-rm ${1}.test
+rm ${TEST_FILE}.test

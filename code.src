@@ -1,11 +1,1 @@
-`
-#include <stdio.h>
-
-int printstr(char* str) {
-    printf("%s\n", str);
-    return 9;
-}
-`
-
-native printstr(str) int;
-printstr ("Hello World");
+10 * 20 / 30 + 30 * 39 / 29 + 58 - 10;

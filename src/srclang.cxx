@@ -598,7 +598,7 @@ struct MemoryManager {
 
     MemoryManager() = default;
 
-    ~MemoryManager() { sweep(); }
+    ~MemoryManager() { }
 
     void mark(Value val) {
         if (SRCLANG_VALUE_IS_OBJECT(val)) {
@@ -635,29 +635,25 @@ struct MemoryManager {
     }
 
     void sweep() {
-        heap.erase(
-                std::remove_if(heap.begin(), heap.end(),
-                               [](auto value) {
-                                   if (SRCLANG_VALUE_IS_OBJECT(value)) {
-                                       auto obj = SRCLANG_VALUE_AS_OBJECT(value);
-                                       if (obj->marked) {
-                                           obj->marked = false;
-                                           return false;
-                                       } else {
+        for(auto i = heap.begin(); i != heap.end();) {
+            if (SRCLANG_VALUE_IS_OBJECT(*i)) {
+                auto obj = SRCLANG_VALUE_AS_OBJECT(*i);
+                if (obj->marked) {
+                    obj->marked = false;
+                    i++;
+                } else {
 #ifdef SRCLANG_GC_DEBUG
-                                           cout << "   deallocating "
+                    cout << "   deallocating "
                                                 << uintptr_t(obj->pointer) << "'"
                                                 << SRCLANG_VALUE_GET_STRING(value)
                                                 << "'" << endl;
 #endif
-                                           obj->destructor(obj->pointer);
-                                           delete obj;
-                                           return true;
-                                       }
-                                   }
-                                   return false;
-                               }),
-                heap.end());
+                    obj->destructor(obj->pointer);
+                    delete obj;
+                    i = heap.erase(i);
+                }
+            }
+        }
     }
 };
 
@@ -996,8 +992,8 @@ struct Compiler {
         return false;
     }
 
-    enum Precedence : int {
-        P_None,
+    enum Precedence {
+        P_None = 0,
         P_Assignment,
         P_Or,
         P_And,
@@ -1013,8 +1009,8 @@ struct Compiler {
         P_Primary,
     };
 
-    int precedence(string tok) {
-        static map<string, int> _prec = {
+    Precedence precedence(string tok) {
+        static map<string, Precedence> prec = {
                 {":=",  P_Assignment},
                 {"=",   P_Assignment},
                 {"or",  P_Or},
@@ -1041,9 +1037,9 @@ struct Compiler {
                 {"[",   P_Call},
                 {"(",   P_Call},
         };
-        auto i = _prec.find(tok);
-        if (i == _prec.end()) {
-            return -1;
+        auto i = prec.find(tok);
+        if (i == prec.end()) {
+            return P_None;
         }
         return i->second;
     }
@@ -1071,6 +1067,7 @@ struct Compiler {
                     error("multiple floating point detected", cur.pos);
                     return false;
                 }
+                number_value += '.';
                 is_float = true;
             } else if (i == '_') {
                 continue;
@@ -1413,13 +1410,13 @@ struct Compiler {
     }
 
     bool expression(int prec = P_Assignment) {
-        bool can_assign = prec <= 10;
+        bool can_assign = prec <= P_Assignment;
         if (!prefix(can_assign)) {
             return false;
         }
 
         while ((cur.literal != ";" && cur.literal != "{") &&
-               prec < precedence(cur.literal)) {
+               prec <= precedence(cur.literal)) {
             if (!infix(can_assign)) {
                 return false;
             }
@@ -2090,9 +2087,10 @@ struct Interpreter {
             auto b = SRCLANG_VALUE_AS_CHAR(rhs);
             switch (op) {
                 case OpCode::ADD: {
-                    char *buf = new char[2];
+                    char *buf = new char[3];
                     buf[0] = a;
                     buf[1] = b;
+                    buf[2] = '\0';
                     *sp++ = SRCLANG_VALUE_STRING(buf);
                     add_object(*(sp - 1));
                 }
