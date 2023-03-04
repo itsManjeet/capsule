@@ -8,29 +8,44 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(POSITION_INDEPENDENT_CODE ON)
 
 include(GNUInstallDirs)
-find_library(FFI ffi REQUIRED)
-find_library(DL dl REQUIRED)
-
-find_library(LIBTCC tcc)
-find_program(MAKE_EXECUTABLE NAMES gmake make mingw32-make REQUIRED)
 include(ExternalProject)
-if (NOT LIBTCC)
-    ExternalProject_Add(tinycc
-            GIT_REPOSITORY "https://repo.or.cz/tinycc.git"
-            GIT_TAG mob
-            CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix=<INSTALL_DIR>
-            BUILD_COMMAND ${MAKE_EXECUTABLE}
-            INSTALL_COMMAND ${MAKE_EXECUTABLE} install)
-    ExternalProject_Get_Property(tinycc INSTALL_DIR)
-    include_directories(${INSTALL_DIR}/include)
-    link_directories(${INSTALL_DIR}/lib)
-    set(LIBTCC tcc)
-endif ()
+
+set(CMAKE_FIND_LIBRARY_SUFFIXES ".so" ".a")
+find_library(DL dl REQUIRED)
+find_library(FFI ffi)
+find_library(TCC tcc)
+find_program(MAKE_EXECUTABLE NAMES gmake make mingw32-make REQUIRED)
 
 add_executable(${PROJECT_NAME} src/srclang.cxx)
-add_dependencies(${PROJECT_NAME} tinycc)
+if ((NOT FFI) OR (FFI MATCHES ".*\\.so"))
+ExternalProject_Add(libffi
+        SOURCE_DIR ${PROJECT_SOURCE_DIR}/libffi
+        DOWNLOAD_COMMAND cd <SOURCE_DIR> && ./autogen.sh
+        CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix=<INSTALL_DIR>
+        BUILD_COMMAND ${MAKE_EXECUTABLE}
+        INSTALL_COMMAND ${MAKE_EXECUTABLE} install)
+ExternalProject_Get_Property(libffi INSTALL_DIR)
+include_directories(${INSTALL_DIR}/include)
+link_directories(${INSTALL_DIR}/lib)
+set(FFI ${INSTALL_DIR}/lib/libffi.a)
+add_dependencies(${PROJECT_NAME} libffi)
+endif ()
 
-target_link_libraries(${PROJECT_NAME} ${FFI} ${DL} ${LIBTCC} -rdynamic)
+if (NOT TCC)
+ExternalProject_Add(tinycc
+        SOURCE_DIR ${PROJECT_SOURCE_DIR}/libtcc
+        CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix=<INSTALL_DIR>
+        BUILD_COMMAND ${MAKE_EXECUTABLE}
+        INSTALL_COMMAND ${MAKE_EXECUTABLE} install)
+ExternalProject_Get_Property(tinycc INSTALL_DIR)
+include_directories(${INSTALL_DIR}/include)
+link_directories(${INSTALL_DIR}/lib)
+set(LIBTCC ${INSTALL_DIR}/lib/libtcc.a)
+add_dependencies(${PROJECT_NAME} tinycc)
+endif ()
+
+
+target_link_libraries(${PROJECT_NAME} ${FFI} ${DL} ${LIBTCC} -static -rdynamic)
 # target_compile_definitions(${PROJECT_NAME} PUBLIC -DSRCLANG_GC_DEBUG)
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
 enable_testing()

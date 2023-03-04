@@ -13,6 +13,7 @@
     <generated>
       <config projectName="srclang" targetName="tinycc" />
       <config projectName="srclang" targetName="srclang" />
+      <config projectName="srclang" targetName="libffi" />
     </generated>
   </component>
   <component name="CMakeSettings" AUTO_RELOAD="true">
@@ -22,12 +23,8 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="c3289c7c-6c3f-4b49-8e47-c6d3c10cfbd5" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/vcs.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/CMakeLists.txt" beforeDir="false" afterPath="$PROJECT_DIR$/CMakeLists.txt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/code.src" beforeDir="false" afterPath="$PROJECT_DIR$/code.src" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/srclang.cxx" beforeDir="false" afterPath="$PROJECT_DIR$/src/srclang.cxx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/tests/run_test.sh" beforeDir="false" afterPath="$PROJECT_DIR$/tests/run_test.sh" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -76,7 +73,7 @@
     &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
 }</component>
-  <component name="RunManager" selected="CMake Application.srclang">
+  <component name="RunManager" selected="CTest Application.All CTest">
     <configuration default="true" type="CLionExternalRunConfiguration" factoryName="Application" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" PASS_PARENT_ENVS_2="true">
       <method v="2">
         <option name="CLION.EXTERNAL.BUILD" enabled="true" />
@@ -84,6 +81,11 @@
     </configuration>
     <configuration name="srclang" type="CMakeListConfigurationType" factoryName="CMakeListConfigurationFactory" temporary="true">
       <method v="2" />
+    </configuration>
+    <configuration name="libffi" type="CMakeRunConfiguration" factoryName="Application" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" PASS_PARENT_ENVS_2="true" PROJECT_NAME="srclang" TARGET_NAME="libffi" CONFIG_NAME="Debug">
+      <method v="2">
+        <option name="com.jetbrains.cidr.execution.CidrBuildBeforeRunTaskProvider$BuildBeforeRunTask" enabled="true" />
+      </method>
     </configuration>
     <configuration name="srclang" type="CMakeRunConfiguration" factoryName="Application" PROGRAM_PARAMS="./code.src -debug" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" WORKING_DIR="file://$ContentRoot$" PASS_PARENT_ENVS_2="true" PROJECT_NAME="srclang" TARGET_NAME="srclang" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="srclang" RUN_TARGET_NAME="srclang">
       <method v="2">
@@ -102,6 +104,7 @@
       </method>
     </configuration>
     <list>
+      <item itemvalue="CMake Application.libffi" />
       <item itemvalue="CMake Application.srclang" />
       <item itemvalue="CMake Application.tinycc" />
       <item itemvalue="CMake Debug.srclang" />
@@ -126,7 +129,7 @@
       <workItem from="1677857726721" duration="22000" />
       <workItem from="1677857918677" duration="2206000" />
       <workItem from="1677922676665" duration="124000" />
-      <workItem from="1677923486067" duration="1860000" />
+      <workItem from="1677923486067" duration="2896000" />
     </task>
     <servers />
   </component>
