@@ -23,9 +23,12 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="c3289c7c-6c3f-4b49-8e47-c6d3c10cfbd5" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.github/workflows/cmake.yml" beforeDir="false" afterPath="$PROJECT_DIR$/.github/workflows/cmake.yml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/tests/loop.src" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/tests/loop.src.out" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.gitmodules" beforeDir="false" afterPath="$PROJECT_DIR$/.gitmodules" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/code.src" beforeDir="false" afterPath="$PROJECT_DIR$/code.src" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/srclang.cxx" beforeDir="false" afterPath="$PROJECT_DIR$/src/srclang.cxx" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -49,6 +52,9 @@
     <option name="minorVersion" value="3.2" />
   </component>
   <component name="ProjectId" id="2MVdp4feASNvvwXLyn6usFYsMYg" />
+  <component name="ProjectLevelVcsManager">
+    <ConfirmationsSetting value="2" id="Add" />
+  </component>
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
@@ -64,7 +70,7 @@
     &quot;cf.first.check.clang-format&quot;: &quot;false&quot;,
     &quot;cidr.known.project.marker&quot;: &quot;true&quot;,
     &quot;ctest.advertisement.all.test.configuration.is.created&quot;: &quot;true&quot;,
-    &quot;last_opened_file_path&quot;: &quot;/var/home/itsmanjeet/Projects/rlxos&quot;,
+    &quot;last_opened_file_path&quot;: &quot;/var/home/itsmanjeet/Projects/bolt&quot;,
     &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
     &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
     &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
@@ -75,11 +81,6 @@
   }
 }</component>
   <component name="RunManager" selected="CTest Application.All CTest">
-    <configuration default="true" type="CLionExternalRunConfiguration" factoryName="Application" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" PASS_PARENT_ENVS_2="true">
-      <method v="2">
-        <option name="CLION.EXTERNAL.BUILD" enabled="true" />
-      </method>
-    </configuration>
     <configuration name="srclang" type="CMakeListConfigurationType" factoryName="CMakeListConfigurationFactory" temporary="true">
       <method v="2" />
     </configuration>
@@ -130,27 +131,16 @@
       <workItem from="1677857726721" duration="22000" />
       <workItem from="1677857918677" duration="2206000" />
       <workItem from="1677922676665" duration="124000" />
-      <workItem from="1677923486067" duration="2974000" />
+      <workItem from="1677923486067" duration="3619000" />
+      <workItem from="1677939226882" duration="6546000" />
+      <workItem from="1677945795116" duration="1350000" />
+      <workItem from="1677947392372" duration="7000" />
+      <workItem from="1678010631536" duration="4704000" />
+      <workItem from="1678015554182" duration="1220000" />
     </task>
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
     <option name="version" value="3" />
-  </component>
-  <component name="XDebuggerManager">
-    <breakpoint-manager>
-      <breakpoints>
-        <line-breakpoint enabled="true" type="com.jetbrains.cidr.execution.debugger.OCBreakpointType">
-          <url>file://$PROJECT_DIR$/src/srclang.cxx</url>
-          <line>1412</line>
-          <option name="timeStamp" value="1" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" type="com.jetbrains.cidr.execution.debugger.OCBreakpointType">
-          <url>file://$PROJECT_DIR$/src/srclang.cxx</url>
-          <line>1039</line>
-          <option name="timeStamp" value="2" />
-        </line-breakpoint>
-      </breakpoints>
-    </breakpoint-manager>
   </component>
 </project>

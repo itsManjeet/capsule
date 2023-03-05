@@ -9,11 +9,8 @@
 #include <iomanip>
 #include <iostream>
 #include <map>
-#include <memory>
 #include <optional>
-#include <sstream>
 #include <string>
-#include <type_traits>
 #include <variant>
 #include <vector>
 
@@ -105,6 +102,7 @@ struct Token {
     X(RET)                  \
     X(JNZ)                  \
     X(JMP)                  \
+    X(SIZE)                 \
     X(IMPL)                 \
     X(HLT)
 
@@ -598,7 +596,7 @@ struct MemoryManager {
 
     MemoryManager() = default;
 
-    ~MemoryManager() { }
+    ~MemoryManager() {}
 
     void mark(Value val) {
         if (SRCLANG_VALUE_IS_OBJECT(val)) {
@@ -635,7 +633,7 @@ struct MemoryManager {
     }
 
     void sweep() {
-        for(auto i = heap.begin(); i != heap.end();) {
+        for (auto i = heap.begin(); i != heap.end();) {
             if (SRCLANG_VALUE_IS_OBJECT(*i)) {
                 auto obj = SRCLANG_VALUE_AS_OBJECT(*i);
                 if (obj->marked) {
@@ -684,14 +682,15 @@ struct Compiler {
     shared_ptr<DebugInfo> global_debug_info;
     TCCState *state;
     Options options = {
-            {"VERSION",             double(SRCLANG_VERSION)},
-            {"GC_HEAP_GROW_FACTOR", double(2)},
-            {"GC_INITIAL_TRIGGER",  double(30)},
-            {"SEARCH_PATH",         string("/usr/lib/srclang/")},
-            {"LOAD_LIBC",           true},
-            {"LIBC",                "libc.so.6"},
-            {"C_LIBRARY",           ""},
-            {"C_INCLUDE",           ""},
+            {"VERSION",               double(SRCLANG_VERSION)},
+            {"GC_HEAP_GROW_FACTOR",   double(2)},
+            {"GC_INITIAL_TRIGGER",    double(30)},
+            {"SEARCH_PATH",           string("/usr/lib/srclang/")},
+            {"LOAD_LIBC",             true},
+            {"LIBC",                  "libc.so.6"},
+            {"C_LIBRARY",             ""},
+            {"C_INCLUDE",             ""},
+            {"EXPERIMENTAL_FEATURES", false},
     };
     string cstring;
 
@@ -941,6 +940,7 @@ struct Compiler {
         /// reserved ::=
         for (string k: {"let", "fun", "native", "return", "if", "else", "for",
                         "break", "continue", "import", "global", "impl", "as",
+                        "in",
 
                 // specical operators
                         "#!", "not",
@@ -1043,8 +1043,6 @@ struct Compiler {
         }
         return i->second;
     }
-
-    int emit() { return 0; }
 
     template<typename T, typename... Ts>
     int emit(T t, Ts... ts) {
@@ -1546,7 +1544,10 @@ struct Compiler {
         for (int i = loop_start; i < inst()->size();) {
             auto j = OpCode(inst()->at(i++));
             switch (j) {
-                case OpCode::CONST: {
+                case OpCode::JNZ:
+                case OpCode::JMP:
+                case OpCode::CONST:
+                case OpCode::CALL: {
                     i++;
                 }
                     break;
@@ -1555,18 +1556,10 @@ struct Compiler {
                     if (j == to_patch) inst()->at(i++) = pos;
                 }
                     break;
-                case OpCode::JNZ:
-                case OpCode::JMP: {
-                    i++;
-                }
-                    break;
+
                 case OpCode::LOAD:
                 case OpCode::STORE: {
                     i += 2;
-                }
-                    break;
-                case OpCode::CALL: {
-                    i++;
                 }
                     break;
                 default:
@@ -1576,20 +1569,67 @@ struct Compiler {
     }
 
     /// loop ::= 'for' <expression> <block>
+    /// loop ::= 'for' <identifier> 'in' <expression> <block>
     bool loop() {
+        optional<Symbol> count;
+        optional<Symbol> iter;
+        static int loop_iterator = 0;
+        if (cur.type == TokenType::Identifier &&
+            peek.type == TokenType::Reserved &&
+            peek.literal == "in" &&
+            get<bool>(options["EXPERIMENTAL_FEATURES"])) {
+            count = symbol_table->define("__iter_" + to_string(loop_iterator++) + "__");
+            iter = symbol_table->resolve(cur.literal);
+            if (iter == nullopt) iter = symbol_table->define(cur.literal);
+
+            constants.push_back(SRCLANG_VALUE_INTEGER(0));
+            emit(OpCode::CONST, constants.size() - 1);
+            emit(OpCode::STORE, count->scope, count->index);
+            emit(OpCode::POP);
+            if (!eat()) return false;
+            if (!expect("in")) return false;
+        }
+
         auto loop_start = inst()->size();
         if (!expression()) return false;
 
-        auto loop_exit = emit(OpCode::JNZ, 0);
+        int loop_exit;
+
+        if (iter.has_value() &&
+            get<bool>(options["EXPERIMENTAL_FEATURES"])) {
+            emit(OpCode::SIZE);
+            // perform index;
+            emit(OpCode::LOAD, count->scope, count->index);
+            emit(OpCode::GT);
+            loop_exit = emit(OpCode::JNZ, 0);
+
+            emit(OpCode::LOAD, count->scope, count->index);
+            emit(OpCode::INDEX, 1);
+            emit(OpCode::STORE, iter->scope, iter->index);
+            emit(OpCode::POP);
+
+            constants.push_back(SRCLANG_VALUE_INTEGER(1));
+            emit(OpCode::CONST, constants.size() - 1);
+            emit(OpCode::LOAD, count->scope, count->index);
+            emit(OpCode::ADD);
+            emit(OpCode::STORE, count->scope, count->index);
+
+            emit(OpCode::POP);
+        } else {
+            loop_exit = emit(OpCode::JNZ, 0);
+        }
+
+
         if (!block()) return false;
 
         patch_loop(loop_start, OpCode::CONTINUE, loop_start);
 
         emit(OpCode::JMP, loop_start);
-        constants.push_back(SRCLANG_VALUE_NULL);
-        auto after_condition = emit(OpCode::CONST, (int) constants.size() - 1);
+
+        int after_condition = emit(OpCode::CONST_NULL);
 
         inst()->at(loop_exit + 1) = after_condition;
+
         patch_loop(loop_start, OpCode::BREAK, after_condition);
         return true;
     }
@@ -2839,6 +2879,10 @@ struct Interpreter {
                     break;
 
                 case OpCode::POP: {
+                    if (sp == stack.begin()) {
+                        error("Stack-underflow");
+                        return false;
+                    }
                     *--sp;
                 }
                     break;
@@ -3075,6 +3119,27 @@ struct Interpreter {
                         return false;
                     }
                     *sp++ = container;
+                }
+                    break;
+
+                case OpCode::SIZE: {
+                    auto val = *(sp - 1);
+                    if (!SRCLANG_VALUE_IS_OBJECT(val)) {
+                        error("container in loop is not iterable");
+                        return false;
+                    }
+                    auto obj = SRCLANG_VALUE_AS_OBJECT(val);
+                    switch (obj->type) {
+                        case ValueType::String:
+                            *sp++ = SRCLANG_VALUE_INTEGER(strlen((char *) obj->pointer));
+                            break;
+                        case ValueType::List:
+                            *sp++ = SRCLANG_VALUE_INTEGER(((SrcLangList *) obj->pointer)->size());
+                            break;
+                        default:
+                            error("container '" + SRCLANG_VALUE_GET_STRING(val) + "' is not a iterable object");
+                            return false;
+                    }
                 }
                     break;
 
