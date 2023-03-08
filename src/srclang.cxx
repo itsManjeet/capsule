@@ -2828,6 +2828,10 @@ struct Interpreter {
                             *(cur()->bp + pos) = *(sp - 1);
                             break;
                         case Symbol::Scope::GLOBAL:
+                            if (pos >= globals.size()) {
+                                error("GLOBALS SYMBOLS OVERFLOW");
+                                return false;
+                            }
                             globals[pos] = *(sp - 1);
                             break;
                         default:
@@ -3438,7 +3442,7 @@ int main(int argc, char **argv) {
         cout << " PRESS [CTRL+C] to exit" << endl;
         cout << endl;
     }
-    vector<Value> globals(20);
+    vector<Value> globals(125);
     {
         int i = 0;
 #define X(id) symbol_table.define(#id, i++);
@@ -3501,10 +3505,12 @@ int main(int argc, char **argv) {
         interpreter.break_ = break_;
         interpreter.state = compiler.state;
         if (!interpreter.run()) {
-            if (is_interactive)
+            if (is_interactive) {
                 continue;
-            else
+            } else {
+                memory_manager.sweep();
                 return 1;
+            }
         }
         tcc_delete(compiler.state);
 
@@ -3513,4 +3519,5 @@ int main(int argc, char **argv) {
         }
 
     } while (is_interactive);
+    symbol_table.store.clear();
 }
