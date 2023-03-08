@@ -1,4 +1,3 @@
-#![EXPERIMENTAL_FEATURES]
 for i in range (5) {
     println (i);
 }

@@ -1577,8 +1577,7 @@ struct Compiler {
         static int temp_expr_count = 0;
         if (cur.type == TokenType::Identifier &&
             peek.type == TokenType::Reserved &&
-            peek.literal == "in" &&
-            get<bool>(options["EXPERIMENTAL_FEATURES"])) {
+            peek.literal == "in") {
             count = symbol_table->define("__iter_" + to_string(loop_iterator++) + "__");
             temp_expr = symbol_table->define("__temp_expr_" + to_string(temp_expr_count++) + "__");
             iter = symbol_table->resolve(cur.literal);
@@ -1600,8 +1599,7 @@ struct Compiler {
 
         int loop_exit;
 
-        if (iter.has_value() &&
-            get<bool>(options["EXPERIMENTAL_FEATURES"])) {
+        if (iter.has_value()) {
             emit(OpCode::SIZE);
 
             // perform index;
