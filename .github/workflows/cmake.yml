@@ -36,29 +36,13 @@ jobs:
       # See https://cmake.org/cmake/help/latest/manual/ctest.1.html for more detail
       run: ctest -C ${{env.BUILD_TYPE}}
       
-    - name: delete tag
-      continue-on-error: true
-      uses: actions/github-script@v6
+    - uses: dev-drprasad/delete-tag-and-release@v0.2.0
       with:
-        script: |
-          github.rest.git.deleteRef({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            ref: 'tags/latest',
-            sha: context.sha
-          })
+        tag_name: latest #(required) tag name to delete
+        delete_release: true #(optional) default: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: create tag
-      uses: actions/github-script@v6
-      with:
-        script: |
-          github.rest.git.createRef({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            ref: 'refs/tags/latest',
-            sha: context.sha
-          })
-      
     - name: Create Release
       id: create_release
       uses: actions/create-release@v1
