@@ -3,7 +3,8 @@ name: CI
 on:
   push:
     branches: [ "master" ]
-  pull-request:
+  pull_request:
+  workflow_run:
 
 env:
   # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
