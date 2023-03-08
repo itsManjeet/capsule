@@ -1553,7 +1553,8 @@ struct Compiler {
                     break;
                 case OpCode::CONTINUE:
                 case OpCode::BREAK: {
-                    if (j == to_patch) inst()->at(i++) = pos;
+                    if (j == to_patch && inst()->at(i) == 0)
+                        inst()->at(i++) = pos;
                 }
                     break;
 
@@ -1571,14 +1572,15 @@ struct Compiler {
     /// loop ::= 'for' <expression> <block>
     /// loop ::= 'for' <identifier> 'in' <expression> <block>
     bool loop() {
-        optional<Symbol> count;
-        optional<Symbol> iter;
+        optional<Symbol> count, iter, temp_expr;
         static int loop_iterator = 0;
+        static int temp_expr_count = 0;
         if (cur.type == TokenType::Identifier &&
             peek.type == TokenType::Reserved &&
             peek.literal == "in" &&
             get<bool>(options["EXPERIMENTAL_FEATURES"])) {
             count = symbol_table->define("__iter_" + to_string(loop_iterator++) + "__");
+            temp_expr = symbol_table->define("__temp_expr_" + to_string(temp_expr_count++) + "__");
             iter = symbol_table->resolve(cur.literal);
             if (iter == nullopt) iter = symbol_table->define(cur.literal);
 
@@ -1592,17 +1594,22 @@ struct Compiler {
 
         auto loop_start = inst()->size();
         if (!expression()) return false;
+        if (iter.has_value()) {
+            emit(OpCode::STORE, temp_expr->scope, temp_expr->index);
+        }
 
         int loop_exit;
 
         if (iter.has_value() &&
             get<bool>(options["EXPERIMENTAL_FEATURES"])) {
             emit(OpCode::SIZE);
+
             // perform index;
             emit(OpCode::LOAD, count->scope, count->index);
             emit(OpCode::GT);
             loop_exit = emit(OpCode::JNZ, 0);
 
+            emit(OpCode::LOAD, temp_expr->scope, temp_expr->index);
             emit(OpCode::LOAD, count->scope, count->index);
             emit(OpCode::INDEX, 1);
             emit(OpCode::STORE, iter->scope, iter->index);
@@ -1627,6 +1634,7 @@ struct Compiler {
         emit(OpCode::JMP, loop_start);
 
         int after_condition = emit(OpCode::CONST_NULL);
+        emit(OpCode::POP);
 
         inst()->at(loop_exit + 1) = after_condition;
 
@@ -3123,7 +3131,7 @@ struct Interpreter {
                     break;
 
                 case OpCode::SIZE: {
-                    auto val = *(sp - 1);
+                    auto val = *--sp;
                     if (!SRCLANG_VALUE_IS_OBJECT(val)) {
                         error("container in loop is not iterable");
                         return false;
