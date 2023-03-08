@@ -44,25 +44,7 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Create Release
-      id: create_release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Create release with changelog
+      uses: konfer-be/action-create-release-from-tag@v1.0.2
       with:
-        tag_name: latest
-        release_name: latest
-        draft: false
-        prerelease: true
-    
-    - name: Upload Release Asset
-      id: upload-release-asset 
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./build/srclang
-        asset_name: srclang
-        asset_content_type: application/x-executable
-
+        token: ${{ secrets.GITHUB_TOKEN }} # required
