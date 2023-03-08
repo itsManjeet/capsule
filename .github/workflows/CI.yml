@@ -37,14 +37,3 @@ jobs:
       # See https://cmake.org/cmake/help/latest/manual/ctest.1.html for more detail
       run: ctest -C ${{env.BUILD_TYPE}}
       
-    - uses: dev-drprasad/delete-tag-and-release@v0.2.0
-      with:
-        tag_name: latest #(required) tag name to delete
-        delete_release: true #(optional) default: true
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Create release with changelog
-      uses: konfer-be/action-create-release-from-tag@v1.0.2
-      with:
-        token: ${{ secrets.GITHUB_TOKEN }} # required
