@@ -1253,16 +1253,20 @@ struct Compiler {
         return true;
     }
 
-    /// map ::= '{' ((<string> ':' <expression>) % ',') '}'
+    /// map ::= '{' ((<identifier> ':' <expression>) % ',') '}'
     bool map_() {
         int size = 0;
         while (!consume("}")) {
-            if (!string_()) return false;
+            if (!check(TokenType::Identifier)) return false;
+            constants.push_back(SRCLANG_VALUE_STRING(strdup(cur.literal.c_str())));
+            emit(OpCode::CONST, constants.size() - 1);
+            if (!eat()) return false;
+
             if (!expect(":")) return false;
             if (!expression()) return false;
             size++;
             if (consume("}")) break;
-            if (!consume(",")) return false;
+            if (!expect(",")) return false;
         }
         emit(OpCode::MAP, size);
         return true;
