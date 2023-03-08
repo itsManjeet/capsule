@@ -1,0 +1,9 @@
+println({});
+let x = {integer: 103, decimal: 10.34, string: "string", boolean: true, function: fun(a, b) { let c = 23; return a + b + c + 10; }};
+println(x);
+println(x.integer);
+println(x.decimal);
+println(x.string);
+println(x.boolean);
+println(x.function);
+println(x.function(1, 49));
