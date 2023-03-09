@@ -1740,7 +1740,8 @@ struct Compiler {
             }
         }
 
-        auto after_alt_pos = inst()->size();
+        auto after_alt_pos = emit(OpCode::CONST_NULL);
+        emit(OpCode::POP);
         inst()->at(jmp_pos + 1) = after_alt_pos;
 
         return true;
