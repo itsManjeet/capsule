@@ -1,0 +1,77 @@
+import "std";
+
+let Flag = fun (id) {
+    let self = {};
+    self.id = id;
+
+    self.about = "yet another flag";
+    self.About = fun (ab) {
+        self.about = ab;
+        return self;
+    };
+
+    return self;
+};
+
+let New = fun (id) {
+    let self = {};
+    self.id = id;
+
+    self.version = 0.1;
+    self.about = "yet another shit in srclang";
+    self.flags = [];
+
+    self.Help = fun (ctxt) {
+        println (self.id, " - ", self.version);
+        println (self.about);
+
+        if self.flags.len() > 0 {
+            println ("flags:");
+            self.flags.foreach (fun (value, idx) {
+                    println ("  -", value.id, " : ", value.about);
+            });
+        }
+
+        return 0;
+    };
+
+    self.handler = self.Help;
+
+    self.Version = fun (ver) {
+        self.version = ver;
+        return self;
+    };
+
+    self.About = fun (ab) {
+        self.about = ab;
+        return self;
+    };
+
+    self.Handler = fun (h) {
+        self.handler = h;
+        return self;
+    };
+
+    self.Run = fun (args) {
+        let ctxt = {};
+
+        ctxt.args = [];
+        let task = null;
+
+        for arg in args {
+
+        }
+
+        if task == null {
+            task = self.handler;
+        }
+        return task(ctxt);
+    };
+
+    self.Flag = fun (fl) {
+        append(self.flags, fl);
+        return self;
+    };
+
+    return self;
+};

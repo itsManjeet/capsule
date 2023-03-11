@@ -333,6 +333,7 @@ typedef uint64_t Value;
 
 #define SRCLANG_VALUE_GET_TYPE(val) srclang_value_get_type(val)
 #define SRCLANG_VALUE_GET_STRING(val) srclang_value_print(val)
+#define SRCLANG_VALUE_DEBUG(val) SRCLANG_VALUE_GET_STRING(val) + ":" + SRCLANG_VALUE_TYPE_ID[(int)SRCLANG_VALUE_GET_TYPE(val)]
 
 #define SRCLANG_CHECK_ARGS_EXACT(count)                                    \
     if (args.size() != count)                                              \
@@ -445,19 +446,19 @@ struct SymbolTable {
         return store[name];
     }
 
-    Symbol define(string name, int index) {
+    Symbol define(const string& name, int index) {
         store[name] = Symbol{name, Symbol::BUILTIN, index};
         return store[name];
     }
 
-    Symbol define(Symbol other) {
+    Symbol define(const Symbol& other) {
         free.push_back(other);
         auto sym = Symbol{other.name, Symbol::FREE, (int) free.size() - 1};
         store[other.name] = sym;
         return sym;
     }
 
-    optional<Symbol> resolve(string name) {
+    optional<Symbol> resolve(const string& name) {
         auto iter = store.find(name);
         if (iter != store.end()) {
             return iter->second;
@@ -482,14 +483,14 @@ struct SymbolTable {
 struct DebugInfo {
     string filename;
     vector<int> lines;
-    int position;
+    int position{};
 };
 
 template<typename Byte>
 struct Instructions : vector<Byte> {
     Instructions() = default;
 
-    OpCode last_instruction;
+    OpCode last_instruction{};
 
     size_t emit(DebugInfo *debug_info, int line) { return 0; }
 
@@ -522,14 +523,15 @@ struct ByteCode {
                 int pos = instructions[offset++];
                 if (constants.size() > 0) {
                     os << " " << pos << " '"
-                       << srclang_value_print(constants[pos]) << "'";
+                       << SRCLANG_VALUE_DEBUG(constants[pos]) << "'";
                 }
 
             }
                 break;
             case OpCode::INDEX:
             case OpCode::PACK:
-            case OpCode::MAP: {
+            case OpCode::MAP:
+            case OpCode::FUN: {
                 os << " " << (int) instructions[offset++];
             }
                 break;
@@ -570,7 +572,7 @@ struct ByteCode {
         }
         os << "\n== CONSTANTS ==" << endl;
         for (auto i = 0; i < bytecode.constants.size(); i++) {
-            os << i << " " << srclang_value_print(bytecode.constants[i])
+            os << i << " " << SRCLANG_VALUE_DEBUG(bytecode.constants[i])
                << endl;
         }
         return os;
@@ -582,12 +584,12 @@ enum class FunctionType {
 };
 template<typename Byte, typename Constant>
 struct Function {
-    FunctionType type;
-    unique_ptr<Instructions<Byte>> instructions;
+    FunctionType type{FunctionType::Function};
+    unique_ptr<Instructions<Byte>> instructions{nullptr};
     vector<Value> free{0};
-    int nlocals;
-    int nparams;
-    shared_ptr<DebugInfo> debug_info;
+    int nlocals{0};
+    int nparams{0};
+    shared_ptr<DebugInfo> debug_info{nullptr};
 };
 
 struct MemoryManager {
@@ -596,7 +598,7 @@ struct MemoryManager {
 
     MemoryManager() = default;
 
-    ~MemoryManager() {}
+    ~MemoryManager() = default;
 
     void mark(Value val) {
         if (SRCLANG_VALUE_IS_OBJECT(val)) {
@@ -616,11 +618,8 @@ struct MemoryManager {
                      reinterpret_cast<Function<Byte, Value> *>(obj->pointer)
                              ->free.end());
             } else if (obj->type == ValueType::Map) {
-                for (auto i =
-                        reinterpret_cast<SrcLangMap *>(obj->pointer)->begin();
-                     i != reinterpret_cast<SrcLangMap *>(obj->pointer)->end();
-                     i++) {
-                    mark(i->second);
+                for (auto & i : *reinterpret_cast<SrcLangMap *>(obj->pointer)) {
+                    mark(i.second);
                 }
             }
         }
@@ -676,15 +675,15 @@ struct Compiler {
     vector<Value> &constants;
     vector<string> loaded_imports;
     vector<unique_ptr<Instructions<Byte>>> instructions;
-    using OptionType = variant<string, double, bool>;
+    using OptionType = variant<string, int, double, bool>;
     using Options = map<string, OptionType>;
     DebugInfo *debug_info;
     shared_ptr<DebugInfo> global_debug_info;
     TCCState *state;
     Options options = {
-            {"VERSION",               double(SRCLANG_VERSION)},
-            {"GC_HEAP_GROW_FACTOR",   double(2)},
-            {"GC_INITIAL_TRIGGER",    double(30)},
+            {"VERSION",               SRCLANG_VERSION},
+            {"GC_HEAP_GROW_FACTOR",   2},
+            {"GC_INITIAL_TRIGGER",    30},
             {"SEARCH_PATH",           string("/usr/lib/srclang/")},
             {"LOAD_LIBC",             true},
             {"LIBC",                  "libc.so.6"},
@@ -692,9 +691,9 @@ struct Compiler {
             {"C_INCLUDE",             ""},
             {"EXPERIMENTAL_FEATURES", false},
     };
-    string cstring;
+    string cstring{""};
 
-    Compiler(Iterator start, Iterator end, string filename, SymbolTable *global,
+    Compiler(Iterator start, Iterator end, const string& filename, SymbolTable *global,
              vector<Value> &constants, MemoryManager *memory_manager)
             : iter{start},
               start{start},
@@ -703,7 +702,8 @@ struct Compiler {
               global{global},
               symbol_table{global},
               filename{filename},
-              memory_manager{memory_manager} {
+              memory_manager{memory_manager},
+              state{nullptr} {
         global_debug_info = make_shared<DebugInfo>();
         global_debug_info->filename = filename;
         global_debug_info->position = 0;
@@ -714,7 +714,7 @@ struct Compiler {
     }
 
     ByteCode<Byte, Value> code() {
-        return ByteCode<Byte, Value>{move(instructions.back()), constants};
+        return ByteCode<Byte, Value>{std::move(instructions.back()), constants};
     }
 
     Instructions<Byte> *inst() { return instructions.back().get(); }
@@ -728,9 +728,9 @@ struct Compiler {
         auto old = symbol_table;
         symbol_table = symbol_table->parent;
         delete old;
-        auto res = move(instructions.back());
+        auto res = std::move(instructions.back());
         instructions.pop_back();
-        return move(res);
+        return std::move(res);
     }
 
     template<typename Message>
@@ -773,7 +773,7 @@ struct Compiler {
         return line_start;
     }
 
-    string get_error_line(Iterator err_pos) const {
+    [[nodiscard]] string get_error_line(Iterator err_pos) const {
         Iterator i = err_pos;
         // position i to the next EOL
         while (i != end && (*i != '\r' && *i != '\n')) ++i;
@@ -852,8 +852,6 @@ struct Compiler {
                         return '\a';
                     case 'b':
                         return '\b';
-                    case 'e':
-                        return '\e';
                     case 'n':
                         return '\n';
                     case 't':
@@ -1533,6 +1531,7 @@ struct Compiler {
         }
 
         emit(OpCode::STORE, symbol->scope, symbol->index);
+        emit(OpCode::POP);
         return expect(";");
     }
 
@@ -1644,7 +1643,7 @@ struct Compiler {
         return true;
     }
 
-    /// import ::= 'import' <string>
+    /// import ::= 'import' <string> ('as' <identifier>)?
     bool import_() {
         if (!check(TokenType::String)) return false;
         auto path = cur.literal;
@@ -1655,7 +1654,7 @@ struct Compiler {
         string search_path;
         bool found = false;
         while (getline(ss, search_path, ':')) {
-            search_path = search_path + "/" + path + ".src";
+            search_path += "/" + path + ".src";
             if (filesystem::exists(search_path)) {
                 found = true;
                 break;
@@ -1677,6 +1676,9 @@ struct Compiler {
                      (istreambuf_iterator<char>()));
         reader.close();
 
+        auto old_symbol_table = symbol_table;
+        symbol_table = new SymbolTable{old_symbol_table};
+
         Compiler<Iterator, Byte> compiler(input.begin(), input.end(),
                                           search_path, symbol_table, constants,
                                           memory_manager);
@@ -1690,30 +1692,59 @@ struct Compiler {
         cstring = compiler.cstring;
         options = compiler.options;
 
+
         auto instructions = move(compiler.code().instructions);
         instructions->pop_back();  // pop OpCode::HLT
-        if (instructions->last_instruction == OpCode::POP) {
-            instructions->pop_back();
-            instructions->emit(compiler.global_debug_info.get(), 0,
-                               OpCode::RET);
-        } else {
-            instructions->emit(compiler.global_debug_info.get(), 0,
-                               OpCode::CONST_NULL);
-            instructions->emit(compiler.global_debug_info.get(), 0,
-                               OpCode::RET);
+
+        int total = 0;
+        // export symbols
+        for (auto i: symbol_table->store) {
+            if (i.second.scope == Symbol::Scope::LOCAL &&
+                isupper(i.first[0])) {
+                constants.push_back(SRCLANG_VALUE_STRING(strdup(i.first.c_str())));
+                instructions->emit(compiler.global_debug_info.get(), 0, OpCode::CONST, constants.size() - 1);
+                instructions->emit(compiler.global_debug_info.get(), 0, OpCode::LOAD, i.second.scope, i.second.index);
+                total++;
+            }
         }
+        int nlocals = symbol_table->store.size();
+        auto nfree = symbol_table->free;
+        delete symbol_table;
+        symbol_table = old_symbol_table;
+        instructions->emit(compiler.global_debug_info.get(), 0, OpCode::MAP, total);
+        instructions->emit(compiler.global_debug_info.get(), 0,
+                           OpCode::RET);
 
         auto fun = new Function<Byte, Value>{
-                FunctionType::Function, move(instructions), {}, 0, 0,
+                FunctionType::Function, move(instructions), {}, nlocals, 0,
                 compiler.global_debug_info};
         auto val = SRCLANG_VALUE_FUNCTION(fun);
         memory_manager->heap.push_back(val);
         constants.push_back(val);
+
+        for (auto const &i: nfree) {
+            emit(OpCode::LOAD, i.scope, i.index);
+        }
+
         emit(OpCode::CONST, constants.size() - 1);
-        emit(OpCode::FUN, 0);
+        emit(OpCode::FUN, nfree.size());
         emit(OpCode::CALL, 0);
-        eat();
+        if (!eat()) return false;
+
+        string module_name = filesystem::path(path).filename().string();
+        if (consume("as")) {
+            if (!check(TokenType::Identifier)) return false;
+            module_name = cur.literal;
+            if (!eat()) return false;
+        }
+        if (symbol_table->resolve(module_name) != nullopt) {
+            error("Can't import module with '" + module_name + "', variable already defined", cur.pos);
+            return false;
+        }
+        auto symbol = symbol_table->define(module_name);
+        emit(OpCode::STORE, symbol.scope, symbol.index);
         emit(OpCode::POP);
+
         return true;
     }
 
@@ -2118,9 +2149,14 @@ struct Interpreter {
     }
 
     bool binary(Value lhs, Value rhs, OpCode op) {
-        if (op == OpCode::NE &&
+        if ((op == OpCode::NE || op == OpCode::EQ) &&
             SRCLANG_VALUE_GET_TYPE(lhs) != SRCLANG_VALUE_GET_TYPE(rhs)) {
-            *sp++ = SRCLANG_VALUE_TRUE;
+            *sp++ = op == OpCode::NE ? SRCLANG_VALUE_TRUE : SRCLANG_VALUE_FALSE;
+            return true;
+        }
+
+        if (SRCLANG_VALUE_IS_NULL(lhs) && SRCLANG_VALUE_IS_NULL(rhs)) {
+            *sp++ = op == OpCode::EQ ? SRCLANG_VALUE_TRUE : SRCLANG_VALUE_FALSE;
             return true;
         }
 
@@ -2433,7 +2469,7 @@ struct Interpreter {
         auto fun = reinterpret_cast<Function<Byte, Value> *>(
                 SRCLANG_VALUE_AS_OBJECT(callee)->pointer);
         if (count != fun->nparams) {
-            cerr << "Invalid parameters" << endl;
+            error("expected '" + to_string(fun->nparams) + "' but '" + to_string(count) + "' provided");
             return false;
         }
         fp->fun = move(fun);
@@ -2743,16 +2779,14 @@ struct Interpreter {
                 case ValueType::Bounded:
                     return call_bounded(callee, count);
                 default:
-                    error("ERROR: can't call object of type '" +
-                          SRCLANG_VALUE_TYPE_ID[static_cast<int>(
-                                  srclang_value_get_type(callee))] +
+                    error("ERROR: can't call object '" +
+                          SRCLANG_VALUE_DEBUG(callee) +
                           "'");
                     return false;
             }
         }
         error("ERROR: can't call value of type '" +
-              SRCLANG_VALUE_TYPE_ID[static_cast<int>(
-                      srclang_value_get_type(callee))] +
+              SRCLANG_VALUE_DEBUG(callee) +
               "'");
         return false;
     }
@@ -2769,7 +2803,7 @@ struct Interpreter {
 
                 cout << "  ";
                 for (auto i = stack.begin(); i != sp; i++) {
-                    cout << "[" << srclang_value_print(*i) << "] ";
+                    cout << "[" << SRCLANG_VALUE_DEBUG(*i) << "] ";
                 }
                 cout << endl;
                 cout << ">> ";
@@ -3111,18 +3145,22 @@ struct Interpreter {
                                ValueType::List &&
                                SRCLANG_VALUE_GET_TYPE(pos) ==
                                ValueType::Integer) {
-                        auto list = reinterpret_cast<SrcLangList *>(
+                        auto list = reinterpret_cast<SrcLangList*>(
                                 SRCLANG_VALUE_AS_OBJECT(container)->pointer);
                         list->at(SRCLANG_VALUE_AS_INTEGER(pos)) = val;
                     } else if (SRCLANG_VALUE_GET_TYPE(container) ==
                                ValueType::Map &&
                                SRCLANG_VALUE_GET_TYPE(pos) ==
                                ValueType::String) {
-                        auto map = reinterpret_cast<SrcLangMap *>(
+                        auto map = reinterpret_cast<SrcLangMap*>(
                                 SRCLANG_VALUE_AS_OBJECT(container)->pointer);
                         auto buf = reinterpret_cast<char *>(
                                 SRCLANG_VALUE_AS_OBJECT(pos)->pointer);
-                        map->insert({buf, val});
+                        if (map->find(buf) == map->end()) {
+                            map->insert({buf, val});
+                        } else {
+                            map->at(buf) = val;
+                        }
                     } else {
                         error("invalid SET operation for '" +
                               SRCLANG_VALUE_TYPE_ID[int(
@@ -3501,9 +3539,9 @@ int main(int argc, char **argv) {
         Interpreter<Byte> interpreter(code, globals, compiler.global_debug_info,
                                       &memory_manager);
         interpreter.GC_HEAP_GROW_FACTOR =
-                std::get<double>(compiler.options["GC_HEAP_GROW_FACTOR"]);
+                std::get<int>(compiler.options["GC_HEAP_GROW_FACTOR"]);
         interpreter.next_gc =
-                std::get<double>(compiler.options["GC_INITIAL_TRIGGER"]);
+                std::get<int>(compiler.options["GC_INITIAL_TRIGGER"]);
         interpreter.debug = debug;
         interpreter.break_ = break_;
         interpreter.state = compiler.state;
@@ -3511,7 +3549,6 @@ int main(int argc, char **argv) {
             if (is_interactive) {
                 continue;
             } else {
-                memory_manager.sweep();
                 return 1;
             }
         }

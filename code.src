@@ -1,29 +1,9 @@
-#![EXPERIMENTAL_FEATURES]
-for i in range (5) {
-    println (i);
-}
+#![SEARCH_PATH("./modules")]
+import "app";
 
-for i in range (5) {
-    if i == 2 {
-        continue;
-    }
-    println (i);
-}
-
-for i in range(5) {
-    for j in range(5) {
-        println (i, j);
-    }
-}
-
-for i in range(5) {
-    if i == 3 {
-        continue;
-    }
-    for j in range(5) {
-        if j == 2 {
-            continue;
-        }
-        println (i, j);
-    }
-}
+app.New("srclang")
+    .Version("0.0.1")
+    .About("Source Programming Language")
+    .Flag(app.Flag("sample")
+            .About("Sample flag"))
+    .Run([]);

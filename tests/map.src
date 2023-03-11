@@ -7,3 +7,6 @@ println(x.string);
 println(x.boolean);
 println(x.function);
 println(x.function(1, 49));
+
+x.decimal = 12.304;
+println (x);
