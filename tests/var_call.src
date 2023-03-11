@@ -7,3 +7,6 @@ let add = fun (a, b...) {
 };
 
 println (add(1));
+println (add(1, 2));
+println (add(1, 2, 3));
+println (add(1, 2, 3, 4));

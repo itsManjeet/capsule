@@ -438,27 +438,28 @@ struct SymbolTable {
     SymbolTable *parent{nullptr};
     map<string, Symbol> store;
     vector<Symbol> free;
+    int definations{0};
 
-    Symbol define(string name) {
+    Symbol define(const string& name) {
         store[name] =
                 Symbol{name, (parent == nullptr ? Symbol::GLOBAL : Symbol::LOCAL),
-                       (int) store.size()};
+                       definations++};
         return store[name];
     }
 
-    Symbol define(const string& name, int index) {
+    Symbol define(const string &name, int index) {
         store[name] = Symbol{name, Symbol::BUILTIN, index};
         return store[name];
     }
 
-    Symbol define(const Symbol& other) {
+    Symbol define(const Symbol &other) {
         free.push_back(other);
         auto sym = Symbol{other.name, Symbol::FREE, (int) free.size() - 1};
         store[other.name] = sym;
         return sym;
     }
 
-    optional<Symbol> resolve(const string& name) {
+    optional<Symbol> resolve(const string &name) {
         auto iter = store.find(name);
         if (iter != store.end()) {
             return iter->second;
@@ -589,6 +590,7 @@ struct Function {
     vector<Value> free{0};
     int nlocals{0};
     int nparams{0};
+    bool is_variadic{false};
     shared_ptr<DebugInfo> debug_info{nullptr};
 };
 
@@ -618,7 +620,7 @@ struct MemoryManager {
                      reinterpret_cast<Function<Byte, Value> *>(obj->pointer)
                              ->free.end());
             } else if (obj->type == ValueType::Map) {
-                for (auto & i : *reinterpret_cast<SrcLangMap *>(obj->pointer)) {
+                for (auto &i: *reinterpret_cast<SrcLangMap *>(obj->pointer)) {
                     mark(i.second);
                 }
             }
@@ -681,7 +683,7 @@ struct Compiler {
     shared_ptr<DebugInfo> global_debug_info;
     TCCState *state;
     Options options = {
-            {"VERSION",               SRCLANG_VERSION},
+            {"VERSION", SRCLANG_VERSION},
             {"GC_HEAP_GROW_FACTOR",   2},
             {"GC_INITIAL_TRIGGER",    30},
             {"SEARCH_PATH",           string("/usr/lib/srclang/")},
@@ -693,7 +695,7 @@ struct Compiler {
     };
     string cstring{""};
 
-    Compiler(Iterator start, Iterator end, const string& filename, SymbolTable *global,
+    Compiler(Iterator start, Iterator end, const string &filename, SymbolTable *global,
              vector<Value> &constants, MemoryManager *memory_manager)
             : iter{start},
               start{start},
@@ -941,7 +943,7 @@ struct Compiler {
                         "in",
 
                 // specical operators
-                        "#!", "not",
+                        "#!", "not", "...",
 
                 // multi char operators
                         "==", "!=", "<=", ">=", ">>", "<<"}) {
@@ -1150,6 +1152,7 @@ struct Compiler {
 
     /// fun '(' args ')' block
     bool function() {
+        bool is_variadic = false;
         auto pos = cur.pos;
         push_scope();
         // eat '('
@@ -1163,7 +1166,13 @@ struct Compiler {
             symbol_table->define(cur.literal);
             eat();
 
+            if (consume("...")) {
+                if (!expect(")")) return false;
+                is_variadic = true;
+                break;
+            }
             if (consume(")")) break;
+
             if (!expect(",")) return false;
         }
 
@@ -1179,7 +1188,7 @@ struct Compiler {
 
         debug_info = old_debug_info;
 
-        int nlocals = symbol_table->store.size();
+        int nlocals = symbol_table->definations;
         auto free_symbols = symbol_table->free;
 
         auto fun_instructions = pop_scope();
@@ -1194,6 +1203,7 @@ struct Compiler {
 
         auto fun = new Function<Byte, Value>{
                 FunctionType::Function, move(fun_instructions), {}, nlocals, nparam,
+                is_variadic,
                 fun_debug_info};
         auto fun_value = SRCLANG_VALUE_FUNCTION(fun);
         memory_manager->heap.push_back(fun_value);
@@ -1707,7 +1717,7 @@ struct Compiler {
                 total++;
             }
         }
-        int nlocals = symbol_table->store.size();
+        int nlocals = symbol_table->definations;
         auto nfree = symbol_table->free;
         delete symbol_table;
         symbol_table = old_symbol_table;
@@ -1716,7 +1726,7 @@ struct Compiler {
                            OpCode::RET);
 
         auto fun = new Function<Byte, Value>{
-                FunctionType::Function, move(instructions), {}, nlocals, 0,
+                FunctionType::Function, move(instructions), {}, nlocals, 0, false,
                 compiler.global_debug_info};
         auto val = SRCLANG_VALUE_FUNCTION(fun);
         memory_manager->heap.push_back(val);
@@ -2035,6 +2045,7 @@ struct Interpreter {
                                              {},
                                              0,
                                              0,
+                                             false,
                                              debug_info};
         fp->fun = move(fun);
         fp->ip = fp->fun->instructions->begin();
@@ -2465,17 +2476,53 @@ struct Interpreter {
                 SRCLANG_VALUE_AS_INTEGER(val) == 0);
     }
 
+    void print_stack() {
+        if (debug) {
+            cout << "  ";
+            for (auto i = stack.begin(); i != sp; i++) {
+                cout << "[" << srclang_value_print(*i) << "] ";
+            }
+            cout << endl;
+        }
+    }
+
     bool call_function(Value callee, uint8_t count) {
         auto fun = reinterpret_cast<Function<Byte, Value> *>(
                 SRCLANG_VALUE_AS_OBJECT(callee)->pointer);
+        if (fun->is_variadic) {
+            if (count < fun->nparams - 1) {
+                error("expected atleast '" + to_string(fun->nparams - 1) + "' but '" + to_string(count) + "' provided");
+                return false;
+            }
+            auto v_arg_begin = (sp - (count - (fun->nparams - 1)));
+            auto v_arg_end = sp;
+            SrcLangList *var_args;
+            auto dist = distance(v_arg_begin, v_arg_end);
+            if (dist == 0) {
+                var_args = new SrcLangList();
+            } else {
+                var_args = new SrcLangList(v_arg_begin, v_arg_end);
+            }
+            auto var_val = SRCLANG_VALUE_LIST(var_args);
+            add_object(var_val);
+            *(sp - (count - (fun->nparams - 1))) = var_val;
+            sp = (sp - (count - fun->nparams));
+            count = fun->nparams;
+
+            print_stack();
+        }
+
         if (count != fun->nparams) {
             error("expected '" + to_string(fun->nparams) + "' but '" + to_string(count) + "' provided");
             return false;
         }
-        fp->fun = move(fun);
+
+
+        fp->fun = std::move(fun);
         fp->ip = fp->fun->instructions->begin();
         fp->bp = (sp - count);
-        sp = fp->bp + fun->nlocals;
+        sp = fp->bp + fp->fun->nlocals;
+        print_stack();
         debug_info.push_back(fp->fun->debug_info);
         fp++;
         return true;
@@ -2729,11 +2776,8 @@ struct Interpreter {
         *(sp - count) = bounded->parent;
         sp++;
         if (debug) {
-            cout << endl << "  ";
-            for (auto i = stack.begin(); i != sp; i++) {
-                cout << "[" << srclang_value_print(*i) << "] ";
-            }
             cout << endl;
+            print_stack();
         }
 
         return call(count + 1);
@@ -3145,14 +3189,14 @@ struct Interpreter {
                                ValueType::List &&
                                SRCLANG_VALUE_GET_TYPE(pos) ==
                                ValueType::Integer) {
-                        auto list = reinterpret_cast<SrcLangList*>(
+                        auto list = reinterpret_cast<SrcLangList *>(
                                 SRCLANG_VALUE_AS_OBJECT(container)->pointer);
                         list->at(SRCLANG_VALUE_AS_INTEGER(pos)) = val;
                     } else if (SRCLANG_VALUE_GET_TYPE(container) ==
                                ValueType::Map &&
                                SRCLANG_VALUE_GET_TYPE(pos) ==
                                ValueType::String) {
-                        auto map = reinterpret_cast<SrcLangMap*>(
+                        auto map = reinterpret_cast<SrcLangMap *>(
                                 SRCLANG_VALUE_AS_OBJECT(container)->pointer);
                         auto buf = reinterpret_cast<char *>(
                                 SRCLANG_VALUE_AS_OBJECT(pos)->pointer);
