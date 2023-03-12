@@ -1,0 +1,13 @@
+println (2+3*4);
+println (20-3*4);
+println (2+6/3);
+println (2-6/3);
+println (false == 2 < 1);
+println (false == 1 > 2);
+println (false == 2 <= 1);
+println (false == 1 >= 2);
+println (1 - 1);
+println (1 -1);
+println (1- 1);
+println (1-1);
+println (2 *(6-(2+2)));

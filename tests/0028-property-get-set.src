@@ -1,0 +1,22 @@
+let Foo = fun () {
+    let self = {};
+    self.method = fun (a) {
+        println ("method");
+        println (a);
+    };
+
+    self.other = fun (a) {
+        println ("other");
+        println (a);
+    };
+
+    return self;
+};
+
+let foo = Foo ();
+let method = foo.method;
+
+foo.method = foo.other;
+foo.method (1);
+
+method (2);

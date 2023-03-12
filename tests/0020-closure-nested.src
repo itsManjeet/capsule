@@ -1,0 +1,22 @@
+let f = null;
+
+let f1 = fun () {
+    let a = 'a';
+    let f2 = fun () {
+        let b = 'b';
+        let f3 = fun () {
+            let c = 'c';
+            let f4 = fun () {
+                println (a);
+                println (b);
+                println (c);
+            };
+            f = f4;
+        };
+        f3 ();
+    };
+    f2 ();
+};
+
+f1 ();
+f ();

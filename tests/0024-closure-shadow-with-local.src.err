@@ -1,0 +1,4 @@
+tests/0024-closure-shadow-with-local.src:3
+ERROR: Variable already defined 'foo'
+ |     let foo = "shadow";
+           ^

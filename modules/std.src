@@ -67,4 +67,3 @@ let upper = fun (s) {
     return s;
 };
 impl upper for str;
-

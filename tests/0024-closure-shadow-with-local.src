@@ -1,0 +1,7 @@
+let foo = "closure";
+let f = fun () {
+    let foo = "shadow";
+    println (foo);
+};
+println (foo);
+f ();

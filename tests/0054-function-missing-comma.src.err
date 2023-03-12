@@ -1,0 +1,4 @@
+tests/0054-function-missing-comma.src:1
+ERROR: Expected ',' but got 'c'
+ | let foo = fun (a, b c, d, e, f) {
+                       ^

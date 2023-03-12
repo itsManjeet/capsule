@@ -1,0 +1,13 @@
+let f = fun () {
+    for true {
+        let i = 'i';
+        let g = fun () {
+            println (i);
+        };
+
+        return g;
+    };
+};
+
+let h = f ();
+h ();

@@ -1,0 +1,16 @@
+let f = null;
+
+let Foo = fun () {
+    let self = {};
+    self.method = fun (param) {
+        let f_ = fun () {
+            println (param);
+        };
+
+        f = f_;
+    };
+    return self;
+};
+
+Foo().method("param");
+f();

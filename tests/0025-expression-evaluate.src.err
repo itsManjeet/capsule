@@ -1,0 +1,4 @@
+tests/0025-expression-evaluate.src:1
+ERROR: Expected ',' but got ';'
+ | println ((5 - (3 - 1) + -1);
+                              ^

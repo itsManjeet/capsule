@@ -1,0 +1,13 @@
+let Foo = fun () {
+    let self = {};
+
+    self.bar = fun (arg) {
+        println (arg);
+    };
+
+    return self;
+};
+
+let bar = Foo().bar;
+println ("got method");
+bar ("arg");

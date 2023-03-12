@@ -1,0 +1,12 @@
+// TODO: work for local variable
+
+let f = null;
+
+let a = 'a';
+let f_ = fun () {
+    println (a);
+};
+f = f_;
+
+let b = 'b';
+f ();

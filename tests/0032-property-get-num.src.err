@@ -1,0 +1,4 @@
+tests/0032-property-get-num.src:1
+ERROR: Expected ';' but got 'foo'
+ | 123.foo;
+       ^

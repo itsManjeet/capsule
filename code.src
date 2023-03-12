@@ -1,9 +1,5 @@
-let add = fun (a, b...) {
-    let result = a;
-    for i in b {
-        result = result + i;
-    }
-    return result;
-};
+#![SEARCH_PATH("./modules")]
 
-println (add(1));
+import "std";
+
+println ("hello".contains("e2l"));

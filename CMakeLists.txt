@@ -55,7 +55,8 @@ file(GLOB_RECURSE TestFiles "tests/*.src")
 foreach(testFile ${TestFiles})
     get_filename_component(testName ${testFile} NAME_WE)
     add_test(NAME ${testName}
-        COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tests/run_test.sh ${PROJECT_BINARY_DIR}/${PROJECT_NAME} ${testFile})
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+        COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tests/run_test.sh ${PROJECT_BINARY_DIR}/${PROJECT_NAME} tests/${testName}.src)
 endforeach()
 
 endif ()

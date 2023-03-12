@@ -1,0 +1,3 @@
+let foo = fun () {};
+
+foo.bar = "value";

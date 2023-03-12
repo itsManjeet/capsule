@@ -1,0 +1,13 @@
+let return_arg = fun (arg) {
+    return arg;
+};
+
+let return_fun_call_with_arg = fun (f, arg) {
+    return return_arg (f)(arg);
+};
+
+let print_arg = fun (arg) {
+    println (arg);
+};
+
+return_fun_call_with_arg (print_arg, "hello world");

@@ -9,6 +9,10 @@ else
     outfile=${TEST_FILE}.err
 fi
 
+if [[ ! -e ${outfile} ]] ; then
+    cp ${TEST_FILE}.test ${outfile}
+fi
+
 diff -u "${TEST_FILE}.test" "${outfile}"
 if [[ $? != 0 ]] ; then
     rm ${TEST_FILE}.test

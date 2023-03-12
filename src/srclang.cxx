@@ -67,6 +67,7 @@ struct Token {
 
 #define SRCLANG_OPCODE_LIST \
     X(CONST)                \
+    X(CONST_INT)            \
     X(CONST_NULL)           \
     X(LOAD)                 \
     X(STORE)                \
@@ -440,7 +441,7 @@ struct SymbolTable {
     vector<Symbol> free;
     int definations{0};
 
-    Symbol define(const string& name) {
+    Symbol define(const string &name) {
         store[name] =
                 Symbol{name, (parent == nullptr ? Symbol::GLOBAL : Symbol::LOCAL),
                        definations++};
@@ -551,6 +552,7 @@ struct ByteCode {
                 os << " " << pos << " '" << SRCLANG_SYMBOL_ID[scope] << "'";
             }
                 break;
+            case OpCode::CONST_INT:
             case OpCode::CALL: {
                 int count = instructions[offset++];
                 os << " '" << count << "'";
@@ -1329,6 +1331,7 @@ struct Compiler {
 
     /// call ::= '(' (expr % ',' ) ')'
     bool call() {
+        auto pos = cur.pos;
         int count = 0;
         while (!consume(")")) {
             count++;
@@ -1336,7 +1339,11 @@ struct Compiler {
                 return false;
             }
             if (consume(")")) break;
-            if (!consume(",")) return false;
+            if (!expect(",")) return false;
+        }
+        if (count >= UINT8_MAX) {
+            error("can't have arguments more that '" + to_string(UINT8_MAX) + "'", pos);
+            return false;
         }
         emit(OpCode::CALL, count);
         return true;
@@ -1345,10 +1352,20 @@ struct Compiler {
     /// index ::= <expression> '[' <expession> (':' <expression>)? ']'
     bool index(bool can_assign) {
         int count = 1;
-        if (!expression()) return false;
+        if (cur.literal == ":") {
+            emit(OpCode::CONST_INT, 0);
+        } else {
+            if (!expression()) return false;
+        }
+
         if (consume(":")) {
             count += 1;
-            if (!expression()) return false;
+            if (cur.literal == "]") {
+                emit(OpCode::CONST_INT, -1);
+            } else {
+                if (!expression()) return false;
+            }
+
         }
         if (!expect("]")) return false;
         if (can_assign && consume("=") && count == 1) {
@@ -1560,6 +1577,7 @@ struct Compiler {
                 case OpCode::JNZ:
                 case OpCode::JMP:
                 case OpCode::CONST:
+                case OpCode::CONST_INT:
                 case OpCode::CALL: {
                     i++;
                 }
@@ -2863,6 +2881,9 @@ struct Interpreter {
                 case OpCode::CONST:
                     *sp++ = constants[*ip()++];
                     break;
+                case OpCode::CONST_INT:
+                    *sp++ = SRCLANG_VALUE_INTEGER((*ip()++));
+                    break;
                 case OpCode::CONST_NULL:
                     *sp++ = SRCLANG_VALUE_NULL;
                     break;
@@ -3049,7 +3070,7 @@ struct Interpreter {
                             case 2: {
                                 int end = SRCLANG_VALUE_AS_INTEGER(end_idx);
                                 if (index < 0) index = len + index;
-                                if (end < 0) end = len + end;
+                                if (end < 0) end = len + end + 1;
                                 if (end - index < 0 || end - index >= len) {
                                     error("Out-of-range");
                                     return false;
@@ -3091,7 +3112,7 @@ struct Interpreter {
                             case 2: {
                                 int end = SRCLANG_VALUE_AS_INTEGER(end_idx);
                                 if (index < 0) index = list.size() + index;
-                                if (end < 0) end = list.size() + end;
+                                if (end < 0) end = list.size() + end + 1;
                                 if (end - index < 0) {
                                     error("Invalid range value");
                                     return false;
@@ -3487,9 +3508,10 @@ int main(int argc, char **argv) {
 
     bool debug = false;
     bool break_ = false;
+    auto args = new SrcLangList ();
     for (int i = 1; i < argc; i++) {
         string arg(argv[i]);
-        if (arg[0] == '-') {
+        if (arg[0] == '-' && filename == nullopt) {
             arg = arg.substr(1);
             if (arg == "debug")
                 debug = true;
@@ -3504,10 +3526,11 @@ int main(int argc, char **argv) {
                    filesystem::path(arg).extension() == ".src") {
             filename = arg;
         } else {
-            cerr << "ERROR: unknown argument " << arg << endl;
-            return 1;
+            args->push_back(SRCLANG_VALUE_STRING(strdup(argv[i])));
         }
     }
+
+    auto args_value = SRCLANG_VALUE_LIST(args);
 
     string input;
     if (filename.has_value()) {
@@ -3538,9 +3561,11 @@ int main(int argc, char **argv) {
     auto true_symbol = symbol_table.define("true");
     auto false_symbol = symbol_table.define("false");
     auto null_symbol = symbol_table.define("null");
+    auto args_symbol = symbol_table.define("__ARGS__");
     globals[true_symbol.index] = SRCLANG_VALUE_TRUE;
     globals[false_symbol.index] = SRCLANG_VALUE_FALSE;
     globals[null_symbol.index] = SRCLANG_VALUE_NULL;
+    globals[args_symbol.index] = args_value;
     vector<Value> constants;
 
     do {
@@ -3556,7 +3581,10 @@ int main(int argc, char **argv) {
                 (filename == nullopt ? "<script>" : *filename), &symbol_table,
                 constants, &memory_manager);
         if (!compiler.compile()) {
-            continue;
+            if (is_interactive)
+                continue;
+            else
+                return 1;
         }
 
         if (get<bool>(compiler.options["LOAD_LIBC"])) {

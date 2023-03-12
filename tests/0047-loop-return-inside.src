@@ -1,0 +1,8 @@
+let f = fun () {
+    for true {
+        let i = 'i';
+        return i;
+    }
+};
+
+println (f ());

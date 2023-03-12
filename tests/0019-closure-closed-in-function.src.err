@@ -1,0 +1,4 @@
+tests/0019-closure-closed-in-function.src:7
+ERROR: Expected ';' but got 'f'
+ | f = f_;
+   ^

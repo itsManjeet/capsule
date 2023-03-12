@@ -1,0 +1,4 @@
+tests/0042-property-set-on-num.src:1
+ERROR: Expected ';' but got 'foo'
+ | 123.foo = "value";
+       ^

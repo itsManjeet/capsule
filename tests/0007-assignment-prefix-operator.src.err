@@ -1,0 +1,4 @@
+tests/0007-assignment-prefix-operator.src:2
+ERROR: not yet implemented
+ | not a = "value";
+           ^
