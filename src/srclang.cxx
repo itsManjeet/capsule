@@ -617,10 +617,13 @@ struct MemoryManager {
                 mark(reinterpret_cast<vector<Value> *>(obj->pointer)->begin(),
                      reinterpret_cast<vector<Value> *>(obj->pointer)->end());
             } else if (obj->type == ValueType::Function) {
-                mark(reinterpret_cast<Function<Byte, Value> *>(obj->pointer)
-                             ->free.begin(),
-                     reinterpret_cast<Function<Byte, Value> *>(obj->pointer)
-                             ->free.end());
+                if (!reinterpret_cast<Function<Byte, Value>*>(obj->pointer)->free.empty()) {
+                    mark(reinterpret_cast<Function<Byte, Value> *>(obj->pointer)
+                                 ->free.begin(),
+                         reinterpret_cast<Function<Byte, Value> *>(obj->pointer)
+                                 ->free.end());
+                }
+
             } else if (obj->type == ValueType::Map) {
                 for (auto &i: *reinterpret_cast<SrcLangMap *>(obj->pointer)) {
                     mark(i.second);

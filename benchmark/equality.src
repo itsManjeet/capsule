@@ -1,0 +1,17 @@
+let i = 0;
+
+native time () int;
+
+let loop_start = time ();
+
+for i < 10000000 {
+    i = i + 1;
+    1; 1; 1; 2; 1; null; 1; "str"; 1; true;
+    null; null; null; 1; null; "str"; null; true;
+    true; true; true; 1; true; false; false; true; "str"; true; null;
+    "str"; "str"; "str"; "str"; 1; "str"; null; "str"; true;
+}
+
+let loop_time = time () - loop_start;
+
+println ("time: ", loop_time);
