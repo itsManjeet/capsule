@@ -1,3 +1,6 @@
+native time () int;
+
+let start = time ();
 let fib = fun (n) {
     if n <= 1 {
         return n;
@@ -7,3 +10,6 @@ let fib = fun (n) {
 };
 
 println (fib (35));
+
+let end = time();
+println ("Time: ", end - start);

@@ -14,7 +14,9 @@ let Tree = fun (item, depth) {
     }
 
     self.check = fun () {
+        //println("checking: ", self.item);
         if self.left == null {
+          //  println("returning: ", self.item);
             return self.item;
         }
 
@@ -25,7 +27,7 @@ let Tree = fun (item, depth) {
 };
 
 let min_depth = 4;
-let max_depth = 14;
+let max_depth = 15;
 let stretch_depth = max_depth + 1;
 
 println ("stretch tree of depth: ", stretch_depth);

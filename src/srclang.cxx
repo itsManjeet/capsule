@@ -66,55 +66,62 @@ struct Token {
 };
 
 #define SRCLANG_OPCODE_LIST \
-    X(CONST)                \
-    X(CONST_INT)            \
-    X(CONST_NULL)           \
-    X(LOAD)                 \
-    X(STORE)                \
-    X(ADD)                  \
-    X(SUB)                  \
-    X(MUL)                  \
-    X(DIV)                  \
-    X(NEG)                  \
-    X(NOT)                  \
-    X(COMMAND)              \
-    X(EQ)                   \
-    X(NE)                   \
-    X(LT)                   \
-    X(LE)                   \
-    X(GT)                   \
-    X(GE)                   \
-    X(AND)                  \
-    X(OR)                   \
-    X(LAND)                 \
-    X(LOR)                  \
-    X(LSHIFT)               \
-    X(RSHIFT)               \
-    X(MOD)                  \
-    X(BREAK)                \
-    X(CONTINUE)             \
-    X(FUN)                  \
-    X(CALL)                 \
-    X(PACK)                 \
-    X(MAP)                  \
-    X(INDEX)                \
-    X(SET)                  \
-    X(POP)                  \
-    X(RET)                  \
-    X(JNZ)                  \
-    X(JMP)                  \
-    X(SIZE)                 \
-    X(IMPL)                 \
-    X(HLT)
+    X(CONST, 1)                \
+    X(CONST_INT, 1)            \
+    X(CONST_NULL, 1)           \
+    X(LOAD, 2)                 \
+    X(STORE, 2)                \
+    X(ADD, 0)                  \
+    X(SUB, 0)                  \
+    X(MUL, 0)                  \
+    X(DIV, 0)                  \
+    X(NEG, 0)                  \
+    X(NOT, 0)                  \
+    X(COMMAND, 0)              \
+    X(EQ, 0)                   \
+    X(NE, 0)                   \
+    X(LT, 0)                   \
+    X(LE, 0)                   \
+    X(GT, 0)                   \
+    X(GE, 0)                   \
+    X(AND, 0)                  \
+    X(OR, 0)                   \
+    X(LAND, 0)                 \
+    X(LOR, 0)                  \
+    X(LSHIFT, 0)               \
+    X(RSHIFT, 0)               \
+    X(MOD, 0)                  \
+    X(BREAK, 1)                \
+    X(CONTINUE, 1)             \
+    X(CLOSURE, 2)              \
+    X(CALL, 1)                 \
+    X(PACK, 0)                 \
+    X(MAP, 0)                  \
+    X(INDEX, 2)                \
+    X(SET, 0)                  \
+    X(SET_SELF, 1)             \
+    X(POP, 0)                  \
+    X(RET, 0)                  \
+    X(JNZ, 1)                  \
+    X(JMP, 1)                  \
+    X(SIZE, 0)                 \
+    X(IMPL, 0)                 \
+    X(HLT, 0)
 
 enum class OpCode : uint8_t {
-#define X(id) id,
+#define X(id, size) id,
     SRCLANG_OPCODE_LIST
 #undef X
 };
 
 const vector<string> SRCLANG_OPCODE_ID = {
-#define X(id) #id,
+#define X(id, size) #id,
+        SRCLANG_OPCODE_LIST
+#undef X
+};
+
+const vector<int> SRCLANG_OPCODE_SIZE = {
+#define X(id, size) size,
         SRCLANG_OPCODE_LIST
 #undef X
 };
@@ -152,6 +159,7 @@ const vector<string> SRCLANG_SYMBOL_ID = {
     X(List, "list")             \
     X(Map, "map")               \
     X(Function, "function")     \
+    X(Closure, "closure")       \
     X(Builtin, "builtin")       \
     X(Native, "native")         \
     X(Error, "error")           \
@@ -275,11 +283,11 @@ typedef uint64_t Value;
             stringstream ss;                                                  \
             SrcLangMap m = *reinterpret_cast<SrcLangMap*>(ptr);               \
             ss << "{";                                                        \
-            string sep;                                                       \
+            string sep; if (!m.empty()) {                                                       \
             for (auto i : m) {                                                \
                 ss << sep << i.first << ":" << srclang_value_print(i.second); \
                 sep = ", ";                                                   \
-            }                                                                 \
+            }                            }                                     \
             ss << "}";                                                        \
             return ss.str();                                                  \
         }))
@@ -306,11 +314,12 @@ typedef uint64_t Value;
 #define SRCLANG_VALUE_FUNCTION(fun)                                           \
     SRCLANG_VALUE_HEAP_OBJECT(                                                \
         ValueType::Function, (void*)fun, ([](void* ptr) {                     \
-            delete reinterpret_cast<Function<Byte, Value>*>(ptr);             \
+            delete reinterpret_cast<Function<Byte>*>(ptr);             \
         }),                                                                   \
         ([](void* ptr) -> string {                                            \
-            Function<Byte, Value>* fun =                                      \
-                reinterpret_cast<Function<Byte, Value>*>(ptr);                \
+                    Function<Byte>* fun =                                      \
+                reinterpret_cast<Function<Byte>*>(ptr);                \
+                return "<function("+ fun->id + ")>";                                                                                      \
             vector<Value> constants;                                          \
             stringstream ss;                                                  \
             for (int offset = 0; offset < fun->instructions->size();) {       \
@@ -320,6 +329,13 @@ typedef uint64_t Value;
             }                                                                 \
             return ss.str();                                                  \
         }))
+
+#define SRCLANG_VALUE_CLOSURE(fun)                                       \
+    SRCLANG_VALUE_HEAP_OBJECT(                                                \
+        ValueType::Closure, (void*)fun, ([](void* ptr) {                     \
+                                                                              \
+        }),                                                                   \
+        ([](void* ptr) -> string { return "<closure()>"; }))
 
 #define SRCLANG_VALUE_TRUE \
     ((Value)(uint64_t)(SRCLANG_VALUE_QNAN | SRCLANG_VALUE_TAG_TRUE))
@@ -533,7 +549,7 @@ struct ByteCode {
             case OpCode::INDEX:
             case OpCode::PACK:
             case OpCode::MAP:
-            case OpCode::FUN: {
+            case OpCode::SET_SELF: {
                 os << " " << (int) instructions[offset++];
             }
                 break;
@@ -552,6 +568,13 @@ struct ByteCode {
                 os << " " << pos << " '" << SRCLANG_SYMBOL_ID[scope] << "'";
             }
                 break;
+            case OpCode::CLOSURE: {
+                int constantIndex = instructions[offset++];
+                int nfree = instructions[offset++];
+                os << constants[constantIndex] << " " << nfree;
+            }
+                break;
+
             case OpCode::CONST_INT:
             case OpCode::CALL: {
                 int count = instructions[offset++];
@@ -559,6 +582,7 @@ struct ByteCode {
             }
                 break;
             default:
+                offset += SRCLANG_OPCODE_SIZE[int(op)];
                 break;
         }
 
@@ -585,15 +609,21 @@ struct ByteCode {
 enum class FunctionType {
     Function, Method, Initializer, Native
 };
-template<typename Byte, typename Constant>
+template<typename Byte>
 struct Function {
     FunctionType type{FunctionType::Function};
+    string id;
     unique_ptr<Instructions<Byte>> instructions{nullptr};
-    vector<Value> free{0};
     int nlocals{0};
     int nparams{0};
     bool is_variadic{false};
     shared_ptr<DebugInfo> debug_info{nullptr};
+};
+
+template<typename Byte, typename Constant>
+struct Closure {
+    Function<Byte> *fun;
+    vector<Value> free{0};
 };
 
 struct MemoryManager {
@@ -607,6 +637,7 @@ struct MemoryManager {
     void mark(Value val) {
         if (SRCLANG_VALUE_IS_OBJECT(val)) {
             auto obj = SRCLANG_VALUE_AS_OBJECT(val);
+            if (obj->marked) return;
             obj->marked = true;
 #ifdef SRCLANG_GC_DEBUG
             cout << "  marked "
@@ -616,14 +647,9 @@ struct MemoryManager {
             if (obj->type == ValueType::List) {
                 mark(reinterpret_cast<vector<Value> *>(obj->pointer)->begin(),
                      reinterpret_cast<vector<Value> *>(obj->pointer)->end());
-            } else if (obj->type == ValueType::Function) {
-                if (!reinterpret_cast<Function<Byte, Value>*>(obj->pointer)->free.empty()) {
-                    mark(reinterpret_cast<Function<Byte, Value> *>(obj->pointer)
-                                 ->free.begin(),
-                         reinterpret_cast<Function<Byte, Value> *>(obj->pointer)
-                                 ->free.end());
-                }
-
+            } else if (obj->type == ValueType::Closure) {
+                mark(reinterpret_cast<Closure<Byte, Value>*>(obj->pointer)->free.begin(),
+                     reinterpret_cast<Closure<Byte, Value>*>(obj->pointer)->free.end());
             } else if (obj->type == ValueType::Map) {
                 for (auto &i: *reinterpret_cast<SrcLangMap *>(obj->pointer)) {
                     mark(i.second);
@@ -649,7 +675,7 @@ struct MemoryManager {
 #ifdef SRCLANG_GC_DEBUG
                     cout << "   deallocating "
                                                 << uintptr_t(obj->pointer) << "'"
-                                                << SRCLANG_VALUE_GET_STRING(value)
+                                                << SRCLANG_VALUE_GET_STRING(*i)
                                                 << "'" << endl;
 #endif
                     obj->destructor(obj->pointer);
@@ -682,15 +708,15 @@ struct Compiler {
     vector<Value> &constants;
     vector<string> loaded_imports;
     vector<unique_ptr<Instructions<Byte>>> instructions;
-    using OptionType = variant<string, int, double, bool>;
+    using OptionType = variant<string, int, float, bool>;
     using Options = map<string, OptionType>;
     DebugInfo *debug_info;
     shared_ptr<DebugInfo> global_debug_info;
     TCCState *state;
     Options options = {
             {"VERSION", SRCLANG_VERSION},
-            {"GC_HEAP_GROW_FACTOR",   2},
-            {"GC_INITIAL_TRIGGER",    30},
+            {"GC_HEAP_GROW_FACTOR",   1.0f},
+            {"GC_INITIAL_TRIGGER",    200},
             {"SEARCH_PATH",           string("/usr/lib/srclang/")},
             {"LOAD_LIBC",             true},
             {"LIBC",                  "libc.so.6"},
@@ -1156,10 +1182,15 @@ struct Compiler {
     }
 
     /// fun '(' args ')' block
-    bool function() {
+    bool function(Symbol *symbol) {
         bool is_variadic = false;
         auto pos = cur.pos;
         push_scope();
+        if (symbol != nullptr) {
+            auto freeSymbol = symbol_table->define(*symbol);
+            emit(OpCode::SET_SELF, freeSymbol.index);
+        }
+
         // eat '('
         if (!expect("(")) return false;
         int nparam = 0;
@@ -1206,20 +1237,27 @@ struct Compiler {
             fun_instructions->emit(fun_debug_info.get(), line, OpCode::RET);
         }
 
-        auto fun = new Function<Byte, Value>{
-                FunctionType::Function, move(fun_instructions), {}, nlocals, nparam,
+        for (auto const &i: free_symbols) {
+            emit(OpCode::LOAD, i.scope, i.index);
+        }
+
+        static int function_count = 0;
+        std::string id;
+        if (symbol == nullptr) {
+            id = to_string(function_count++);
+        } else {
+            id = symbol->name;
+        }
+
+        auto fun = new Function<Byte>{
+                FunctionType::Function, id, move(fun_instructions), nlocals, nparam,
                 is_variadic,
                 fun_debug_info};
         auto fun_value = SRCLANG_VALUE_FUNCTION(fun);
         memory_manager->heap.push_back(fun_value);
         constants.push_back(fun_value);
 
-        for (auto const &i: free_symbols) {
-            emit(OpCode::LOAD, i.scope, i.index);
-        }
-
-        emit(OpCode::CONST, constants.size() - 1);
-        emit(OpCode::FUN, free_symbols.size());
+        emit(OpCode::CLOSURE, constants.size() - 1, free_symbols.size());
         return true;
     }
 
@@ -1300,8 +1338,6 @@ struct Compiler {
             return unary(OpCode::NEG);
         } else if (consume("$")) {
             return unary(OpCode::COMMAND);
-        } else if (consume("fun")) {
-            return function();
         } else if (consume("[")) {
             return list();
         } else if (consume("{")) {
@@ -1372,7 +1408,12 @@ struct Compiler {
         }
         if (!expect("]")) return false;
         if (can_assign && consume("=") && count == 1) {
-            if (!expression()) return false;
+            if (consume("fun")) {
+                if (!function(nullptr)) return false;
+            } else {
+                if (!expression()) return false;
+            }
+
             emit(OpCode::SET);
         } else {
             emit(OpCode::INDEX, count);
@@ -1391,7 +1432,11 @@ struct Compiler {
         if (!eat()) return false;
 
         if (can_assign && consume("=")) {
-            if (!expression()) return false;
+            if (consume("fun")) {
+                if (!function(nullptr)) return false;
+            } else {
+                if (!expression()) return false;
+            }
             emit(OpCode::SET);
         } else {
             emit(OpCode::INDEX, 1);
@@ -1493,9 +1538,19 @@ struct Compiler {
                     CHECK_TYPE_ID(string);
                     value = cur.literal;
                     break;
-                case TokenType::Number:
-                    CHECK_TYPE_ID(double);
-                    value = stod(cur.literal);
+                case TokenType::Number: {
+                    bool is_float = false;
+                    for (int i = 0; i < cur.literal.size(); i++)
+                        if (cur.literal[i] == '.') is_float = true;
+
+                    if (is_float) {
+                        CHECK_TYPE_ID(float);
+                        value = stof(cur.literal);
+                    } else {
+                        CHECK_TYPE_ID(int);
+                        value = stoi(cur.literal);
+                    }
+                }
                     break;
                 default:
                     CHECK_TYPE_ID(void);
@@ -1509,7 +1564,7 @@ struct Compiler {
 #undef CHECK_TYPE_ID
 
         if (option_id == "VERSION") {
-            if (SRCLANG_VERSION > get<double>(value)) {
+            if (SRCLANG_VERSION > get<float>(value)) {
                 error(
                         "Code need srclang of version above or equal to "
                         "'" +
@@ -1555,10 +1610,16 @@ struct Compiler {
         if (!expect("=")) {
             return false;
         }
-
-        if (!expression()) {
-            return false;
+        if (consume("fun")) {
+            if (!function(&(*symbol))) {
+                return false;
+            }
+        } else {
+            if (!expression()) {
+                return false;
+            }
         }
+
 
         emit(OpCode::STORE, symbol->scope, symbol->index);
         emit(OpCode::POP);
@@ -1577,14 +1638,6 @@ struct Compiler {
         for (int i = loop_start; i < inst()->size();) {
             auto j = OpCode(inst()->at(i++));
             switch (j) {
-                case OpCode::JNZ:
-                case OpCode::JMP:
-                case OpCode::CONST:
-                case OpCode::CONST_INT:
-                case OpCode::CALL: {
-                    i++;
-                }
-                    break;
                 case OpCode::CONTINUE:
                 case OpCode::BREAK: {
                     if (j == to_patch && inst()->at(i) == 0)
@@ -1592,12 +1645,8 @@ struct Compiler {
                 }
                     break;
 
-                case OpCode::LOAD:
-                case OpCode::STORE: {
-                    i += 2;
-                }
-                    break;
                 default:
+                    i += SRCLANG_OPCODE_SIZE[int(j)];
                     break;
             }
         }
@@ -1746,19 +1795,19 @@ struct Compiler {
         instructions->emit(compiler.global_debug_info.get(), 0,
                            OpCode::RET);
 
-        auto fun = new Function<Byte, Value>{
-                FunctionType::Function, move(instructions), {}, nlocals, 0, false,
-                compiler.global_debug_info};
-        auto val = SRCLANG_VALUE_FUNCTION(fun);
-        memory_manager->heap.push_back(val);
-        constants.push_back(val);
 
         for (auto const &i: nfree) {
             emit(OpCode::LOAD, i.scope, i.index);
         }
 
-        emit(OpCode::CONST, constants.size() - 1);
-        emit(OpCode::FUN, nfree.size());
+        auto fun = new Function<Byte>{
+                FunctionType::Function, "", move(instructions), nlocals, 0, false,
+                compiler.global_debug_info};
+        auto val = SRCLANG_VALUE_FUNCTION(fun);
+        memory_manager->heap.push_back(val);
+        constants.push_back(val);
+
+        emit(OpCode::CLOSURE, constants.size() - 1, nfree.size());
         emit(OpCode::CALL, 0);
         if (!eat()) return false;
 
@@ -1772,6 +1821,7 @@ struct Compiler {
             error("Can't import module with '" + module_name + "', variable already defined", cur.pos);
             return false;
         }
+        fun->id = module_name;
         auto symbol = symbol_table->define(module_name);
         emit(OpCode::STORE, symbol.scope, symbol.index);
         emit(OpCode::POP);
@@ -1985,7 +2035,7 @@ template<typename Byte>
 struct Interpreter {
     struct Frame {
         typename vector<Byte>::iterator ip;
-        Function<Byte, Value> *fun;
+        Closure<Byte, Value> *closure;
         vector<Value>::iterator bp;
     };
 
@@ -2022,8 +2072,9 @@ struct Interpreter {
 #undef ADD_BUILTIN_PROPERTY
     };
 
-    int next_gc = 20;
-    int GC_HEAP_GROW_FACTOR = 2;
+    int next_gc = 50;
+    float GC_HEAP_GROW_FACTOR = 1.0;
+    int LIMIT_NEXT_GC = 200;
 
     vector<Value> stack;
     vector<Value>::iterator sp;
@@ -2045,7 +2096,7 @@ struct Interpreter {
 
         cerr << debug_info.back()->filename << ":"
              << debug_info.back()->lines[distance(
-                     cur()->fun->instructions->begin(), cur()->ip)]
+                     cur()->closure->fun->instructions->begin(), cur()->ip)]
              << endl;
         cerr << "  ERROR: " << mesg << endl;
     }
@@ -2053,36 +2104,41 @@ struct Interpreter {
     Interpreter(ByteCode<Byte, Value> &code, vector<Value> &globals,
                 shared_ptr<DebugInfo> const &debug_info,
                 MemoryManager *memory_manager)
-            : stack(1024),
-              frames(256),
+            : stack(2048),
+              frames(1024),
               globals{globals},
               constants{code.constants},
               memory_manager{memory_manager} {
         sp = stack.begin();
         fp = frames.begin();
         this->debug_info.push_back(debug_info);
-        auto fun = new Function<Byte, Value>{FunctionType::Function,
-                                             move(code.instructions),
-                                             {},
-                                             0,
-                                             0,
-                                             false,
-                                             debug_info};
-        fp->fun = move(fun);
-        fp->ip = fp->fun->instructions->begin();
+        auto fun = new Function<Byte>{FunctionType::Function, "<script>",
+                                      move(code.instructions),
+                                      0,
+                                      0,
+                                      false,
+                                      debug_info};
+        fp->closure = new Closure<Byte, Value>{move(fun), {}};
+        fp->ip = fp->closure->fun->instructions->begin();
         fp->bp = sp;
         fp++;
     }
 
-    ~Interpreter() { delete (frames.begin())->fun; }
+    ~Interpreter() {
+        delete (frames.begin())->closure->fun;
+        delete (frames.begin())->closure;
+    }
 
     void add_object(Value val) {
 #ifdef SRCLANG_GC_DEBUG
         gc();
 #else
-        if (memory_manager->heap.size() > next_gc) {
+        if (memory_manager->heap.size() > next_gc && next_gc < LIMIT_NEXT_GC) {
+            std::cout << "TRIGGERING GC:" << std::endl;
             gc();
+            memory_manager->heap.shrink_to_fit();
             next_gc = memory_manager->heap.size() * GC_HEAP_GROW_FACTOR;
+            std::cout << "NEXT GC:" << next_gc << std::endl;
         }
 #endif
         memory_manager->heap.push_back(val);
@@ -2507,15 +2563,16 @@ struct Interpreter {
         }
     }
 
-    bool call_function(Value callee, uint8_t count) {
-        auto fun = reinterpret_cast<Function<Byte, Value> *>(
+    bool call_closure(Value callee, uint8_t count) {
+        auto closure = reinterpret_cast<Closure<Byte, Value> *>(
                 SRCLANG_VALUE_AS_OBJECT(callee)->pointer);
-        if (fun->is_variadic) {
-            if (count < fun->nparams - 1) {
-                error("expected atleast '" + to_string(fun->nparams - 1) + "' but '" + to_string(count) + "' provided");
+        if (closure->fun->is_variadic) {
+            if (count < closure->fun->nparams - 1) {
+                error("expected atleast '" + to_string(closure->fun->nparams - 1) + "' but '" + to_string(count) +
+                      "' provided");
                 return false;
             }
-            auto v_arg_begin = (sp - (count - (fun->nparams - 1)));
+            auto v_arg_begin = (sp - (count - (closure->fun->nparams - 1)));
             auto v_arg_end = sp;
             SrcLangList *var_args;
             auto dist = distance(v_arg_begin, v_arg_end);
@@ -2526,25 +2583,25 @@ struct Interpreter {
             }
             auto var_val = SRCLANG_VALUE_LIST(var_args);
             add_object(var_val);
-            *(sp - (count - (fun->nparams - 1))) = var_val;
-            sp = (sp - (count - fun->nparams));
-            count = fun->nparams;
+            *(sp - (count - (closure->fun->nparams - 1))) = var_val;
+            sp = (sp - (count - closure->fun->nparams));
+            count = closure->fun->nparams;
 
             print_stack();
         }
 
-        if (count != fun->nparams) {
-            error("expected '" + to_string(fun->nparams) + "' but '" + to_string(count) + "' provided");
+        if (count != closure->fun->nparams) {
+            error("expected '" + to_string(closure->fun->nparams) + "' but '" + to_string(count) + "' provided");
             return false;
         }
 
 
-        fp->fun = std::move(fun);
-        fp->ip = fp->fun->instructions->begin();
+        fp->closure = closure;
+        fp->ip = fp->closure->fun->instructions->begin();
         fp->bp = (sp - count);
-        sp = fp->bp + fp->fun->nlocals;
+        sp = fp->bp + fp->closure->fun->nlocals;
         print_stack();
-        debug_info.push_back(fp->fun->debug_info);
+        debug_info.push_back(fp->closure->fun->debug_info);
         fp++;
         return true;
     }
@@ -2835,8 +2892,8 @@ struct Interpreter {
             return call_typecast(callee, count);
         } else if (SRCLANG_VALUE_IS_OBJECT(callee)) {
             switch (SRCLANG_VALUE_AS_OBJECT(callee)->type) {
-                case ValueType::Function:
-                    return call_function(callee, count);
+                case ValueType::Closure:
+                    return call_closure(callee, count);
                 case ValueType::Builtin:
                     return call_builtin(callee, count);
                 case ValueType::Native:
@@ -2862,7 +2919,7 @@ struct Interpreter {
                 if (debug_info.size()) {
                     cout << debug_info.back()->filename << ":"
                          << debug_info.back()->lines[distance(
-                                 cur()->fun->instructions->begin(), cur()->ip)]
+                                 cur()->closure->fun->instructions->begin(), cur()->ip)]
                          << endl;
                 }
 
@@ -2873,8 +2930,8 @@ struct Interpreter {
                 cout << endl;
                 cout << ">> ";
                 ByteCode<Byte, Value>::debug(
-                        *cur()->fun->instructions.get(), constants,
-                        distance(cur()->fun->instructions->begin(), ip()), cout);
+                        *cur()->closure->fun->instructions.get(), constants,
+                        distance(cur()->closure->fun->instructions->begin(), ip()), cout);
                 cout << endl;
 
                 if (break_) cin.get();
@@ -2964,7 +3021,7 @@ struct Interpreter {
                             *sp++ = SRCLANG_VALUE_TYPES[pos];
                             break;
                         case Symbol::Scope::FREE:
-                            *sp++ = cur()->fun->free[pos];
+                            *sp++ = cur()->closure->free[pos];
                             break;
                         default:
                             error("ERROR: can't load value of scope '" +
@@ -2975,15 +3032,18 @@ struct Interpreter {
                 }
                     break;
 
-                case OpCode::FUN: {
+                case OpCode::CLOSURE: {
+                    int funIndex = *ip()++;
                     int nfree = *ip()++;
-                    auto fun_value = *--sp;
-                    auto fun = (Function<Byte, Value> *) (SRCLANG_VALUE_AS_OBJECT(
-                            fun_value)
-                            ->pointer);
-                    fun->free = vector<Value>(sp - nfree, sp);
+
+                    auto constant = constants[funIndex];
+                    auto fun = (Function<Byte> *) SRCLANG_VALUE_AS_OBJECT(constant)->pointer;
+                    auto frees = vector<Value>(sp - nfree, sp);
                     sp -= nfree;
-                    *sp++ = fun_value;
+                    auto closure = new Closure<Byte, Value>(fun, frees);
+                    auto closure_value = SRCLANG_VALUE_CLOSURE(closure);
+                    *sp++ = closure_value;
+                    add_object(closure_value);
                 }
                     break;
 
@@ -3173,6 +3233,14 @@ struct Interpreter {
                 }
                     break;
 
+                case OpCode::SET_SELF: {
+                    auto freeIndex = *ip()++;
+
+                    auto currentClosure = cur()->closure;
+                    currentClosure->free[freeIndex] = SRCLANG_VALUE_CLOSURE(currentClosure);
+                }
+                    break;
+
                 case OpCode::SET: {
                     auto val = *--sp;
                     auto pos = *--sp;
@@ -3293,7 +3361,7 @@ struct Interpreter {
                 case OpCode::JNZ: {
                     auto value = *--sp;
                     if (!SRCLANG_VALUE_AS_BOOL(value)) {
-                        ip() = (cur()->fun->instructions->begin() + *ip());
+                        ip() = (cur()->closure->fun->instructions->begin() + *ip());
                     } else {
                         *ip()++;
                     }
@@ -3303,7 +3371,7 @@ struct Interpreter {
                 case OpCode::CONTINUE:
                 case OpCode::BREAK:
                 case OpCode::JMP: {
-                    ip() = (cur()->fun->instructions->begin() + *ip());
+                    ip() = (cur()->closure->fun->instructions->begin() + *ip());
                 }
                     break;
 
@@ -3511,7 +3579,7 @@ int main(int argc, char **argv) {
 
     bool debug = false;
     bool break_ = false;
-    auto args = new SrcLangList ();
+    auto args = new SrcLangList();
     for (int i = 1; i < argc; i++) {
         string arg(argv[i]);
         if (arg[0] == '-' && filename == nullopt) {
@@ -3553,7 +3621,7 @@ int main(int argc, char **argv) {
         cout << " PRESS [CTRL+C] to exit" << endl;
         cout << endl;
     }
-    vector<Value> globals(125);
+    vector<Value> globals(65536);
     {
         int i = 0;
 #define X(id) symbol_table.define(#id, i++);
@@ -3614,7 +3682,7 @@ int main(int argc, char **argv) {
         Interpreter<Byte> interpreter(code, globals, compiler.global_debug_info,
                                       &memory_manager);
         interpreter.GC_HEAP_GROW_FACTOR =
-                std::get<int>(compiler.options["GC_HEAP_GROW_FACTOR"]);
+                std::get<float>(compiler.options["GC_HEAP_GROW_FACTOR"]);
         interpreter.next_gc =
                 std::get<int>(compiler.options["GC_INITIAL_TRIGGER"]);
         interpreter.debug = debug;
