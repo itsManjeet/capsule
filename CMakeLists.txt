@@ -47,7 +47,7 @@ add_dependencies(${PROJECT_NAME} tinycc)
 endif ()
 
 
-target_link_libraries(${PROJECT_NAME} ${FFI} ${DL} ${LIBTCC} -rdynamic)
+target_link_libraries(${PROJECT_NAME} ${FFI} ${DL} ${LIBTCC} -static -rdynamic)
 # target_compile_definitions(${PROJECT_NAME} PUBLIC -DSRCLANG_GC_DEBUG)
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
 enable_testing()
