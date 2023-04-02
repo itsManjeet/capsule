@@ -164,7 +164,8 @@ const vector<string> SRCLANG_SYMBOL_ID = {
     X(Native, "native")         \
     X(Error, "error")           \
     X(Bounded, "bounded")       \
-    X(Type, "type")
+    X(Type, "type")             \
+    X(Pointer, "ptr")
 
 enum class ValueType : uint8_t {
 #define X(id, name) id,
@@ -239,103 +240,41 @@ typedef uint64_t Value;
     ((Value)(SRCLANG_VALUE_QNAN | ((uint64_t)(uint32_t)(val) << 3) | \
              SRCLANG_VALUE_TAG_CHAR))
 
-#define SRCLANG_VALUE_HEAP_OBJECT(type, ptr, destructor, printer) \
+#define SRCLANG_VALUE_HEAP_OBJECT(type, ptr) \
     SRCLANG_VALUE_OBJECT(                                         \
-        (new HeapObject{(type), (ptr), (destructor), (printer)}))
+        (new HeapObject{(type), (ptr)}))
 
 #define SRCLANG_VALUE_STRING(str)                       \
     SRCLANG_VALUE_HEAP_OBJECT(                          \
-        ValueType::String, (void*)str, ([](void* ptr) { \
-            if (ptr != nullptr) delete[] (char*)ptr;    \
-        }),                                             \
-        ([](void* ptr) -> string { return (char*)ptr; }))
+        ValueType::String, (void*)str)
 
 #define SRCLANG_VALUE_LIST(list)                                              \
-    SRCLANG_VALUE_HEAP_OBJECT(ValueType::List, (void*)list, ([](void* ptr) {  \
-                                  if (ptr != nullptr) {                       \
-                                      ((SrcLangList*)ptr)->clear();           \
-                                      delete (SrcLangList*)ptr;               \
-                                  }                                           \
-                              }),                                             \
-                              ([](void* ptr) -> string {                      \
-                                  stringstream ss;                            \
-                                  vector<Value> list =                        \
-                                      *reinterpret_cast<vector<Value>*>(ptr); \
-                                  ss << "[";                                  \
-                                  string sep;                                 \
-                                  for (auto i : list) {                       \
-                                      ss << sep << srclang_value_print(i);    \
-                                      sep = ", ";                             \
-                                  }                                           \
-                                  ss << "]";                                  \
-                                  return ss.str();                            \
-                              }))
+    SRCLANG_VALUE_HEAP_OBJECT(ValueType::List, (void*)list)
 
 #define SRCLANG_VALUE_MAP(map)                                                \
     SRCLANG_VALUE_HEAP_OBJECT(                                                \
-        ValueType::Map, (void*)map, ([](void* ptr) {                          \
-            if (ptr != nullptr) {                                             \
-                ((SrcLangMap*)ptr)->clear();                                  \
-                delete (SrcLangMap*)ptr;                                      \
-            }                                                                 \
-        }),                                                                   \
-        ([](void* ptr) -> string {                                            \
-            stringstream ss;                                                  \
-            SrcLangMap m = *reinterpret_cast<SrcLangMap*>(ptr);               \
-            ss << "{";                                                        \
-            string sep; if (!m.empty()) {                                                       \
-            for (auto i : m) {                                                \
-                ss << sep << i.first << ":" << srclang_value_print(i.second); \
-                sep = ", ";                                                   \
-            }                            }                                     \
-            ss << "}";                                                        \
-            return ss.str();                                                  \
-        }))
+        ValueType::Map, (void*)map)
 
 #define SRCLANG_VALUE_ERROR(err)                  \
     SRCLANG_VALUE_HEAP_OBJECT(                    \
-        ValueType::Error, (void*)err,             \
-        ([](void* ptr) { delete[] (char*)ptr; }), \
-        ([](void* ptr) -> string { return (char*)ptr; }))
+        ValueType::Error, (void*)err)
 
 #define SRCLANG_VALUE_NATIVE(native)                                          \
-    SRCLANG_VALUE_HEAP_OBJECT(ValueType::Native, (void*)native,               \
-                              ([](void* ptr) {}), ([](void* ptr) -> string {  \
-                                  NativeFunction* native =                    \
-                                      reinterpret_cast<NativeFunction*>(ptr); \
-                                  return "<native(" + native->id + ")";       \
-                              }))
+    SRCLANG_VALUE_HEAP_OBJECT(ValueType::Native, (void*)native)
 
 #define SRCLANG_VALUE_BUILTIN(id)                                    \
     SRCLANG_VALUE_HEAP_OBJECT(                                       \
-        ValueType::Builtin, (void*)builtin_##id, ([](void* ptr) {}), \
-        ([](void* ptr) -> string { return "<builtin " #id ">"; }))
+        ValueType::Builtin, (void*)builtin_##id)
 
 #define SRCLANG_VALUE_FUNCTION(fun)                                           \
     SRCLANG_VALUE_HEAP_OBJECT(                                                \
-        ValueType::Function, (void*)fun, ([](void* ptr) {                     \
-            delete reinterpret_cast<Function<Byte>*>(ptr);             \
-        }),                                                                   \
-        ([](void* ptr) -> string {                                            \
-                    Function<Byte>* fun =                                      \
-                reinterpret_cast<Function<Byte>*>(ptr);                \
-                return "<function("+ fun->id + ")>";                                                                                      \
-            vector<Value> constants;                                          \
-            stringstream ss;                                                  \
-            for (int offset = 0; offset < fun->instructions->size();) {       \
-                offset = ByteCode<Byte, Value>::debug(*fun->instructions,     \
-                                                      constants, offset, ss); \
-                ss << " | ";                                                  \
-            }                                                                 \
-            return ss.str();                                                  \
-        }))
+        ValueType::Function, (void*)fun)
 
 #define SRCLANG_VALUE_CLOSURE(fun)                                       \
     SRCLANG_VALUE_HEAP_OBJECT(                                                \
-        ValueType::Closure, (void*)fun, ([](void* ptr) {                     \
-                                                                              \
-        }),                                                                   \
-        ([](void* ptr) -> string { return "<closure()>"; }))
+        ValueType::Closure, (void*)fun)
+
+#define SRCLANG_VALUE_POINTER(ptr) SRCLANG_VALUE_HEAP_OBJECT(ValueType::Pointer, ptr)
 
 #define SRCLANG_VALUE_TRUE \
     ((Value)(uint64_t)(SRCLANG_VALUE_QNAN | SRCLANG_VALUE_TAG_TRUE))
@@ -348,8 +287,6 @@ typedef uint64_t Value;
     Value builtin_##id(vector<Value> const& args, \
                        Interpreter<Byte>* interpreter)
 
-#define SRCLANG_VALUE_GET_TYPE(val) srclang_value_get_type(val)
-#define SRCLANG_VALUE_GET_STRING(val) srclang_value_print(val)
 #define SRCLANG_VALUE_DEBUG(val) SRCLANG_VALUE_GET_STRING(val) + ":" + SRCLANG_VALUE_TYPE_ID[(int)SRCLANG_VALUE_GET_TYPE(val)]
 
 #define SRCLANG_CHECK_ARGS_EXACT(count)                                    \
@@ -386,14 +323,8 @@ static inline Value srclang_decimal_to_value(double num) {
 }
 
 struct HeapObject {
-    using Destructor = function<void(void *)>;
-    using Printer = function<string(void *)>;
-
     ValueType type;
     void *pointer{nullptr};
-
-    Destructor destructor{nullptr};
-    Printer printer{nullptr};
 
     bool marked{false};
 };
@@ -415,7 +346,7 @@ static const vector<Value> SRCLANG_VALUE_TYPES = {
 #undef X
 };
 
-ValueType srclang_value_get_type(Value val) {
+ValueType SRCLANG_VALUE_GET_TYPE(Value val) {
     if (SRCLANG_VALUE_IS_NULL(val)) return ValueType::Null;
     if (SRCLANG_VALUE_IS_BOOL(val)) return ValueType::Boolean;
     if (SRCLANG_VALUE_IS_DECIMAL(val)) return ValueType::Decimal;
@@ -428,8 +359,8 @@ ValueType srclang_value_get_type(Value val) {
     throw runtime_error("invalid value '" + to_string((uint64_t) val) + "'");
 }
 
-string srclang_value_print(Value val) {
-    auto type = srclang_value_get_type(val);
+string SRCLANG_VALUE_GET_STRING(Value val) {
+    auto type = SRCLANG_VALUE_GET_TYPE(val);
     switch (type) {
         case ValueType::Null:
             return "null";
@@ -446,10 +377,58 @@ string srclang_value_print(Value val) {
                    SRCLANG_VALUE_TYPE_ID[int(SRCLANG_VALUE_AS_TYPE(val))] +
                    ")>";
         default:
-            return SRCLANG_VALUE_AS_OBJECT(val)->printer(
-                    (SRCLANG_VALUE_AS_OBJECT(val)->pointer));
+            if (SRCLANG_VALUE_IS_OBJECT(val)) {
+                auto object = SRCLANG_VALUE_AS_OBJECT(val);
+                switch (type) {
+                    case ValueType::String:
+                    case ValueType::Error:
+                        return (char *) object->pointer;
+                    case ValueType::List: {
+                        stringstream ss;
+                        ss << "[";
+                        string sep;
+                        for (auto const &i: *(reinterpret_cast<SrcLangList *>(object->pointer))) {
+                            ss << sep << SRCLANG_VALUE_GET_STRING(i);
+                            sep = ", ";
+                        }
+                        ss << "]";
+                        return ss.str();
+                    }
+                        break;
+
+                    case ValueType::Map: {
+                        stringstream ss;
+                        ss << "{";
+                        string sep;
+                        for (auto const &i: *(reinterpret_cast<SrcLangMap *>(object->pointer))) {
+                            ss << sep << i.first << ":" << SRCLANG_VALUE_GET_STRING(i.second);
+                            sep = ", ";
+                        }
+                        ss << "}";
+                        return ss.str();
+                    }
+                        break;
+
+                    case ValueType::Function: {
+                        return "<function()>";
+                    }
+                        break;
+
+                    case ValueType::Pointer: {
+                        stringstream ss;
+                        ss << "0x" << std::hex << reinterpret_cast<unsigned long>(object->pointer);
+                        return ss.str();
+                    }
+
+                    default:
+                        return "<object(" + SRCLANG_VALUE_TYPE_ID[int(type)] + ")>";
+                }
+            }
     }
+
+    return "<value(" + SRCLANG_VALUE_TYPE_ID[int(type)] + ")>";
 }
+
 
 struct SymbolTable {
     SymbolTable *parent{nullptr};
@@ -626,6 +605,39 @@ struct Closure {
     vector<Value> free{0};
 };
 
+void SRCLANG_VALUE_FREE(Value value) {
+    if (!SRCLANG_VALUE_IS_OBJECT(value)) {
+        return;
+    }
+    auto type = SRCLANG_VALUE_GET_TYPE(value);
+    auto object = SRCLANG_VALUE_AS_OBJECT(value);
+    switch (type) {
+        case ValueType::String:
+        case ValueType::Error:
+            free((char *) object->pointer);
+            break;
+
+        case ValueType::List:
+            delete reinterpret_cast<SrcLangList *>(object->pointer);
+            break;
+
+        case ValueType::Map:
+            delete reinterpret_cast<SrcLangMap *>(object->pointer);
+            break;
+
+        case ValueType::Function:
+            delete reinterpret_cast<Function<Byte> *>(object->pointer);
+            break;
+
+        case ValueType::Pointer:
+            break;
+
+        default:
+            runtime_error("can't clean value of type '" + SRCLANG_VALUE_TYPE_ID[int(type)] + "'");
+    }
+    delete object;
+}
+
 struct MemoryManager {
     using Heap = vector<Value>;
     Heap heap;
@@ -640,7 +652,7 @@ struct MemoryManager {
             if (obj->marked) return;
             obj->marked = true;
 #ifdef SRCLANG_GC_DEBUG
-            cout << "  marked "
+                                                                                                                                    cout << "  marked "
                  << uintptr_t(SRCLANG_VALUE_AS_OBJECT(val)->pointer) << "'"
                  << SRCLANG_VALUE_GET_STRING(val) << "'" << endl;
 #endif
@@ -648,8 +660,8 @@ struct MemoryManager {
                 mark(reinterpret_cast<vector<Value> *>(obj->pointer)->begin(),
                      reinterpret_cast<vector<Value> *>(obj->pointer)->end());
             } else if (obj->type == ValueType::Closure) {
-                mark(reinterpret_cast<Closure<Byte, Value>*>(obj->pointer)->free.begin(),
-                     reinterpret_cast<Closure<Byte, Value>*>(obj->pointer)->free.end());
+                mark(reinterpret_cast<Closure<Byte, Value> *>(obj->pointer)->free.begin(),
+                     reinterpret_cast<Closure<Byte, Value> *>(obj->pointer)->free.end());
             } else if (obj->type == ValueType::Map) {
                 for (auto &i: *reinterpret_cast<SrcLangMap *>(obj->pointer)) {
                     mark(i.second);
@@ -673,13 +685,12 @@ struct MemoryManager {
                     i++;
                 } else {
 #ifdef SRCLANG_GC_DEBUG
-                    cout << "   deallocating "
+                                                                                                                                            cout << "   deallocating "
                                                 << uintptr_t(obj->pointer) << "'"
                                                 << SRCLANG_VALUE_GET_STRING(*i)
                                                 << "'" << endl;
 #endif
-                    obj->destructor(obj->pointer);
-                    delete obj;
+                    SRCLANG_VALUE_FREE(*i);
                     i = heap.erase(i);
                 }
             }
@@ -713,6 +724,7 @@ struct Compiler {
     DebugInfo *debug_info;
     shared_ptr<DebugInfo> global_debug_info;
     TCCState *state;
+    int fileConstantPosition = 0;
     Options options = {
             {"VERSION", SRCLANG_VERSION},
             {"GC_HEAP_GROW_FACTOR",   1.0f},
@@ -741,9 +753,12 @@ struct Compiler {
         global_debug_info->filename = filename;
         global_debug_info->position = 0;
         debug_info = global_debug_info.get();
-        instructions.push_back(make_unique<Instructions<Byte>>());
+        instructions.push_back(make_unique<Instructions<Byte>>
+                                       ());
         eat();
         eat();
+        constants.push_back(SRCLANG_VALUE_STRING(strdup(filename.c_str())));
+        fileConstantPosition = constants.size() - 1;
     }
 
     ByteCode<Byte, Value> code() {
@@ -754,7 +769,8 @@ struct Compiler {
 
     void push_scope() {
         symbol_table = new SymbolTable{symbol_table};
-        instructions.push_back(make_unique<Instructions<Byte>>());
+        instructions.push_back(make_unique<Instructions<Byte>>
+                                       ());
     }
 
     unique_ptr<Instructions<Byte>> pop_scope() {
@@ -1574,7 +1590,7 @@ struct Compiler {
             }
         } else if (option_id == "SEARCH_PATH") {
             options[option_id] =
-                    get<string>(value) + ":" + get<string>(options[option_id]);
+                    filesystem::absolute(get<string>(value)).string() + ":" + get<string>(options[option_id]);
         } else if (option_id == "C_LIBRARY") {
             tcc_add_library(state, get<string>(value).c_str());
         } else if (option_id == "C_LIBRARY_PATH") {
@@ -1783,7 +1799,8 @@ struct Compiler {
                 isupper(i.first[0])) {
                 constants.push_back(SRCLANG_VALUE_STRING(strdup(i.first.c_str())));
                 instructions->emit(compiler.global_debug_info.get(), 0, OpCode::CONST, constants.size() - 1);
-                instructions->emit(compiler.global_debug_info.get(), 0, OpCode::LOAD, i.second.scope, i.second.index);
+                instructions->emit(compiler.global_debug_info.get(), 0, OpCode::LOAD, i.second.scope,
+                                   i.second.index);
                 total++;
             }
         }
@@ -1824,6 +1841,11 @@ struct Compiler {
         fun->id = module_name;
         auto symbol = symbol_table->define(module_name);
         emit(OpCode::STORE, symbol.scope, symbol.index);
+        emit(OpCode::POP);
+
+        auto fileSymbol = symbol_table->resolve("__FILE__");
+        emit(OpCode::CONST, fileConstantPosition);
+        emit(OpCode::STORE, fileSymbol->scope, fileSymbol->index);
         emit(OpCode::POP);
 
         return true;
@@ -1970,6 +1992,10 @@ struct Compiler {
     }
 
     bool compile(bool is_sub = false) {
+        auto fileSymbol = symbol_table->resolve("__FILE__");
+        emit(OpCode::CONST, fileConstantPosition);
+        emit(OpCode::STORE, fileSymbol->scope, fileSymbol->index);
+        emit(OpCode::POP);
         if (!is_sub) {
             state = tcc_new();
             if (state == nullptr) {
@@ -2009,7 +2035,10 @@ struct Compiler {
     X(append)                \
     X(range)                 \
     X(clone)                 \
-    X(pop)
+    X(pop)                   \
+    X(lower)                 \
+    X(upper)                 \
+    X(search)
 
 template<typename Byte>
 struct Interpreter;
@@ -2051,6 +2080,9 @@ struct Interpreter {
                             ADD_BUILTIN_PROPERTY(append),
                             ADD_BUILTIN_PROPERTY(pop),
                             ADD_BUILTIN_PROPERTY(clone),
+                            ADD_BUILTIN_PROPERTY(upper),
+                            ADD_BUILTIN_PROPERTY(lower),
+                            ADD_BUILTIN_PROPERTY(search),
                     },
             },
 
@@ -2061,6 +2093,13 @@ struct Interpreter {
                             ADD_BUILTIN_PROPERTY(append),
                             ADD_BUILTIN_PROPERTY(pop),
                             ADD_BUILTIN_PROPERTY(clone),
+                            ADD_BUILTIN_PROPERTY(search),
+                    },
+            },
+            {
+                    ValueType::Map,
+                    {
+                            ADD_BUILTIN_PROPERTY(search),
                     },
             },
             {
@@ -2150,7 +2189,7 @@ struct Interpreter {
 
     void gc() {
 #ifdef SRCLANG_GC_DEBUG
-        cout << "Total allocations: " << memory_manager->heap.size() << endl;
+                                                                                                                                cout << "Total allocations: " << memory_manager->heap.size() << endl;
         cout << "gc begin:" << endl;
 #endif
         memory_manager->mark(stack.begin(), sp);
@@ -2159,9 +2198,47 @@ struct Interpreter {
         memory_manager->mark(builtins.begin(), builtins.end());
         memory_manager->sweep();
 #ifdef SRCLANG_GC_DEBUG
-        cout << "gc end:" << endl;
+                                                                                                                                cout << "gc end:" << endl;
         cout << "Total allocations: " << memory_manager->heap.size() << endl;
 #endif
+    }
+
+    bool isEqual(Value a, Value b) {
+        auto aType = SRCLANG_VALUE_GET_TYPE(a);
+        auto bType = SRCLANG_VALUE_GET_TYPE(b);
+        if (aType != bType) return false;
+        if (SRCLANG_VALUE_IS_OBJECT(a)) return a == b;
+        switch (aType) {
+            case ValueType::Error:
+            case ValueType::String: {
+                char *aBuffer = (char *) SRCLANG_VALUE_AS_OBJECT(a)->pointer;
+                char *bBuffer = (char *) SRCLANG_VALUE_AS_OBJECT(b)->pointer;
+                return !strcmp(aBuffer, bBuffer);
+            }
+
+            case ValueType::List: {
+                SrcLangList *aList = (SrcLangList *) SRCLANG_VALUE_AS_OBJECT(a)->pointer;
+                SrcLangList *bList = (SrcLangList *) SRCLANG_VALUE_AS_OBJECT(b)->pointer;
+                if (aList->size() != bList->size()) return false;
+                for (int i = 0; i < aList->size(); i++) {
+                    if (!isEqual(aList->at(i), bList->at(i))) return false;
+                }
+                return true;
+            }
+
+            case ValueType::Map: {
+                SrcLangMap *aMap = (SrcLangMap *) SRCLANG_VALUE_AS_OBJECT(a)->pointer;
+                SrcLangMap *bMap = (SrcLangMap *) SRCLANG_VALUE_AS_OBJECT(b)->pointer;
+                if (aMap->size() != bMap->size()) return false;
+                for (auto const &i: *aMap) {
+                    auto iter = bMap->find(i.first);
+                    if (iter == bMap->end()) return false;
+                    if (!isEqual(iter->second, i.second)) return false;
+                }
+                return true;
+            }
+        }
+        return false;
     }
 
     bool unary(Value a, OpCode op) {
@@ -2178,7 +2255,7 @@ struct Interpreter {
                     error(
                             "unexpected unary operator '" +
                             SRCLANG_OPCODE_ID[static_cast<int>(op)] + "' for '" +
-                            SRCLANG_VALUE_TYPE_ID[int(srclang_value_get_type(a))] +
+                            SRCLANG_VALUE_TYPE_ID[int(SRCLANG_VALUE_GET_TYPE(a))] +
                             "'");
                     return false;
             }
@@ -2191,11 +2268,11 @@ struct Interpreter {
                     error(
                             "unexpected unary operator '" +
                             SRCLANG_OPCODE_ID[static_cast<int>(op)] + "' for '" +
-                            SRCLANG_VALUE_TYPE_ID[int(srclang_value_get_type(a))] +
+                            SRCLANG_VALUE_TYPE_ID[int(SRCLANG_VALUE_GET_TYPE(a))] +
                             "'");
                     return false;
             }
-        } else if (srclang_value_get_type(a) == ValueType::String) {
+        } else if (SRCLANG_VALUE_GET_TYPE(a) == ValueType::String) {
             switch (op) {
                 case OpCode::COMMAND: {
                     array<char, 128> buffer;
@@ -2221,14 +2298,14 @@ struct Interpreter {
                     error(
                             "unexpected unary operator '" +
                             SRCLANG_OPCODE_ID[static_cast<int>(op)] + "' for '" +
-                            SRCLANG_VALUE_TYPE_ID[int(srclang_value_get_type(a))] +
+                            SRCLANG_VALUE_TYPE_ID[int(SRCLANG_VALUE_GET_TYPE(a))] +
                             "'");
                     return false;
             }
         } else {
             error("ERROR: unhandler unary operation for value of type " +
                   SRCLANG_VALUE_TYPE_ID[static_cast<int>(
-                          srclang_value_get_type(a))] +
+                          SRCLANG_VALUE_GET_TYPE(a))] +
                   "'");
             return false;
         }
@@ -2446,7 +2523,7 @@ struct Interpreter {
                           SRCLANG_OPCODE_ID[static_cast<int>(op)] + "'");
                     return false;
             }
-        } else if (srclang_value_get_type(lhs) == ValueType::String) {
+        } else if (SRCLANG_VALUE_GET_TYPE(lhs) == ValueType::String) {
             char *a =
                     reinterpret_cast<char *>(SRCLANG_VALUE_AS_OBJECT(lhs)->pointer);
             if (SRCLANG_VALUE_GET_TYPE(rhs) != ValueType::String) {
@@ -2537,7 +2614,7 @@ struct Interpreter {
             error("ERROR: unsupported binary operator '" +
                   SRCLANG_OPCODE_ID[int(op)] + "' for type '" +
                   SRCLANG_VALUE_TYPE_ID[static_cast<int>(
-                          srclang_value_get_type(lhs))] +
+                          SRCLANG_VALUE_GET_TYPE(lhs))] +
                   "'");
             return false;
         }
@@ -2557,7 +2634,7 @@ struct Interpreter {
         if (debug) {
             cout << "  ";
             for (auto i = stack.begin(); i != sp; i++) {
-                cout << "[" << srclang_value_print(*i) << "] ";
+                cout << "[" << SRCLANG_VALUE_GET_STRING(*i) << "] ";
             }
             cout << endl;
         }
@@ -2684,7 +2761,7 @@ struct Interpreter {
     bool call_typecast_string(uint8_t count) {
         string buf;
         for (auto i = sp - count; i != sp; i++) {
-            buf += srclang_value_print(*i);
+            buf += SRCLANG_VALUE_GET_STRING(*i);
         }
         sp -= count + 1;
         *sp++ = SRCLANG_VALUE_STRING(strdup(buf.c_str()));
@@ -2694,7 +2771,7 @@ struct Interpreter {
     bool call_typecast_error(uint8_t count) {
         string buf;
         for (auto i = sp - count; i != sp; i++) {
-            buf += srclang_value_print(*i);
+            buf += SRCLANG_VALUE_GET_STRING(*i);
         }
         sp -= count + 1;
         *sp++ = SRCLANG_VALUE_ERROR(strdup(buf.c_str()));
@@ -2719,7 +2796,7 @@ struct Interpreter {
         }
         Value val = *(sp - count);
         sp -= count + 1;
-        *sp++ = SRCLANG_VALUE_TYPE(srclang_value_get_type(val));
+        *sp++ = SRCLANG_VALUE_TYPE(SRCLANG_VALUE_GET_TYPE(val));
         return true;
     }
 
@@ -2772,9 +2849,12 @@ struct Interpreter {
         ffi_type *types[count];
         int j = 0;
         for (auto i = sp - count; i != sp; i++, j++) {
-            auto type = srclang_value_get_type(*i);
+            auto type = SRCLANG_VALUE_GET_TYPE(*i);
             if (type != native->param[j]) {
-                error("ERROR: invalid " + to_string(j) + "th parameter");
+                error("ERROR: invalid " + to_string(j) + "th parameter, expected '" +
+                      SRCLANG_VALUE_TYPE_ID[int(native->param[j])] + "' but got '" +
+                      SRCLANG_VALUE_TYPE_ID[int(type)] +
+                      "'");
                 return false;
             }
             switch (type) {
@@ -2795,11 +2875,17 @@ struct Interpreter {
                     types[j] = &ffi_type_uint8;
                 }
                     break;
+                case ValueType::Pointer: {
+                    values[j] = &SRCLANG_VALUE_AS_OBJECT(*i)->pointer;
+                    types[j] = &ffi_type_pointer;
+                }
+                    break;
                 case ValueType::Decimal: {
                     values[j] = &(*i);
                     types[j] = &ffi_type_double;
                 }
                     break;
+
                 case ValueType::Boolean:
                     values[j] = &(*i);
                     types[j] = &ffi_type_sint;
@@ -2810,7 +2896,11 @@ struct Interpreter {
                     break;
             }
         }
-        if (ffi_prep_cif(&cif, FFI_DEFAULT_ABI, count, &ffi_type_slong,
+        ffi_type *ret_type = &ffi_type_slong;
+        if (native->ret == ValueType::Decimal) ret_type = &ffi_type_double;
+        else if (native->ret == ValueType::Pointer) ret_type = &ffi_type_pointer;
+
+        if (ffi_prep_cif(&cif, FFI_DEFAULT_ABI, count, ret_type,
                          types) != FFI_OK) {
             error("ffi_prep_cif() failed");
             return false;
@@ -2828,6 +2918,11 @@ struct Interpreter {
             case ValueType::Integer:
                 result_value = SRCLANG_VALUE_INTEGER(result);
                 break;
+
+            case ValueType::Pointer:
+                result_value = SRCLANG_VALUE_POINTER((void *) result);
+                break;
+
             case ValueType::Decimal:
                 result_value = SRCLANG_VALUE_DECIMAL(result);
                 break;
@@ -2876,8 +2971,7 @@ struct Interpreter {
             case ValueType::Bounded: {
                 auto bounded_value = new BoundedValue{container, value};
                 value = SRCLANG_VALUE_HEAP_OBJECT(
-                        ValueType::Bounded, bounded_value, ([](void *ptr) {}),
-                        ([](void *ptr) -> string { return "<bounded>"; }));
+                        ValueType::Bounded, bounded_value);
             }
                 break;
             default:
@@ -3397,7 +3491,7 @@ SRCLANG_BUILTIN(gc) {
 
 SRCLANG_BUILTIN(println) {
     for (auto const &i: args) {
-        cout << srclang_value_print(i);
+        cout << SRCLANG_VALUE_GET_STRING(i);
     }
     cout << '\n';
     return SRCLANG_VALUE_INTEGER(args.size());
@@ -3569,11 +3663,99 @@ SRCLANG_BUILTIN(clone) {
     return args[0];
 }
 
+SRCLANG_BUILTIN(lower) {
+    SRCLANG_CHECK_ARGS_EXACT(1);
+    SRCLANG_CHECK_ARGS_TYPE(0, ValueType::String);
+
+    char *buffer = reinterpret_cast<char *>(SRCLANG_VALUE_AS_OBJECT(args[0])->pointer);
+    char *newBuffer = strdup(buffer);
+
+    for (int i = 0; i < strlen(buffer); i++) {
+        newBuffer[i] = ::tolower(buffer[i]);
+    }
+    return SRCLANG_VALUE_STRING(newBuffer);
+}
+
+SRCLANG_BUILTIN(upper) {
+    SRCLANG_CHECK_ARGS_EXACT(1);
+    SRCLANG_CHECK_ARGS_TYPE(0, ValueType::String);
+
+    char *buffer = reinterpret_cast<char *>(SRCLANG_VALUE_AS_OBJECT(args[0])->pointer);
+    char *newBuffer = strdup(buffer);
+
+    for (int i = 0; i < strlen(buffer); i++) {
+        newBuffer[i] = ::toupper(buffer[i]);
+    }
+    return SRCLANG_VALUE_STRING(newBuffer);
+}
+
+SRCLANG_BUILTIN(search) {
+    SRCLANG_CHECK_ARGS_EXACT(2);
+    auto containerType = SRCLANG_VALUE_GET_TYPE(args[0]);
+    auto valueType = SRCLANG_VALUE_GET_TYPE(args[1]);
+
+    switch (containerType) {
+        case ValueType::String: {
+            char *buffer = reinterpret_cast<char *>(SRCLANG_VALUE_AS_OBJECT(args[1])->pointer);
+            switch (valueType) {
+                case ValueType::Char: {
+                    char val = SRCLANG_VALUE_AS_CHAR(args[1]);
+                    for (int i = 0; i < strlen(buffer); i++) {
+                        if (buffer[i] == val) {
+                            return SRCLANG_VALUE_INTEGER(i);
+                        }
+                    }
+                    return SRCLANG_VALUE_INTEGER(-1);
+                }
+                    break;
+
+                case ValueType::String: {
+                    char *val = reinterpret_cast<char *>(SRCLANG_VALUE_AS_OBJECT(args[1])->pointer);
+                    char *result = strstr(buffer, val);
+                    if (result == nullptr) {
+                        return SRCLANG_VALUE_INTEGER(-1);
+                    }
+                    return SRCLANG_VALUE_INTEGER(strlen(buffer) - (result - buffer));
+                }
+                    break;
+
+                default:
+                    throw runtime_error(
+                            "can't search value '" + SRCLANG_VALUE_DEBUG(args[1]) + "' in string container");
+
+            }
+
+        }
+            break;
+
+        case ValueType::List: {
+            SrcLangList *list = reinterpret_cast<SrcLangList *>(SRCLANG_VALUE_AS_OBJECT(args[0])->pointer);
+            for (int i = 0; i < list->size(); i++) {
+                if (interpreter->isEqual(args[1], list->at(i))) {
+                    return SRCLANG_VALUE_INTEGER(i);
+                }
+            }
+            return SRCLANG_VALUE_INTEGER(-1);
+        }
+            break;
+
+        case ValueType::Map: {
+            SRCLANG_CHECK_ARGS_TYPE(1, ValueType::String);
+            auto map = reinterpret_cast<SrcLangMap *>(SRCLANG_VALUE_AS_OBJECT(args[0])->pointer);
+            return SRCLANG_VALUE_BOOL(map->find((char *) SRCLANG_VALUE_AS_OBJECT(args[1])->pointer) != map->end());
+        }
+    }
+
+    return SRCLANG_VALUE_INTEGER(-1);
+}
+
 int main(int argc, char **argv) {
     SymbolTable symbol_table;
 
     bool is_interactive = true;
     optional<string> filename = nullopt;
+    std::string SEARCH_PATH =
+            string(getenv("HOME")) + "/.local/share/srclang/:/usr/share/srclang:/usr/lib/srclang/";
     MemoryManager memory_manager;
     for (auto const &i: builtins) memory_manager.heap.push_back(i);
 
@@ -3588,14 +3770,16 @@ int main(int argc, char **argv) {
                 debug = true;
             else if (arg == "break")
                 break_ = true;
-            else {
+            else if (arg.starts_with("search-path=")) {
+                SEARCH_PATH = arg.substr(arg.find_first_of('=') + 1) + ":" + SEARCH_PATH;
+            } else {
                 cerr << "ERROR: unknown flag '-" << arg << "'" << endl;
                 return 1;
             }
         } else if (filename == nullopt && filesystem::exists(arg) &&
                    filesystem::path(arg).has_extension() &&
                    filesystem::path(arg).extension() == ".src") {
-            filename = arg;
+            filename = absolute(filesystem::path(arg));
         } else {
             args->push_back(SRCLANG_VALUE_STRING(strdup(argv[i])));
         }
@@ -3633,11 +3817,23 @@ int main(int argc, char **argv) {
     auto false_symbol = symbol_table.define("false");
     auto null_symbol = symbol_table.define("null");
     auto args_symbol = symbol_table.define("__ARGS__");
+    auto file_symbol = symbol_table.define("__FILE__");
+    auto sys_symbol = symbol_table.define("__PLATFORM__");
     globals[true_symbol.index] = SRCLANG_VALUE_TRUE;
     globals[false_symbol.index] = SRCLANG_VALUE_FALSE;
     globals[null_symbol.index] = SRCLANG_VALUE_NULL;
     globals[args_symbol.index] = args_value;
     vector<Value> constants;
+
+#if defined(_WIN32) || defined(_WIN64) || defined(__CYGWIN__)
+    globals[sys_symbol.index] = SRCLANG_VALUE_STRING(strdup("WINDOWS"));
+#elif defined(unix) || defined(__unix) || defined(__unix__)
+    globals[sys_symbol.index] = SRCLANG_VALUE_STRING(strdup("UNIX"));
+#elif defined(__APPLE__) || defined(__MACH__)
+                                                                                                                            globals[sys_symbol.index] = SRCLANG_VALUE_STRING(strdup("APPLE"));
+#else
+    globals[sys_symbol.index] = SRCLANG_VALUE_STRING(strdup("UNKNOWN"));
+#endif
 
     do {
         if (is_interactive) {
@@ -3651,6 +3847,7 @@ int main(int argc, char **argv) {
                 input.begin(), input.end(),
                 (filename == nullopt ? "<script>" : *filename), &symbol_table,
                 constants, &memory_manager);
+        compiler.options["SEARCH_PATH"] = SEARCH_PATH;
         if (!compiler.compile()) {
             if (is_interactive)
                 continue;
@@ -3673,7 +3870,7 @@ int main(int argc, char **argv) {
             for (auto const &i: symbol_table.store) {
                 if (i.second.scope == Symbol::GLOBAL) {
                     cout << "- " << i.first << " := "
-                         << srclang_value_print(globals[i.second.index])
+                         << SRCLANG_VALUE_GET_STRING(globals[i.second.index])
                          << endl;
                 }
             }

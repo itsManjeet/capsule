@@ -1,12 +1,21 @@
-let Run = fun (data, args) {
-    if not verify(data) {
-        return error("invalid app data");
-    }
+import "path";
 
-    for arg in args {
-        if arg[0] == '-' {
-            arg = arg[1:];
+let Builder = fun (data) {
+    let self = clone(data);
+
+    // verification
+    for key in ["id", "version", "about"] {
+        if not self.search(key) {
+            return error("verification failed, missing required key '" + key + "'");
+        }
+    };
+
+    self.Build = fun (filepath, args) {
+        self.commands = [];
+        if path.Exists(path.Join(filepath, "bin")) {
 
         }
-    }
+    };
+
+    return self;
 };

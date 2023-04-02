@@ -1,4 +1,3 @@
-tests/0038-property-set-evaluation-order.src:1
 ERROR: undefined variable 'undefined1'
  | undefined1.bar = undefined2;
    ^

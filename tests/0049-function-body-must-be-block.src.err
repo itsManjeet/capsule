@@ -1,4 +1,3 @@
-tests/0049-function-body-must-be-block.src:1
 ERROR: Expected '{' but got '10'
  | let f = fun () 10;
                   ^

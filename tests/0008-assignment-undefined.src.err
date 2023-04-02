@@ -1,4 +1,3 @@
-tests/0008-assignment-undefined.src:1
 ERROR: undefined variable 'unknown'
  | unknown = "what";
    ^

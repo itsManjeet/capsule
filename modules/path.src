@@ -1,0 +1,66 @@
+native Exists(str) bool;
+
+native opendir(str) ptr;
+native closedir(ptr) int;
+native readdir(ptr) ptr;
+native getDirentName(ptr) str;
+
+let SEPERATOR = "/";
+if __PLATFORM__ == "WINDOWS" {
+    SEPERATOR = "\\";
+}
+
+let Join = fun (p...) {
+    let res = "";
+    let sep = "";
+    for i in p {
+        res = res + sep + i;
+        sep = SEPERATOR;
+    }
+    return res;
+};
+
+let List = fun (p) {
+    let d = opendir(p);
+    println ("ptr:", d, ", ", type(d));
+    if d == 0.00 {
+        return error("failed to open dir '"  + p + "'");
+    }
+
+    let res = [];
+
+    for true {
+        let dir = readdir(d);
+        println ("dir: ", dir);
+        if dir == 0.00 {
+            break;
+        }
+        append (res, getDirentName(dir));
+    }
+    closedir(d);
+    return res;
+};
+
+
+// Native Code
+
+`
+#include <dirent.h>
+#include <unistd.h>
+#include <string.h>
+#include <stdbool.h>
+
+bool Exists(char *path) {
+    return access(path, F_OK) != -1;
+}
+
+char* getDirentName(struct dirent *dir) {
+    return strdup(dir->d_name);
+}
+
+bool readDirent(struct dirent *dir) {
+
+    return true;
+}
+
+`

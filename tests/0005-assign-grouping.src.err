@@ -1,4 +1,3 @@
-tests/0005-assign-grouping.src:2
 ERROR: not yet implemented
  | (a) = "value";
          ^

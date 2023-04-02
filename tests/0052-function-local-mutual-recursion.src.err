@@ -1,4 +1,3 @@
-tests/0052-function-local-mutual-recursion.src:6
 ERROR: undefined variable 'is_odd'
  |     return is_odd (n-1);
               ^

@@ -1,4 +1,3 @@
-tests/0055-function-nested-call-with-arguments.src:1
 ERROR: Expected 'Identifier' but got 'return'
  | let return_arg = fun (arg) {
        ^
