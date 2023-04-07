@@ -1,6 +1,5 @@
 native system(str) int;
 
-
 let starts_with = fun (str, prefix) {
     return str.search(prefix) == 0;
 };
@@ -16,21 +15,20 @@ let Execute = fun (str) {
     return (((status) & 65280) >> 8);
 };
 
-let Module = fun (data) {
-    let self = clone(data);
+let Allocate = fun (ty, size) {
+    let s = "";
+    if ty == str {
 
-    // verify data
-    for i in ["id", "version", "about"] {
-        if !data.search(id) {
-            return error("Missing required key " + id);
+        for i in range(size) {
+            s = s + " ";
         }
+        return s;
+    } else if ty == list {
+        s = [];
+        for i in range(size) {
+            append (s, null);
+        }
+        return s;
     }
-
-    self.Create = fun (filepath, args) {
-
-    };
-    return self;
+    return null;
 };
-
-
-

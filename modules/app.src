@@ -1,20 +1,173 @@
-import "path";
+import "std";
 
-let Builder = fun (data) {
-    let self = clone(data);
-
-    // verification
-    for key in ["id", "version", "about"] {
-        if not self.search(key) {
-            return error("verification failed, missing required key '" + key + "'");
-        }
+let Flag = fun (id) {
+    let self = {
+        id          : id,
+        count       : 0,
+        about       : id + " flag",
+        values      : []
     };
 
-    self.Build = fun (filepath, args) {
-        self.commands = [];
-        if path.Exists(path.Join(filepath, "bin")) {
-
+    self.About = fun (c...) {
+        if len(c) != 1 {
+            return self.about;
         }
+        self.about = c[0];
+        return self;
+    };
+
+    self.Count = fun (c...) {
+        if len(c) != 1 {
+            return self.count;
+        }
+        self.count = c[0];
+        return self;
+    };
+
+    return self;
+};
+
+let New = fun (id) {
+    let self = {
+        id      : id,
+        version : "0.0.1",
+        about   : "Yet another shit in srclang",
+        flags   : {},
+        sub     : {},
+        _maxTaskSize : 0,
+        _maxFlagSize : 0
+    };
+
+    self.handler = fun (ctxt) {
+        return true;
+    };
+
+    self.Handler = fun (i...) {
+        if len(i) != 1 {
+            return self.handler;
+        }
+
+        self.handler = i[0];
+        return self;
+    };
+
+    self.Version = fun (ver...) {
+        if len(ver) != 1 {
+            return self.version;
+        }
+        self.version = ver[0];
+        return self;
+    };
+
+    self.About = fun (i...) {
+        if len(i) != 1 {
+            return self.about;
+        }
+        self.about = i[0];
+        return self;
+    };
+
+    self.Flag = fun (f) {
+        if len(f.id) > self._maxFlagSize {
+            self._maxFlagSize = len (f.id);
+        }
+        self.flags[f.id] = f;
+        return self;
+    };
+
+    self.Help = fun (ctxt) {
+        println ("Usage : ", self.id, " [TASKS] <FLAGS...>?");
+        println (id, " : ", self.about);
+        println ("");
+        let spacing = "";
+        if len(self.sub) > 0 {
+            println ("TASKS: ");
+            for i in range (self.sub) {
+                spacing = std.Allocate (str, self._maxTaskSize - len(i) + 10);
+                println ("   ",i, spacing, self.sub[i].about);
+            }
+            println ("");
+        }
+
+        if len(self.flags) > 0 {
+            println ("Flags: ");
+            for i in range (self.flags) {
+                spacing = std.Allocate (str, self._maxFlagSize - len(i) + 10);
+                println ("   -",i, spacing, self.flags[i].about);
+            }
+            println ("");
+        }
+
+        return true;
+    };
+
+    self.Sub = fun (s) {
+        if len(s.id) > self._maxTaskSize {
+            self._maxTaskSize = len (s.id);
+        }
+        self.sub[s.id] = s;
+        return self;
+    };
+
+    self.Run = fun (args) {
+        let ctxt = {
+            args    : [],
+            flags   : {},
+        };
+        let task    = null;
+        let i = -1;
+        for i + 1 < len(args) {
+            i = i + 1;
+            let arg = args[i];
+            if arg[0] == '-' {
+                arg = arg[1:];
+                let flags = self.flags;
+                if task != null {
+                    flags = task.flags;
+                }
+
+                if arg == "help" {
+                    if task == null {
+                        self.Help(ctxt);
+                        return true;
+                    }
+                    task.Help(ctxt);
+                    return true;
+                }
+
+                if arg == "version" {
+                    println (self.version);
+                    return true;
+                }
+
+                if flags.search(arg) {
+                    if len(args) <= i + flags[arg].count {
+                        println ("ERROR: -", arg, " expect '", flags[arg].count, "' arguments");
+                        return false;
+                    }
+                    ctxt.flags[arg] = [];
+                    for j in range (flags[arg].count) {
+                        append(ctxt.flags[arg], args[i + 1 + j]);
+                        i = i + 1;
+                    }
+                } else {
+                    println("ERROR: invalid flag '-", arg , "'");
+                    return false;
+                }
+
+            } else if task == null and self.sub.search (arg) {
+                task = self.sub[arg];
+            } else {
+                append (ctxt.args, arg);
+            }
+        }
+
+        if task == null {
+            self.Help(ctxt);
+            return true;
+        };
+
+        return task.handler(ctxt);
     };
 
     return self;

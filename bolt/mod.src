@@ -1,7 +1,0 @@
-#!/usr/bin/env srclang
-
-app.Builder({
-    id: "bolt",
-    version: "0.0.1",
-    about: "A flexible virtual assistant"
-}).Build(__FILE__, __ARGS__);
