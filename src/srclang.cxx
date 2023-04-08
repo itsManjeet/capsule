@@ -3134,7 +3134,7 @@ struct Interpreter {
                     auto fun = (Function<Byte> *) SRCLANG_VALUE_AS_OBJECT(constant)->pointer;
                     auto frees = vector<Value>(sp - nfree, sp);
                     sp -= nfree;
-                    auto closure = new Closure<Byte, Value>(fun, frees);
+                    auto closure = new Closure<Byte, Value>{fun, frees};
                     auto closure_value = SRCLANG_VALUE_CLOSURE(closure);
                     *sp++ = closure_value;
                     add_object(closure_value);
