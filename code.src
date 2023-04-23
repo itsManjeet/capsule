@@ -1,0 +1,5 @@
+#![SEARCH_PATH("./modules")]
+
+import "gi";
+
+println (gi.GetNamespaces());

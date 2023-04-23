@@ -1593,6 +1593,11 @@ struct Compiler {
                     filesystem::absolute(get<string>(value)).string() + ":" + get<string>(options[option_id]);
         } else if (option_id == "C_LIBRARY") {
             tcc_add_library(state, get<string>(value).c_str());
+            void *handler = dlopen(get<string>(value).c_str(), RTLD_GLOBAL | RTLD_NOW);
+            if (handler == nullptr) {
+                error(dlerror(), cur.pos);
+                return false;
+            }
         } else if (option_id == "C_LIBRARY_PATH") {
             tcc_add_library_path(state, get<string>(value).c_str());
         } else if (option_id == "C_INCLUDE") {
@@ -1628,6 +1633,10 @@ struct Compiler {
         }
         if (consume("fun")) {
             if (!function(&(*symbol))) {
+                return false;
+            }
+        } else if (consume("native")) {
+            if (!native(&(*symbol))) {
                 return false;
             }
         } else {
@@ -1893,19 +1902,15 @@ struct Compiler {
     };
 
     /// native ::= 'native' <identifier> ( (<type> % ',') ) <type>
-    bool native() {
-        if (!check(TokenType::Identifier)) return false;
-        auto id = cur.literal;
-        auto symbol = symbol_table->resolve(id);
-        if (symbol) {
-            error("variable already defined with name '" + id + "'", cur.pos);
-            return false;
+    bool native(Symbol *symbol) {
+        auto id = symbol->name;
+
+        if (cur.type == TokenType::Identifier) {
+            id = cur.literal;
+            if (!eat()) return false;
         }
-        symbol = symbol_table->define(id);
         vector<ValueType> types;
         ValueType ret_type;
-
-        if (!eat()) return false;
 
         if (!expect("(")) return false;
 
@@ -1937,7 +1942,7 @@ struct Compiler {
         constants.push_back(val);
         emit(OpCode::CONST, constants.size() - 1);
         emit(OpCode::STORE, symbol->scope, symbol->index);
-        return expect(";");
+        return true;
     }
 
     /// statement ::= set
@@ -1968,8 +1973,6 @@ struct Compiler {
             return impl();
         } else if (consume("#!")) {
             return compiler_options();
-        } else if (consume("native")) {
-            return native();
         } else if (cur.type == TokenType::CString) {
             cstring += cur.literal + "\n";
             return eat();
