@@ -26,7 +26,7 @@ foreach(testFile ${TestFiles})
     get_filename_component(testName ${testFile} NAME_WE)
     add_test(NAME ${testName}
         WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
-        COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tests/run_test.sh ${PROJECT_BINARY_DIR}/${PROJECT_NAME} tests/${testName}.src)
+        COMMAND tests/run_test.sh ${PROJECT_BINARY_DIR}/${PROJECT_NAME} tests/${testName}.src)
 endforeach()
 
 endif ()

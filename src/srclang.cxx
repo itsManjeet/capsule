@@ -4042,5 +4042,8 @@ int main(int argc, char **argv) {
 
     Interpreter<Byte> interpreter(code, globals, debug_info,
                                   &memory_manager, options);
-    interpreter.run();
+    if (!interpreter.run()) {
+        return 1;
+    }
+    return 0;
 }

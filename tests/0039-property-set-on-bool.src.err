@@ -1,0 +1,1 @@
+  ERROR: invalid SET operation for 'bool' and 'str'
