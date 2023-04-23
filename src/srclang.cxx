@@ -1,6 +1,5 @@
 #include <dlfcn.h>
 #include <ffi.h>
-#include <libtcc.h>
 
 #include <cstring>
 #include <filesystem>
@@ -17,7 +16,7 @@
 using namespace std;
 
 #define SRCLANG_VERSION 20230221
-
+const char *MAGIC_CODE = "SRCLANG";
 const auto LOGO = R"(
                        .__                         
   _____________   ____ |  | _____    ____    ____  
@@ -35,7 +34,6 @@ using Byte = uint32_t;
     X(Reserved)                 \
     X(Character)                \
     X(Identifier)               \
-    X(CString)                  \
     X(String)                   \
     X(Number)                   \
     X(Eof)
@@ -306,6 +304,8 @@ typedef uint64_t Value;
         throw std::runtime_error("Expected '" + std::to_string(pos) + \
                                  "' to be '" +                        \
                                  SRCLANG_VALUE_TYPE_ID[int(ty)] + "'");
+
+void SRCLANG_VALUE_DUMP(Value v, ostream &os);
 
 typedef vector<Value> SrcLangList;
 typedef map<string, Value> SrcLangMap;
@@ -588,6 +588,7 @@ struct ByteCode {
 enum class FunctionType {
     Function, Method, Initializer, Native
 };
+
 template<typename Byte>
 struct Function {
     FunctionType type{FunctionType::Function};
@@ -604,6 +605,194 @@ struct Closure {
     Function<Byte> *fun;
     vector<Value> free{0};
 };
+
+template<typename T>
+void dump_int(T size, ostream &os) {
+    os.write(reinterpret_cast<const char *>(&size), sizeof(T));
+}
+
+
+void dump_string(const string &id, ostream &os) {
+    size_t size = id.size();
+    dump_int<size_t>(size, os);
+    os.write(id.c_str(), size * sizeof(char));
+}
+
+template<typename T>
+T read_int(istream &is) {
+    T size;
+    is.read(reinterpret_cast<char *>(&size), sizeof(T));
+    return size;
+}
+
+
+string read_string(istream &is) {
+    auto size = read_int<size_t>(is);
+    char buffer[size + 1];
+    is.read(buffer, size);
+    buffer[size] = '\0';
+    return buffer;
+}
+
+void SRCLANG_DEBUGINFO_DUMP(DebugInfo* debug_info, ostream& os) {
+    dump_string(debug_info->filename, os);
+    dump_int<int>(debug_info->position, os);
+    dump_int<size_t>(debug_info->lines.size(), os);
+    for(auto i : debug_info->lines) {
+        dump_int<int>(i, os);
+    }
+}
+
+shared_ptr<DebugInfo> SRCLANG_DEBUGINFO_READ(istream& is) {
+    auto debug_info = make_shared<DebugInfo>();
+    debug_info->filename = read_string(is);
+    debug_info->position = read_int<int>(is);
+    size_t size = read_int<size_t>(is);
+    for(auto i = 0; i < size; i++) {
+        debug_info->lines.push_back(read_int<int>(is));
+    }
+    return debug_info;
+}
+
+void SRCLANG_VALUE_DUMP(Value v, ostream &os) {
+    auto valueType = SRCLANG_VALUE_GET_TYPE(v);
+    os.write(reinterpret_cast<const char *>(&valueType), sizeof(ValueType));
+    if (!SRCLANG_VALUE_IS_OBJECT(v)) {
+        os.write(reinterpret_cast<const char *>(&v), sizeof(Value));
+        return;
+    }
+
+    auto object = SRCLANG_VALUE_AS_OBJECT(v);
+    object->type = valueType;
+    switch (object->type) {
+        case ValueType::String:
+        case ValueType::Error:
+            dump_string((const char *) object->pointer, os);
+            break;
+        case ValueType::List: {
+            auto list = (SrcLangList *) object->pointer;
+            dump_int<size_t>(list->size(), os);
+            for (auto &i: *list) {
+                SRCLANG_VALUE_DUMP(i, os);
+            }
+            break;
+        }
+
+        case ValueType::Map: {
+            auto map_ = (SrcLangMap *) object->pointer;
+            dump_int<size_t>(map_->size(), os);
+            for (auto &i: *map_) {
+                dump_string(i.first, os);
+                SRCLANG_VALUE_DUMP(i.second, os);
+            }
+            break;
+        }
+
+        case ValueType::Function: {
+            auto function = (Function<Byte> *) object->pointer;
+            os.write(reinterpret_cast<const char *>(&function->type), sizeof(function->type));
+            dump_string(function->id, os);
+            dump_int<size_t>(function->instructions->size(), os);
+            for (auto i: *function->instructions) {
+                os.write(reinterpret_cast<const char *>(&i), sizeof(i));
+            }
+            dump_int<int>(function->nlocals, os);
+            dump_int<int>(function->nparams, os);
+            dump_int<bool>(function->is_variadic, os);
+            SRCLANG_DEBUGINFO_DUMP(function->debug_info.get(), os);
+        }
+
+        default:
+            throw runtime_error("can't dump value '" + SRCLANG_VALUE_TYPE_ID[int(object->type)] + "'");
+    }
+}
+
+Value SRCLANG_VALUE_READ(istream &is) {
+    ValueType valueType;
+    is.read(reinterpret_cast<char *>(&valueType), sizeof(ValueType));
+    if (valueType <= ValueType::Char) {
+        Value value;
+        is.read(reinterpret_cast<char *>(&value), sizeof(Value));
+        return value;
+    }
+    auto object = new HeapObject();
+    object->type = valueType;
+    switch (object->type) {
+        case ValueType::String:
+        case ValueType::Error:
+            object->pointer = (void *) strdup(read_string(is).c_str());
+            break;
+        case ValueType::List: {
+            auto list = new SrcLangList();
+            auto size = read_int<size_t>(is);
+            for (auto i = 0; i < size; i++) {
+                list->push_back(SRCLANG_VALUE_READ(is));
+            }
+            object->pointer = (void *) list;
+            break;
+        }
+
+        case ValueType::Map: {
+            auto map_ = new SrcLangMap();
+            auto size = read_int<size_t>(is);
+            for (auto i = 0; i < size; i++) {
+                string k = read_string(is);
+                Value v = SRCLANG_VALUE_READ(is);
+                map_->insert({k, v});
+            }
+            object->pointer = (void *) map_;
+            break;
+        }
+
+        case ValueType::Function: {
+            auto function = new Function<Byte>();
+            function->instructions = make_unique<Instructions<Byte>>();
+            is.read(reinterpret_cast<char *>(&function->type), sizeof(function->type));
+            function->id = read_string(is);
+            auto size = read_int<size_t>(is);
+            for (auto i = 0; i < size; i++) {
+                Byte byte;
+                is.read(reinterpret_cast<char *>(&byte), sizeof(Byte));
+                function->instructions->push_back(byte);
+            }
+            function->nlocals = read_int<int>(is);
+            function->nparams = read_int<int>(is);
+            function->is_variadic = read_int<bool>(is);
+            function->debug_info = SRCLANG_DEBUGINFO_READ(is);
+            object->pointer = (void *) function;
+        }
+
+        default:
+            throw runtime_error("can't dump value '" + SRCLANG_VALUE_TYPE_ID[int(object->type)] + "'");
+    }
+
+    return SRCLANG_VALUE_OBJECT(object);
+}
+
+void SRCLANG_BYTECODE_DUMP(ByteCode<Byte, Value> const &bytecode, ostream &os) {
+    dump_int<size_t>(bytecode.instructions->size(), os);
+    for (auto byte : *bytecode.instructions) {
+        dump_int<Byte>(byte, os);
+    }
+    dump_int<size_t>(bytecode.constants.size(), os);
+    for (auto i: bytecode.constants) {
+        SRCLANG_VALUE_DUMP(i, os);
+    }
+}
+
+ByteCode<Byte, Value> SRCLANG_BYTECODE_READ(istream &is) {
+    auto size = read_int<size_t>(is);
+    ByteCode<Byte, Value> bytecode;
+    bytecode.instructions = make_unique<Instructions<Byte>>();
+    for (auto i = 0; i < size; i++) {
+        bytecode.instructions->push_back(read_int<Byte>(is));
+    }
+    size = read_int<size_t>(is);
+    for (auto i = 0; i < size; i++) {
+        bytecode.constants.push_back(SRCLANG_VALUE_READ(is));
+    }
+    return std::move(bytecode);
+}
 
 void SRCLANG_VALUE_FREE(Value value) {
     if (!SRCLANG_VALUE_IS_OBJECT(value)) {
@@ -708,6 +897,9 @@ type_info const &variant_typeid(V const &v) {
     return visit([](auto &&x) -> decltype(auto) { return typeid(x); }, v);
 }
 
+using OptionType = variant<string, int, float, bool>;
+using Options = map<string, OptionType>;
+
 template<typename Iterator, typename Byte>
 struct Compiler {
     SymbolTable *symbol_table{nullptr};
@@ -719,27 +911,13 @@ struct Compiler {
     vector<Value> &constants;
     vector<string> loaded_imports;
     vector<unique_ptr<Instructions<Byte>>> instructions;
-    using OptionType = variant<string, int, float, bool>;
-    using Options = map<string, OptionType>;
     DebugInfo *debug_info;
+    Options &options;
     shared_ptr<DebugInfo> global_debug_info;
-    TCCState *state;
     int fileConstantPosition = 0;
-    Options options = {
-            {"VERSION", SRCLANG_VERSION},
-            {"GC_HEAP_GROW_FACTOR",   1.0f},
-            {"GC_INITIAL_TRIGGER",    200},
-            {"SEARCH_PATH",           string("/usr/lib/srclang/")},
-            {"LOAD_LIBC",             true},
-            {"LIBC",                  "libc.so.6"},
-            {"C_LIBRARY",             ""},
-            {"C_INCLUDE",             ""},
-            {"EXPERIMENTAL_FEATURES", false},
-    };
-    string cstring{""};
 
     Compiler(Iterator start, Iterator end, const string &filename, SymbolTable *global,
-             vector<Value> &constants, MemoryManager *memory_manager)
+             vector<Value> &constants, MemoryManager *memory_manager, Options &options)
             : iter{start},
               start{start},
               end{end},
@@ -748,7 +926,7 @@ struct Compiler {
               symbol_table{global},
               filename{filename},
               memory_manager{memory_manager},
-              state{nullptr} {
+              options{options} {
         global_debug_info = make_shared<DebugInfo>();
         global_debug_info->filename = filename;
         global_debug_info->position = 0;
@@ -949,23 +1127,6 @@ struct Compiler {
             iter++;
             peek.type = TokenType::String;
 
-            return true;
-        }
-
-        /// cstring ::= '`' ... '`'
-        if (*iter == '`') {
-            iter++;
-            peek.literal.clear();
-            do {
-                iter++;
-                if (iter == end) {
-                    error("unterminated cstring", cur.pos);
-                    return false;
-                }
-            } while (*iter != '`');
-            peek.type = TokenType::CString;
-            peek.literal = string(peek.pos + 1, iter);
-            *iter++;
             return true;
         }
 
@@ -1266,7 +1427,7 @@ struct Compiler {
         }
 
         auto fun = new Function<Byte>{
-                FunctionType::Function, id, move(fun_instructions), nlocals, nparam,
+                FunctionType::Function, id, std::move(fun_instructions), nlocals, nparam,
                 is_variadic,
                 fun_debug_info};
         auto fun_value = SRCLANG_VALUE_FUNCTION(fun);
@@ -1592,16 +1753,11 @@ struct Compiler {
             options[option_id] =
                     filesystem::absolute(get<string>(value)).string() + ":" + get<string>(options[option_id]);
         } else if (option_id == "C_LIBRARY") {
-            tcc_add_library(state, get<string>(value).c_str());
             void *handler = dlopen(get<string>(value).c_str(), RTLD_GLOBAL | RTLD_NOW);
             if (handler == nullptr) {
                 error(dlerror(), cur.pos);
                 return false;
             }
-        } else if (option_id == "C_LIBRARY_PATH") {
-            tcc_add_library_path(state, get<string>(value).c_str());
-        } else if (option_id == "C_INCLUDE") {
-            tcc_add_include_path(state, get<string>(value).c_str());
         } else {
             options[option_id] = value;
         }
@@ -1786,19 +1942,14 @@ struct Compiler {
 
         Compiler<Iterator, Byte> compiler(input.begin(), input.end(),
                                           search_path, symbol_table, constants,
-                                          memory_manager);
-        compiler.state = state;
-        compiler.cstring = cstring;
-        compiler.options = options;
-        if (!compiler.compile(true)) {
+                                          memory_manager, options);
+        if (!compiler.compile()) {
             error("failed to import '" + search_path + "'", cur.pos);
             return false;
         }
-        cstring = compiler.cstring;
-        options = compiler.options;
 
 
-        auto instructions = move(compiler.code().instructions);
+        auto instructions = std::move(compiler.code().instructions);
         instructions->pop_back();  // pop OpCode::HLT
 
         int total = 0;
@@ -1827,7 +1978,7 @@ struct Compiler {
         }
 
         auto fun = new Function<Byte>{
-                FunctionType::Function, "", move(instructions), nlocals, 0, false,
+                FunctionType::Function, "", std::move(instructions), nlocals, 0, false,
                 compiler.global_debug_info};
         auto val = SRCLANG_VALUE_FUNCTION(fun);
         memory_manager->heap.push_back(val);
@@ -1973,9 +2124,6 @@ struct Compiler {
             return impl();
         } else if (consume("#!")) {
             return compiler_options();
-        } else if (cur.type == TokenType::CString) {
-            cstring += cur.literal + "\n";
-            return eat();
         }
 
         if (!expression()) {
@@ -1994,38 +2142,15 @@ struct Compiler {
         return true;
     }
 
-    bool compile(bool is_sub = false) {
+    bool compile() {
         auto fileSymbol = symbol_table->resolve("__FILE__");
         emit(OpCode::CONST, fileConstantPosition);
         emit(OpCode::STORE, fileSymbol->scope, fileSymbol->index);
         emit(OpCode::POP);
-        if (!is_sub) {
-            state = tcc_new();
-            if (state == nullptr) {
-                error("failed to create new tcc state", cur.pos);
-                return false;
-            }
-            tcc_set_output_type(state, TCC_OUTPUT_MEMORY);
-        }
-
-
         if (!program()) {
             return false;
         }
         emit(OpCode::HLT);
-
-        if (!is_sub) {
-            if (tcc_compile_string(state, cstring.data()) == -1) {
-                error("failed to compile c code", cur.pos);
-                return false;
-            }
-
-            if (tcc_relocate(state, TCC_RELOCATE_AUTO) == -1) {
-                error("failed to relocate c code", cur.pos);
-                return false;
-            }
-        }
-
         return true;
     }
 };
@@ -2125,13 +2250,13 @@ struct Interpreter {
     vector<Value> &globals;
     vector<Value> &constants;
     vector<Frame> frames;
+    const Options &options;
     typename vector<Frame>::iterator fp;
     vector<shared_ptr<DebugInfo>> debug_info;
     bool debug, break_;
-    TCCState *state;
 
     void error(string const &mesg) {
-        if (debug_info.size() == 0) {
+        if (debug_info.empty() || debug_info.back() == nullptr) {
             cerr << "ERROR: " << mesg << endl;
             return;
         }
@@ -2145,22 +2270,32 @@ struct Interpreter {
 
     Interpreter(ByteCode<Byte, Value> &code, vector<Value> &globals,
                 shared_ptr<DebugInfo> const &debug_info,
-                MemoryManager *memory_manager)
+                MemoryManager *memory_manager, Options const &options)
             : stack(2048),
               frames(1024),
               globals{globals},
               constants{code.constants},
-              memory_manager{memory_manager} {
+              memory_manager{memory_manager},
+              options{options} {
+
+        GC_HEAP_GROW_FACTOR =
+                std::get<float>(options.at("GC_HEAP_GROW_FACTOR"));
+        next_gc =
+                std::get<int>(options.at("GC_INITIAL_TRIGGER"));
         sp = stack.begin();
         fp = frames.begin();
         this->debug_info.push_back(debug_info);
         auto fun = new Function<Byte>{FunctionType::Function, "<script>",
-                                      move(code.instructions),
+                                      std::move(code.instructions),
                                       0,
                                       0,
                                       false,
                                       debug_info};
-        fp->closure = new Closure<Byte, Value>{move(fun), {}};
+
+        debug = get<bool>(options.at("DEBUG"));
+        break_ = get<bool>(options.at("BREAK"));
+
+        fp->closure = new Closure<Byte, Value>{std::move(fun), {}};
         fp->ip = fp->closure->fun->instructions->begin();
         fp->bp = sp;
         fp++;
@@ -2838,13 +2973,10 @@ struct Interpreter {
         }
 
         void *handler = nullptr;
-        handler = tcc_get_symbol(state, native->id.c_str());
+        handler = dlsym(nullptr, native->id.c_str());
         if (handler == nullptr) {
-            handler = dlsym(nullptr, native->id.c_str());
-            if (handler == nullptr) {
-                error(dlerror());
-                return false;
-            }
+            error(dlerror());
+            return false;
         }
 
         ffi_cif cif;
@@ -3754,35 +3886,56 @@ SRCLANG_BUILTIN(search) {
 
 int main(int argc, char **argv) {
     SymbolTable symbol_table;
+    Options options = {
+            {"VERSION", SRCLANG_VERSION},
+            {"GC_HEAP_GROW_FACTOR",   1.0f},
+            {"GC_INITIAL_TRIGGER",    200},
+            {"SEARCH_PATH",           string(getenv("HOME")) +
+                                      "/.local/share/srclang/:/usr/share/srclang:/usr/lib/srclang/"},
+            {"LOAD_LIBC",             true},
+            {"LIBC",                  "libc.so.6"},
+            {"C_LIBRARY",             ""},
+            {"C_INCLUDE",             ""},
+            {"EXPERIMENTAL_FEATURES", false},
+            {"DEBUG",                 false},
+            {"BREAK",                 false},
+    };
 
-    bool is_interactive = true;
-    optional<string> filename = nullopt;
-    std::string SEARCH_PATH =
-            string(getenv("HOME")) + "/.local/share/srclang/:/usr/share/srclang:/usr/lib/srclang/";
+    optional<string> filename;
     MemoryManager memory_manager;
+    enum {
+        NoFile, SourceFile, BinaryFile
+    } fileType = NoFile;
+
     for (auto const &i: builtins) memory_manager.heap.push_back(i);
 
-    bool debug = false;
-    bool break_ = false;
+    optional<string> dump = {};
     auto args = new SrcLangList();
     for (int i = 1; i < argc; i++) {
         string arg(argv[i]);
         if (arg[0] == '-' && filename == nullopt) {
             arg = arg.substr(1);
             if (arg == "debug")
-                debug = true;
+                get<bool>(options["DEBUG"]) = true;
             else if (arg == "break")
-                break_ = true;
+                get<bool>(options["BREAK"]) = true;
+            else if (arg == "dump")
+                dump = argv[++i];
             else if (arg.starts_with("search-path=")) {
-                SEARCH_PATH = arg.substr(arg.find_first_of('=') + 1) + ":" + SEARCH_PATH;
+                get<string>(options["SEARCH_PATH"])
+                        = arg.substr(arg.find_first_of('=') + 1)
+                          + ":"
+                          + get<string>(options["SEARCH_PATH"]);
             } else {
                 cerr << "ERROR: unknown flag '-" << arg << "'" << endl;
                 return 1;
             }
-        } else if (filename == nullopt && filesystem::exists(arg) &&
-                   filesystem::path(arg).has_extension() &&
-                   filesystem::path(arg).extension() == ".src") {
+        } else if (filename == nullopt && filesystem::exists(arg)) {
             filename = absolute(filesystem::path(arg));
+            fileType = (filesystem::path(arg).has_extension() &&
+                        filesystem::path(arg).extension() == ".src") ?
+                       SourceFile :
+                       BinaryFile;
         } else {
             args->push_back(SRCLANG_VALUE_STRING(strdup(argv[i])));
         }
@@ -3791,22 +3944,12 @@ int main(int argc, char **argv) {
     auto args_value = SRCLANG_VALUE_LIST(args);
 
     string input;
-    if (filename.has_value()) {
-        ifstream reader(*filename);
-        input = string((istreambuf_iterator<char>(reader)),
-                       (istreambuf_iterator<char>()));
-        if (input.starts_with("#!/")) {
-            // skip shebang
-            input = input.substr(input.find_first_of('\n'));
-        }
-        is_interactive = false;
-    } else {
-        is_interactive = true;
+    if (!filename.has_value()) {
         cout << LOGO << endl;
         cout << " * VERSION       : " << SRCLANG_VERSION << endl;
         cout << " * DOCUMENTATION : https://srclang.rlxos.dev/" << endl;
-        cout << " PRESS [CTRL+C] to exit" << endl;
         cout << endl;
+        return 0;
     }
     vector<Value> globals(65536);
     {
@@ -3838,69 +3981,66 @@ int main(int argc, char **argv) {
     globals[sys_symbol.index] = SRCLANG_VALUE_STRING(strdup("UNKNOWN"));
 #endif
 
-    do {
-        if (is_interactive) {
-            cout << ">> ";
-            if (!getline(cin, input)) {
-                continue;
-            }
-        }
 
+    ByteCode<Byte, Value> code;
+    shared_ptr<DebugInfo> debug_info{nullptr};
+
+    if (fileType == SourceFile) {
+        ifstream reader(*filename);
+        input = string((istreambuf_iterator<char>(reader)),
+                       (istreambuf_iterator<char>()));
+        reader.close();
         Compiler<Iterator, Byte> compiler(
                 input.begin(), input.end(),
                 (filename == nullopt ? "<script>" : *filename), &symbol_table,
-                constants, &memory_manager);
-        compiler.options["SEARCH_PATH"] = SEARCH_PATH;
+                constants, &memory_manager, options);
+
         if (!compiler.compile()) {
-            if (is_interactive)
-                continue;
-            else
-                return 1;
+            return 1;
         }
 
-        if (get<bool>(compiler.options["LOAD_LIBC"])) {
-            if (dlopen(get<string>(compiler.options["LIBC"]).c_str(),
+        if (get<bool>(options["LOAD_LIBC"])) {
+            if (dlopen(get<string>(options["LIBC"]).c_str(),
                        RTLD_GLOBAL | RTLD_NOW) == nullptr) {
                 cerr << "FAILED to load libc '" << dlerror() << "'" << endl;
                 return 1;
             }
         }
+        code = std::move(compiler.code());
+        debug_info = compiler.global_debug_info;
+    } else if (fileType == BinaryFile) {
+        ifstream reader(*filename);
+        char magic_code[7];
+        reader.read(magic_code, 7);
+        if (strncmp(magic_code, MAGIC_CODE, 7) != 0) {
+            cerr << "MAGIC_CODE mismatch" << endl;
+            return 1;
+        }
+        code = SRCLANG_BYTECODE_READ(reader);
+        debug_info = SRCLANG_DEBUGINFO_READ(reader);
+    }
 
-        auto code = move(compiler.code());
-        if (debug) {
-            cout << code;
-            cout << "== GLOBALS ==" << endl;
-            for (auto const &i: symbol_table.store) {
-                if (i.second.scope == Symbol::GLOBAL) {
-                    cout << "- " << i.first << " := "
-                         << SRCLANG_VALUE_GET_STRING(globals[i.second.index])
-                         << endl;
-                }
+    if (get<bool>(options["DEBUG"])) {
+        cout << code;
+        cout << "== GLOBALS ==" << endl;
+        for (auto const &i: symbol_table.store) {
+            if (i.second.scope == Symbol::GLOBAL) {
+                cout << "- " << i.first << " := "
+                     << SRCLANG_VALUE_GET_STRING(globals[i.second.index])
+                     << endl;
             }
         }
+    }
 
-        Interpreter<Byte> interpreter(code, globals, compiler.global_debug_info,
-                                      &memory_manager);
-        interpreter.GC_HEAP_GROW_FACTOR =
-                std::get<float>(compiler.options["GC_HEAP_GROW_FACTOR"]);
-        interpreter.next_gc =
-                std::get<int>(compiler.options["GC_INITIAL_TRIGGER"]);
-        interpreter.debug = debug;
-        interpreter.break_ = break_;
-        interpreter.state = compiler.state;
-        if (!interpreter.run()) {
-            if (is_interactive) {
-                continue;
-            } else {
-                return 1;
-            }
-        }
-        tcc_delete(compiler.state);
+    if (dump.has_value()) {
+        ofstream writer(*dump);
+        writer.write(MAGIC_CODE, 7);
+        SRCLANG_BYTECODE_DUMP(code, writer);
+        SRCLANG_DEBUGINFO_DUMP(debug_info.get(), writer);
+        return 0;
+    }
 
-        if (is_interactive) {
-            cout << ":: " << SRCLANG_VALUE_GET_STRING(*interpreter.sp) << endl;
-        }
-
-    } while (is_interactive);
-    symbol_table.store.clear();
+    Interpreter<Byte> interpreter(code, globals, debug_info,
+                                  &memory_manager, options);
+    interpreter.run();
 }
