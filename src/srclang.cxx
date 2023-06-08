@@ -20,10 +20,10 @@ const char *MAGIC_CODE = "SRCLANG";
 const auto LOGO = R"(
                        .__                         
   _____________   ____ |  | _____    ____    ____  
- /  ___/\\_  __ \\_/ ___\\|  | \\__  \\  /    \\  / ___\\
- \\___ \\  |  | \\/\\  \\___|  |__/ __ \\|   |  \\/ /_/  >
-/____  > |__|    \\___  >____(____  /___|  /\\___  /
-     \\/              \\/          \\/     \\//_____/
+ /  ___/\_  __ \_/ ___\|  | \__  \  /    \  / ___\
+ \___ \  |  | \/\  \___|  |__/ __ \|   |  \/ /_/  >
+/____  > |__|    \___  >____(____  /___|  /\___  /
+     \/              \/          \/     \//_____/
 
 )";
 
@@ -634,21 +634,21 @@ string read_string(istream &is) {
     return buffer;
 }
 
-void SRCLANG_DEBUGINFO_DUMP(DebugInfo* debug_info, ostream& os) {
+void SRCLANG_DEBUGINFO_DUMP(DebugInfo *debug_info, ostream &os) {
     dump_string(debug_info->filename, os);
     dump_int<int>(debug_info->position, os);
     dump_int<size_t>(debug_info->lines.size(), os);
-    for(auto i : debug_info->lines) {
+    for (auto i: debug_info->lines) {
         dump_int<int>(i, os);
     }
 }
 
-shared_ptr<DebugInfo> SRCLANG_DEBUGINFO_READ(istream& is) {
+shared_ptr<DebugInfo> SRCLANG_DEBUGINFO_READ(istream &is) {
     auto debug_info = make_shared<DebugInfo>();
     debug_info->filename = read_string(is);
     debug_info->position = read_int<int>(is);
     size_t size = read_int<size_t>(is);
-    for(auto i = 0; i < size; i++) {
+    for (auto i = 0; i < size; i++) {
         debug_info->lines.push_back(read_int<int>(is));
     }
     return debug_info;
@@ -771,7 +771,7 @@ Value SRCLANG_VALUE_READ(istream &is) {
 
 void SRCLANG_BYTECODE_DUMP(ByteCode<Byte, Value> const &bytecode, ostream &os) {
     dump_int<size_t>(bytecode.instructions->size(), os);
-    for (auto byte : *bytecode.instructions) {
+    for (auto byte: *bytecode.instructions) {
         dump_int<Byte>(byte, os);
     }
     dump_int<size_t>(bytecode.constants.size(), os);
