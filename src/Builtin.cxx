@@ -1,5 +1,6 @@
 #include "Builtin.hxx"
 #include "Interpreter.hxx"
+#include "Language.hxx"
 
 using namespace srclang;
 
@@ -285,4 +286,12 @@ SRCLANG_BUILTIN(search) {
     }
 
     return SRCLANG_VALUE_INTEGER(-1);
+}
+
+
+SRCLANG_BUILTIN(eval) {
+    SRCLANG_CHECK_ARGS_EXACT(1);
+    SRCLANG_CHECK_ARGS_TYPE(0, ValueType::String);
+    const char *buffer = (const char *) SRCLANG_VALUE_AS_OBJECT(args[0])->pointer;
+    return interpreter->language->execute(buffer, "<inline>");
 }

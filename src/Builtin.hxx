@@ -19,6 +19,7 @@ namespace srclang {
     X(append)                \
     X(range)                 \
     X(clone)                 \
+    X(eval)                  \
     X(pop)                   \
     X(lower)                 \
     X(upper)                 \
