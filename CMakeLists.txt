@@ -16,7 +16,7 @@ set(CMAKE_FIND_LIBRARY_SUFFIXES ".so" ".a")
 find_library(DL dl REQUIRED)
 find_library(FFI ffi REQUIRED)
 
-add_executable(${PROJECT_NAME} src/srclang.cxx)
+add_executable(${PROJECT_NAME} src/srclang.cxx src/Value.hxx src/utils.cxx src/SymbolTable.cxx src/SymbolTable.hxx src/DebugInfo.cxx src/DebugInfo.hxx src/Instructions.cxx src/Instructions.hxx src/ByteCode.cxx src/ByteCode.hxx src/Function.cxx src/Function.hxx src/Utilities.hxx src/Value.cxx src/MemoryManager.cxx src/MemoryManager.hxx src/Builtin.cxx src/Builtin.hxx src/Options.cxx src/Options.hxx src/Compiler.cxx src/Compiler.hxx src/Interpreter.cxx src/Interpreter.hxx src/Language.cxx src/Language.hxx)
 target_link_libraries(${PROJECT_NAME} ${FFI} ${DL} -rdynamic)
 # target_compile_definitions(${PROJECT_NAME} PUBLIC -DSRCLANG_GC_DEBUG)
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
