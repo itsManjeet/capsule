@@ -1,6 +1,8 @@
 #include <utility>
+#include <fstream>
 
 #include "Language.hxx"
+#include "ProjectManager.hxx"
 
 using namespace srclang;
 
@@ -64,6 +66,7 @@ int printHelp() {
     std::cout << "   run                    Run srclang script and bytecode (source ends with .src)\n"
               << "   interactive            Start srclang interactive shell\n"
               << "   compile                Compile srclang script in bytecode\n"
+              << "   new <name>             Setup run srclang project\n"
               << "   help                   Print this help message\n"
               << '\n'
               << " FLAGS:\n"
@@ -83,6 +86,7 @@ int main(int argc, char **argv) {
 
     std::string task = "help";
     std::optional<std::string> filename, output;
+    std::filesystem::path project_path = std::filesystem::current_path();
 
     if (argc >= 2) { task = argv[1]; }
 
@@ -111,6 +115,9 @@ int main(int argc, char **argv) {
             } else if (strcmp(argv[i], "o") == 0) {
                 CHECK_COUNT(1);
                 output = argv[++i];
+            } else if (strcmp(argv[i], "project-path") == 0) {
+                CHECK_COUNT(1);
+                project_path = argv[++i];
             } else {
                 std::cerr << "ERROR: invalid flag '-" << argv[i] << "'" << std::endl;
                 return 1;
@@ -124,11 +131,25 @@ int main(int argc, char **argv) {
     }
 
     language.define("__ARGS__", SRCLANG_VALUE_LIST(args));
+    ProjectManager projectManager(&language, project_path);
 
     if (task == "help") return printHelp();
     else if (task == "run") return run(&language, filename);
     else if (task == "interactive") return interactive(&language);
     else if (task == "compile") return compile(&language, filename, output);
+
+    try {
+        if (task == "new") {
+            if (args->empty()) throw std::runtime_error("no project name specified");
+            projectManager.create((const char *) SRCLANG_VALUE_AS_OBJECT(args->at(0))->pointer);
+        } else if (task == "test") {
+            projectManager.test();
+        }
+    } catch (std::exception const &ex) {
+        std::cerr << "ERROR: " << ex.what() << std::endl;
+        return 1;
+    }
+
 
     return printHelp();
 }
