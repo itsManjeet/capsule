@@ -23,11 +23,19 @@ SRCLANG_BUILTIN(gc) {
     return SRCLANG_VALUE_TRUE;
 }
 
+SRCLANG_BUILTIN(print) {
+    for (auto const &i: args) {
+        std::cout << SRCLANG_VALUE_GET_STRING(i);
+    }
+    return SRCLANG_VALUE_INTEGER(args.size());
+}
+
+
 SRCLANG_BUILTIN(println) {
     for (auto const &i: args) {
         std::cout << SRCLANG_VALUE_GET_STRING(i);
     }
-    std::cout << '\n';
+    std::cout << std::endl;
     return SRCLANG_VALUE_INTEGER(args.size());
 }
 

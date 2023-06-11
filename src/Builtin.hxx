@@ -14,6 +14,7 @@ namespace srclang {
                        Interpreter* interpreter)
 #define SRCLANG_BUILTIN_LIST \
     X(println)               \
+    X(print)                 \
     X(gc)                    \
     X(len)                   \
     X(append)                \
