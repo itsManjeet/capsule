@@ -32,6 +32,8 @@ namespace srclang {
 
         Value execute(std::filesystem::path filename);
 
+        Value call(Value callee, std::vector<Value> const &args);
+
         void appendSearchPath(std::string const &path);
 
     };

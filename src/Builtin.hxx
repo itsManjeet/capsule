@@ -22,6 +22,7 @@ namespace srclang {
     X(clone)                 \
     X(eval)                  \
     X(pop)                   \
+    X(call)                  \
     X(lower)                 \
     X(upper)                 \
     X(search)

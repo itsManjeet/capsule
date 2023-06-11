@@ -64,7 +64,7 @@ Value Language::execute(ByteCode &code, std::shared_ptr<DebugInfo> debugInfo) {
         return SRCLANG_VALUE_ERROR(strdup("INTERPRETATION FAILED"));
     }
     if (std::distance(interpreter.stack.begin(), interpreter.sp) > 0) {
-        return *interpreter.sp;
+        return *(interpreter.sp - 1);
     }
     return SRCLANG_VALUE_TRUE;
 }
@@ -129,4 +129,36 @@ bool Language::compile(const std::string &filename, std::optional<std::string> o
     writer.close();
 
     return true;
+}
+
+Value Language::call(Value callee, const std::vector<Value> &args) {
+    ByteCode code;
+    code.instructions = std::make_unique<Instructions>();
+    code.constants = this->constants;
+
+    code.constants.push_back(callee);
+    code.instructions->push_back(static_cast<const unsigned int>(OpCode::CONST));
+    code.instructions->push_back(code.constants.size() - 1);
+
+    for (auto arg: args) {
+        code.constants.push_back(arg);
+        code.instructions->push_back(static_cast<const unsigned int>(OpCode::CONST));
+        code.instructions->push_back(code.constants.size() - 1);
+    }
+
+
+    code.instructions->push_back(static_cast<const unsigned int>(OpCode::CALL));
+    code.instructions->push_back(args.size());
+    code.instructions->push_back(static_cast<const unsigned int>(OpCode::HLT));
+
+    this->constants = code.constants;
+
+    auto interpreter = Interpreter(code, nullptr, this);
+    if (!interpreter.run()) {
+        return SRCLANG_VALUE_ERROR(strdup("INTERPRETATION FAILED"));
+    }
+    if (std::distance(interpreter.stack.begin(), interpreter.sp) > 0) {
+        return *(interpreter.sp - 1);
+    }
+    return SRCLANG_VALUE_TRUE;
 }

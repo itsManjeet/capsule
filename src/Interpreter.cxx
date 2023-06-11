@@ -867,7 +867,7 @@ bool Interpreter::call(uint8_t count) {
 bool Interpreter::run() {
     while (true) {
         if (debug) {
-            if (debug_info.size()) {
+            if (!debug_info.empty() && debug_info.back() != nullptr) {
                 std::cout << debug_info.back()->filename << ":"
                           << debug_info.back()->lines[distance(
                                   cur()->closure->fun->instructions->begin(), cur()->ip)]
