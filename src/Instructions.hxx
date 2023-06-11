@@ -49,7 +49,6 @@ namespace srclang {
     X(JNZ, 1)                  \
     X(JMP, 1)                  \
     X(SIZE, 0)                 \
-    X(IMPL, 0)                 \
     X(HLT, 0)
 
     enum class OpCode : uint8_t {

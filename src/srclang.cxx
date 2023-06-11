@@ -90,8 +90,19 @@ int main(int argc, char **argv) {
 
     if (argc >= 2) { task = argv[1]; }
 
+    bool prog_args_start = false;
+    std::vector<std::string> cli_args;
+
     for (int i = 2; i < argc; i++) {
-        if (filename == std::nullopt && argv[i][0] == '-') {
+        if (!prog_args_start && strcmp(argv[i], "--") == 0) {
+            prog_args_start = true;
+            continue;
+        }
+        if (prog_args_start) {
+            args->push_back(SRCLANG_VALUE_STRING(strdup(argv[i])));
+            continue;
+        }
+        if (argv[i][0] == '-') {
             argv[i]++;
 #define CHECK_COUNT(c) if (argc <= c + i) { std::cout << "expecting " << c << " arguments" << std::endl; return 1; }
             if (strcmp(argv[i], "debug") == 0) {
@@ -123,10 +134,11 @@ int main(int argc, char **argv) {
                 return 1;
             }
 #undef CHECK_COUNT
-        } else if (filename == std::nullopt) {
+        } else if (filename == std::nullopt &&
+                   std::filesystem::exists(argv[i])) {
             filename = argv[i];
         } else {
-            args->push_back(SRCLANG_VALUE_STRING(strdup(argv[i])));
+            cli_args.emplace_back(argv[i]);
         }
     }
 
@@ -140,11 +152,14 @@ int main(int argc, char **argv) {
 
     try {
         if (task == "new") {
-            if (args->empty()) throw std::runtime_error("no project name specified");
-            projectManager.create((const char *) SRCLANG_VALUE_AS_OBJECT(args->at(0))->pointer);
+            if (cli_args.empty()) throw std::runtime_error("no project name specified");
+            projectManager.create(cli_args[0]);
         } else if (task == "test") {
             projectManager.test();
+        } else {
+            return printHelp();
         }
+        return 0;
     } catch (std::exception const &ex) {
         std::cerr << "ERROR: " << ex.what() << std::endl;
         return 1;

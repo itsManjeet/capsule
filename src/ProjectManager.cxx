@@ -79,7 +79,7 @@ void ProjectManager::test() {
     for (auto const &test: std::filesystem::recursive_directory_iterator(testPath)) {
         if (test.is_regular_file() &&
             test.path().has_extension() &&
-            test.path().string().starts_with("test_") &&
+            test.path().filename().string().starts_with("test_") &&
             test.path().extension() == ".src") {
             Language lang;
             auto result = lang.execute(test.path());
@@ -94,7 +94,8 @@ void ProjectManager::test() {
         }
     }
 
-    std::cout << " --- REPORT --------------\n"
+    std::cout << "\n\n"
+              << "--- REPORT --------------\n"
               << "   TOTAL    :    " << TOTAL_TEST_CASES << '\n'
               << "   FAILED   :    " << TOTAL_FAILED << '\n'
               << "   PASSED   :    " << TOTAL_TEST_CASES - TOTAL_FAILED << '\n'

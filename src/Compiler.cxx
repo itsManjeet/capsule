@@ -202,11 +202,11 @@ bool Compiler::eat() {
 
     /// reserved ::=
     for (std::string k: {"let", "fun", "native", "return", "if", "else", "for",
-                         "break", "continue", "import", "global", "impl", "as",
+                         "break", "continue", "import", "global", "as",
                          "in",
 
             // specical operators
-                         "#!", "not", "...",
+                         "#!", "not", "...", ":=",
 
             // multi char operators
                          "==", "!=", "<=", ">=", ">>", "<<"}) {
@@ -342,19 +342,32 @@ bool Compiler::identifier(bool can_assign) {
              distance(SRCLANG_VALUE_TYPE_ID.begin(), iter));
         return eat();
     }
-    auto symbol = symbol_table->resolve(cur.literal);
-    if (symbol == std::nullopt) {
-        error("undefined variable '" + cur.literal + "'", cur.pos);
-        return false;
-    }
+    if (!check(TokenType::Identifier)) return false;
+    auto id = cur;
     if (!eat()) return false;
+    auto symbol = symbol_table->resolve(id.literal);
 
-    if (can_assign && consume("=")) {
-        if (!expression()) return false;
+    if (can_assign && consume(":=")) {
+        if (symbol != std::nullopt) {
+            error("Already defined variable '" + id.literal + "'", id.pos);
+            return false;
+        }
+        symbol = symbol_table->define(id.literal);
+        if (!value(&*symbol)) return false;
         emit(OpCode::STORE, symbol->scope, symbol->index);
     } else {
-        emit(OpCode::LOAD, symbol->scope, symbol->index);
+        if (symbol == std::nullopt) {
+            error("undefined variable '" + id.literal + "'", id.pos);
+            return false;
+        }
+        if (can_assign && consume("=")) {
+            if (!value(&*symbol)) return false;
+            emit(OpCode::STORE, symbol->scope, symbol->index);
+        } else {
+            emit(OpCode::LOAD, symbol->scope, symbol->index);
+        }
     }
+
     return true;
 }
 
@@ -470,33 +483,6 @@ bool Compiler::function(Symbol *symbol) {
     return true;
 }
 
-/// impl ::= 'impl' ("as" <string>) <identifier> 'for' <type>
-bool Compiler::impl() {
-    if (consume("as")) {
-        if (!string_()) return false;
-    } else {
-        if (!check(TokenType::Identifier)) return false;
-        auto id = cur.literal;
-        language->constants.push_back(SRCLANG_VALUE_STRING(strdup(id.c_str())));
-        emit(OpCode::CONST, language->constants.size() - 1);
-    }
-
-    if (!identifier(false)) return false;
-
-    if (!expect("for")) return false;
-    ValueType ty;
-
-    try {
-        ty = type(cur.literal);
-        emit(OpCode::LOAD, Symbol::Scope::TYPE, int(ty));
-    } catch (std::exception const &exc) {
-        error(exc.what(), cur.pos);
-        return false;
-    }
-    if (!eat()) return false;
-    emit(OpCode::IMPL);
-    return true;
-}
 
 /// list ::= '[' (<expression> % ',') ']'
 bool Compiler::list() {
@@ -1152,8 +1138,6 @@ bool Compiler::statement() {
     } else if (consume("continue")) {
         emit(OpCode::CONTINUE, 0);
         return true;
-    } else if (consume("impl")) {
-        return impl();
     } else if (consume("#!")) {
         return compiler_options();
     }
@@ -1174,7 +1158,11 @@ bool Compiler::program() {
     return true;
 }
 
-Compiler::Compiler(Iterator start, Iterator end, const std::string &filename, Language *language)
+Compiler::Compiler(Iterator
+                   start, Iterator
+                   end,
+                   const std::string &filename, Language
+                   *language)
         : iter{start},
           start{start},
           end{end},
@@ -1203,4 +1191,13 @@ bool Compiler::compile() {
     }
     emit(OpCode::HLT);
     return true;
+}
+
+bool Compiler::value(Symbol *symbol) {
+    if (consume("fun")) {
+        return function(symbol);
+    } else if (symbol != nullptr && consume("native")) {
+        return native(symbol);
+    }
+    return expression();
 }

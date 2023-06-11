@@ -147,11 +147,11 @@ namespace srclang {
 
         bool block();
 
+        bool value(Symbol *symbol);
+
         /// fun '(' args ')' block
         bool function(Symbol *symbol);
 
-        /// impl ::= 'impl' ("as" <string>) <identifier> 'for' <type>
-        bool impl();
 
         /// list ::= '[' (<expression> % ',') ']'
         bool list();
