@@ -1,5 +1,0 @@
-import "path";
-
-println (path.Join("usr","bin", "acl"));
-println (path.Exists(__FILE__));
-println (path.Exists("some/unknown/path"));

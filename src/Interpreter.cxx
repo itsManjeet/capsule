@@ -1,4 +1,5 @@
 #include <array>
+#include <ranges>
 #include "Interpreter.hxx"
 #include "SymbolTable.hxx"
 #include "Language.hxx"
@@ -1276,6 +1277,9 @@ bool Interpreter::run() {
 
             case OpCode::RET: {
                 auto value = *--sp;
+                for (unsigned long &defer: std::ranges::reverse_view(cur()->defers)) {
+                    language->call(defer, {});
+                }
                 sp = cur()->bp - 1;
                 fp--;
                 *sp++ = value;
@@ -1293,6 +1297,12 @@ bool Interpreter::run() {
             }
                 break;
 
+            case OpCode::DEFER: {
+                auto fn = *--sp;
+                cur()->defers.push_back(fn);
+            }
+                break;
+
             case OpCode::CONTINUE:
             case OpCode::BREAK:
             case OpCode::JMP: {
@@ -1301,6 +1311,9 @@ bool Interpreter::run() {
                 break;
 
             case OpCode::HLT: {
+                for (unsigned long &defer: std::ranges::reverse_view(cur()->defers)) {
+                    language->call(defer, {});
+                }
                 return true;
             }
                 break;

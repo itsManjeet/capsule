@@ -150,7 +150,7 @@ namespace srclang {
         bool value(Symbol *symbol);
 
         /// fun '(' args ')' block
-        bool function(Symbol *symbol);
+        bool function(Symbol *symbol, bool skip_args = false);
 
 
         /// list ::= '[' (<expression> % ',') ']'
@@ -194,6 +194,9 @@ namespace srclang {
 
         /// import ::= 'import' <string> ('as' <identifier>)?
         bool import_();
+
+        /// defer ::= 'defer' <function>
+        bool defer();
 
         /// condition ::= 'if' <expression> <block> (else statement)?
         bool condition();

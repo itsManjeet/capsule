@@ -1,6 +1,7 @@
 #include <filesystem>
 #include <fstream>
 #include <algorithm>
+#include <ranges>
 #include "Compiler.hxx"
 #include "Utilities.hxx"
 
@@ -203,7 +204,7 @@ bool Compiler::eat() {
     /// reserved ::=
     for (std::string k: {"let", "fun", "native", "return", "if", "else", "for",
                          "break", "continue", "import", "global", "as",
-                         "in",
+                         "in", "defer",
 
             // specical operators
                          "#!", "not", "...", ":=",
@@ -404,7 +405,7 @@ bool Compiler::block() {
 }
 
 /// fun '(' args ')' block
-bool Compiler::function(Symbol *symbol) {
+bool Compiler::function(Symbol *symbol, bool skip_args) {
     bool is_variadic = false;
     auto pos = cur.pos;
     push_scope();
@@ -412,27 +413,29 @@ bool Compiler::function(Symbol *symbol) {
         auto freeSymbol = symbol_table->define(*symbol);
         emit(OpCode::SET_SELF, freeSymbol.index);
     }
-
-    // eat '('
-    if (!expect("(")) return false;
     int nparam = 0;
-    while (!consume(")")) {
-        if (!check(TokenType::Identifier)) {
-            return false;
-        }
-        nparam++;
-        symbol_table->define(cur.literal);
-        eat();
+    if (!skip_args) {
+        if (!expect("(")) return false;
 
-        if (consume("...")) {
-            if (!expect(")")) return false;
-            is_variadic = true;
-            break;
-        }
-        if (consume(")")) break;
+        while (!consume(")")) {
+            if (!check(TokenType::Identifier)) {
+                return false;
+            }
+            nparam++;
+            symbol_table->define(cur.literal);
+            eat();
 
-        if (!expect(",")) return false;
+            if (consume("...")) {
+                if (!expect(")")) return false;
+                is_variadic = true;
+                break;
+            }
+            if (consume(")")) break;
+
+            if (!expect(",")) return false;
+        }
     }
+
 
     auto fun_debug_info = std::make_shared<DebugInfo>();
     fun_debug_info->filename = filename;
@@ -1138,6 +1141,8 @@ bool Compiler::statement() {
     } else if (consume("continue")) {
         emit(OpCode::CONTINUE, 0);
         return true;
+    } else if (consume("defer")) {
+        return defer();
     } else if (consume("#!")) {
         return compiler_options();
     }
@@ -1200,4 +1205,10 @@ bool Compiler::value(Symbol *symbol) {
         return native(symbol);
     }
     return expression();
+}
+
+bool Compiler::defer() {
+    if (!function(nullptr, true)) return false;
+    emit(OpCode::DEFER);
+    return expect(";");
 }

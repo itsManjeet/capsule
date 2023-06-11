@@ -1,0 +1,11 @@
+add := fun (a, b) {
+	defer { println("defer 1"); };
+	return 10;
+	defer { println("defer 2"); };
+};
+
+defer { println("defer 3"); };
+x := add (2, 4);
+println (x);
+
+defer { println("defer 4"); };

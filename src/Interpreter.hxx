@@ -20,6 +20,7 @@ namespace srclang {
             typename std::vector<Byte>::iterator ip;
             Closure *closure;
             std::vector<Value>::iterator bp;
+            std::vector<Value> defers;
         };
 
 
