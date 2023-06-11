@@ -39,6 +39,8 @@ int run(Language *language, std::optional<std::string> path) {
 
 int interactive(Language *language) {
     std::cout << LOGO << std::endl;
+    std::cout << "Source Programming Language" << std::endl;
+    std::cout << "Copyright (C) 2021 rlxos" << std::endl;
 
     while (true) {
         std::cout << "> ";
