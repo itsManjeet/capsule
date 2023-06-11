@@ -1,3 +1,4 @@
 ERROR: Expected ';' but got 'foo'
  | 123.foo;
        ^
+COMPILATION FAILED

@@ -2,7 +2,7 @@
 
 SRCLANG=${1}
 TEST_FILE=${2}
-${SRCLANG} -search-path="./modules/" "${TEST_FILE}" >"${TEST_FILE}.test" 2>&1
+${SRCLANG} run -search-path "./modules/" "${TEST_FILE}" >"${TEST_FILE}.test" 2>&1
 # shellcheck disable=SC2181
 if [[ ${?} == 0 ]]; then
   outfile=${TEST_FILE}.out

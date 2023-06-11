@@ -1,3 +1,4 @@
 ERROR: undefined variable 'is_odd'
  |     return is_odd (n-1);
               ^
+COMPILATION FAILED

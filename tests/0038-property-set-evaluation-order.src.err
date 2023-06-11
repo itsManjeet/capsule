@@ -1,3 +1,4 @@
 ERROR: undefined variable 'undefined1'
  | undefined1.bar = undefined2;
    ^
+COMPILATION FAILED

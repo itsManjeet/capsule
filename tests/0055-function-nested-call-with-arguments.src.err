@@ -1,3 +1,4 @@
 ERROR: Expected 'Identifier' but got 'return'
  | let return_arg = fun (arg) {
        ^
+COMPILATION FAILED
