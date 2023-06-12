@@ -643,12 +643,30 @@ bool Interpreter::call_typecast_char(uint8_t count) {
 }
 
 bool Interpreter::call_typecast_string(uint8_t count) {
-    std::string buf;
-    for (auto i = sp - count; i != sp; i++) {
-        buf += SRCLANG_VALUE_GET_STRING(*i);
+    Value result;
+    if (count == 1) {
+        auto value = *(sp - count);
+        switch (SRCLANG_VALUE_GET_TYPE(value)) {
+            case ValueType::Char:
+                result = SRCLANG_VALUE_STRING(strdup(std::string(1, SRCLANG_VALUE_AS_CHAR(value)).c_str()));
+                break;
+            case ValueType::Pointer:
+                result = SRCLANG_VALUE_STRING(SRCLANG_VALUE_AS_OBJECT(value)->pointer);
+                break;
+            default:
+                result = SRCLANG_VALUE_STRING(strdup(SRCLANG_VALUE_GET_STRING(value).c_str()));
+                break;
+        }
+    } else {
+        std::string buf;
+        for (auto i = sp - count; i != sp; i++) {
+            buf += SRCLANG_VALUE_GET_STRING(*i);
+        }
+        result = SRCLANG_VALUE_STRING(strdup(buf.c_str()));
     }
+
     sp -= count + 1;
-    *sp++ = SRCLANG_VALUE_STRING(strdup(buf.c_str()));
+    *sp++ = result;
     return true;
 }
 
@@ -801,7 +819,12 @@ bool Interpreter::call_native(Value callee, uint8_t count) {
             break;
 
         case ValueType::Pointer:
-            result_value = SRCLANG_VALUE_POINTER((void *) result);
+            if ((void *) result == nullptr) {
+                result_value = SRCLANG_VALUE_NULL;
+            } else {
+                result_value = SRCLANG_VALUE_POINTER((void *) result);
+            }
+
             break;
 
         case ValueType::Decimal:

@@ -961,14 +961,13 @@ bool Compiler::import_() {
 
     auto old_symbol_table = symbol_table;
     symbol_table = new SymbolTable{old_symbol_table};
-
     Compiler compiler(input.begin(), input.end(),
                       search_path, language);
+    compiler.symbol_table = symbol_table;
     if (!compiler.compile()) {
         error("failed to import '" + search_path + "'", cur.pos);
         return false;
     }
-
 
     auto instructions = std::move(compiler.code().instructions);
     instructions->pop_back();  // pop OpCode::HLT

@@ -23,6 +23,8 @@ namespace srclang {
     X(eval)                  \
     X(pop)                   \
     X(call)                  \
+    X(alloc)                 \
+    X(free)                  \
     X(lower)                 \
     X(upper)                 \
     X(search)

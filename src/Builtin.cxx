@@ -314,3 +314,17 @@ SRCLANG_BUILTIN(eval) {
     const char *buffer = (const char *) SRCLANG_VALUE_AS_OBJECT(args[0])->pointer;
     return interpreter->language->execute(buffer, "<inline>");
 }
+
+SRCLANG_BUILTIN(alloc) {
+    SRCLANG_CHECK_ARGS_EXACT(1);
+    SRCLANG_CHECK_ARGS_TYPE(0, ValueType::Integer);
+    void *ptr = malloc(SRCLANG_VALUE_AS_INTEGER(SRCLANG_VALUE_AS_INTEGER(args[0])));
+    return SRCLANG_VALUE_POINTER(ptr);
+}
+
+SRCLANG_BUILTIN(free) {
+    SRCLANG_CHECK_ARGS_EXACT(1);
+    SRCLANG_CHECK_ARGS_TYPE(0, ValueType::Pointer);
+    free(SRCLANG_VALUE_AS_OBJECT(args[0])->pointer);
+    return SRCLANG_VALUE_TRUE;
+}
