@@ -11,18 +11,18 @@ using namespace srclang;
 
 void Interpreter::error(std::string const &mesg) {
     if (debug_info.empty() || debug_info.back() == nullptr) {
-        std::cerr << "ERROR: " << mesg << std::endl;
+        err_stream << "ERROR: " << mesg << std::endl;
         return;
     }
 
-    std::cerr << debug_info.back()->filename << ":"
-              << debug_info.back()->lines[distance(
-                      cur()->closure->fun->instructions->begin(), cur()->ip)]
-              << std::endl;
-    std::cerr << "  ERROR: " << mesg << std::endl;
+    err_stream << debug_info.back()->filename << ":"
+               << debug_info.back()->lines[distance(
+                       cur()->closure->fun->instructions->begin(), cur()->ip)]
+               << std::endl;
+    err_stream << "  ERROR: " << mesg;
 }
 
-Interpreter::Interpreter(ByteCode &code, std::shared_ptr<DebugInfo> debugInfo, Language *language)
+Interpreter::Interpreter(ByteCode &code, const std::shared_ptr<DebugInfo> &debugInfo, Language *language)
         : stack(2048),
           frames(1024),
           language{language} {
@@ -572,15 +572,16 @@ bool Interpreter::call_builtin(Value callee, uint8_t count) {
             reinterpret_cast<Builtin>(SRCLANG_VALUE_AS_OBJECT(callee)->pointer);
     std::vector<Value> args(sp - count, sp);
     sp -= count + 1;
-    auto result = builtin(args, this);
-    if (SRCLANG_VALUE_IS_OBJECT(result)) add_object(result);
-    *sp++ = result;
-    if (SRCLANG_VALUE_IS_OBJECT(result) &&
-        SRCLANG_VALUE_AS_OBJECT(result)->type == ValueType::Error) {
-        error((char *) SRCLANG_VALUE_AS_OBJECT(result)->pointer);
+    Value result;
+    try {
+        result = builtin(args, this);
+    } catch (std::exception const &exception) {
+        error(exception.what());
         return false;
     }
 
+    if (SRCLANG_VALUE_IS_OBJECT(result)) add_object(result);
+    *sp++ = result;
     return true;
 }
 

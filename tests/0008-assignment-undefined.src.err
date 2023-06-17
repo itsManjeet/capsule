@@ -1,4 +1,3 @@
 ERROR: undefined variable 'unknown'
  | unknown = "what";
    ^
-COMPILATION FAILED

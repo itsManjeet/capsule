@@ -24,14 +24,14 @@ SRCLANG_BUILTIN(gc) {
 }
 
 SRCLANG_BUILTIN(call) {
-    SRCLANG_CHECK_ARGS_EXACT(2);
+    SRCLANG_CHECK_ARGS_ATLEAST(1);
     SRCLANG_CHECK_ARGS_TYPE(0, ValueType::Closure);
-    SRCLANG_CHECK_ARGS_TYPE(1, ValueType::List);
-
     auto callee = args[0];
-    auto callee_args = (SrcLangList *) SRCLANG_VALUE_AS_OBJECT(args[1])->pointer;
-
-    return interpreter->language->call(callee, *callee_args);
+    SrcLangList callee_args;
+    if (args.size() > 1) {
+        callee_args = std::vector<Value>(args.begin() + 1, args.end());
+    }
+    return interpreter->language->call(callee, callee_args);
 }
 
 SRCLANG_BUILTIN(print) {

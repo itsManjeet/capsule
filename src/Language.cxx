@@ -52,21 +52,18 @@ void Language::define(const std::string &id, Value value) {
 Value Language::execute(const std::string &input, const std::string &filename) {
     auto compiler = Compiler(input.begin(), input.end(), filename, this);
     if (!compiler.compile()) {
-        return SRCLANG_VALUE_ERROR(strdup("COMPILATION FAILED"));
+        return SRCLANG_VALUE_ERROR(strdup(compiler.get_error().c_str()));
     }
     auto code = std::move(compiler.code());
     return execute(code, compiler.debugInfo());
 }
 
-Value Language::execute(ByteCode &code, std::shared_ptr<DebugInfo> debugInfo) {
-    auto interpreter = Interpreter(code, std::move(debugInfo), this);
+Value Language::execute(ByteCode &code, const std::shared_ptr<DebugInfo> &debugInfo) {
+    auto interpreter = Interpreter(code, debugInfo, this);
     if (!interpreter.run()) {
-        return SRCLANG_VALUE_ERROR(strdup("INTERPRETATION FAILED"));
+        return SRCLANG_VALUE_ERROR(strdup(interpreter.get_error().c_str()));
     }
-    if (std::distance(interpreter.stack.begin(), interpreter.sp) > 0) {
-        return *(interpreter.sp - 1);
-    }
-    return SRCLANG_VALUE_TRUE;
+    return *interpreter.sp;
 }
 
 Value Language::execute(std::filesystem::path filename) {

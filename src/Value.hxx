@@ -158,6 +158,12 @@ namespace srclang {
                                  "' but '" + std::to_string(args.size()) + \
                                  "' provided");
 
+#define SRCLANG_CHECK_ARGS_ATLEAST(count)                                    \
+    if (args.size() < count)                                                 \
+        throw std::runtime_error("Expected atleast '" + std::to_string(count) +    \
+                                 "' but '" + std::to_string(args.size()) + \
+                                 "' provided");
+
 #define SRCLANG_CHECK_ARGS_RANGE(start, end)                               \
     if (args.size() < start || args.size() > end)                          \
         throw std::runtime_error("Expected '" + std::to_string(start) +    \

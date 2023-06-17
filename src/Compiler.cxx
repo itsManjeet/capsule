@@ -1181,6 +1181,8 @@ Compiler::Compiler(Iterator
     eat();
     eat();
 
+    error_stream.clear();
+
     language->constants.push_back(SRCLANG_VALUE_STRING(strdup(filename.c_str())));
     fileConst = language->constants.size() - 1;
 }

@@ -34,13 +34,15 @@ namespace srclang {
 
         Language *language;
 
+        std::stringstream err_stream;
+
         typename std::vector<Frame>::iterator fp;
         std::vector<std::shared_ptr<DebugInfo>> debug_info;
         bool debug, break_;
 
         void error(std::string const &mesg);
 
-        Interpreter(ByteCode &code, std::shared_ptr<DebugInfo> debugInfo, Language *language);
+        Interpreter(ByteCode &code, const std::shared_ptr<DebugInfo>& debugInfo, Language *language);
 
         ~Interpreter();
 
@@ -89,6 +91,12 @@ namespace srclang {
         bool call(uint8_t count);
 
         bool run();
+
+        std::string get_error()  {
+            std::string e = err_stream.str();
+            err_stream.clear();
+            return e;
+        }
     };
 
 } // srclang

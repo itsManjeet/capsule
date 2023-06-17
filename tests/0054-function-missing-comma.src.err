@@ -1,4 +1,3 @@
 ERROR: Expected ',' but got 'c'
  | let foo = fun (a, b c, d, e, f) {
                        ^
-COMPILATION FAILED

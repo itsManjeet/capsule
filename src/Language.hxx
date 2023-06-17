@@ -28,7 +28,7 @@ namespace srclang {
 
         Value execute(std::string const &input, std::string const &filename);
 
-        Value execute(ByteCode &code, std::shared_ptr<DebugInfo> debugInfo);
+        Value execute(ByteCode &code, const std::shared_ptr<DebugInfo>& debugInfo);
 
         Value execute(std::filesystem::path filename);
 

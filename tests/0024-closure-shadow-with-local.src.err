@@ -1,4 +1,3 @@
 ERROR: Variable already defined 'foo'
  |     let foo = "shadow";
            ^
-COMPILATION FAILED

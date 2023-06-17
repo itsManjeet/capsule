@@ -16,6 +16,7 @@
 #include "ByteCode.hxx"
 #include "Function.hxx"
 #include "Options.hxx"
+#include <sstream>
 
 
 namespace srclang {
@@ -65,6 +66,8 @@ namespace srclang {
         Iterator iter, start, end;
         std::string filename;
 
+        std::stringstream error_stream;
+
         std::vector<std::string> loaded_imports;
         std::vector<std::unique_ptr<Instructions >> instructions;
         DebugInfo *debug_info;
@@ -78,20 +81,21 @@ namespace srclang {
         std::unique_ptr<Instructions> pop_scope();
 
         template<typename Message>
-        void error(const Message &mesg, Iterator pos) const {
+        void error(const Message &mesg, Iterator pos) {
             int line;
             Iterator line_start = get_error_pos(pos, line);
-            std::cout << filename << ":" << line << std::endl;
+            error_stream << filename << ":" << line << '\n';
             if (pos != end) {
-                std::cout << "ERROR: " << mesg << std::endl;
-                std::cout << " | " << get_error_line(line_start) << std::endl << "   ";
-                for (; line_start != pos; ++line_start) std::cout << ' ';
-                std::cout << '^' << std::endl;
+                error_stream << "ERROR: " << mesg << '\n';
+                error_stream << " | " << get_error_line(line_start) << '\n' << "   ";
+                for (; line_start != pos; ++line_start) error_stream << ' ';
+                error_stream << '^';
             } else {
-                std::cout << "Unexpected end of file. ";
-                std::cout << mesg << " line " << line << std::endl;
+                error_stream << "Unexpected end of file. ";
+                error_stream << mesg << " line " << line;
             }
         }
+
 
         Iterator get_error_pos(Iterator err_pos, int &line) const;
 
@@ -224,6 +228,12 @@ namespace srclang {
         ByteCode code();
 
         std::shared_ptr<DebugInfo> debugInfo() { return global_debug_info; }
+
+        std::string get_error() {
+            auto s = error_stream.str();
+            error_stream.clear();
+            return s;
+        }
 
     };
 
