@@ -1,5 +1,6 @@
 #include <utility>
 #include <fstream>
+#include <dlfcn.h>
 
 #include "Language.hxx"
 #include "ProjectManager.hxx"
@@ -90,6 +91,8 @@ int main(int argc, char **argv) {
     std::optional<std::string> filename, output;
     std::filesystem::path project_path = std::filesystem::current_path();
 
+    void *handler = nullptr;
+
     if (argc >= 2) { task = argv[1]; }
 
     bool prog_args_start = false;
@@ -128,9 +131,21 @@ int main(int argc, char **argv) {
             } else if (strcmp(argv[i], "o") == 0) {
                 CHECK_COUNT(1);
                 output = argv[++i];
+            } else if (strcmp(argv[i], "lib") == 0) {
+                CHECK_COUNT(1);
+                handler = dlopen(argv[++i], RTLD_GLOBAL | RTLD_NOW);
+                if (handler == nullptr) {
+                    std::cerr << "ERROR: " << dlerror() << std::endl;
+                    return 1;
+                }
             } else if (strcmp(argv[i], "project-path") == 0) {
                 CHECK_COUNT(1);
-                project_path = argv[++i];
+                std::string path(argv[++i]);
+                if (path[0] == '/') {
+                    project_path = path;
+                } else {
+                    project_path = std::filesystem::canonical(std::filesystem::current_path() / path);
+                }
             } else {
                 std::cerr << "ERROR: invalid flag '-" << argv[i] << "'" << std::endl;
                 return 1;
@@ -138,7 +153,12 @@ int main(int argc, char **argv) {
 #undef CHECK_COUNT
         } else if (filename == std::nullopt &&
                    std::filesystem::exists(argv[i])) {
-            filename = argv[i];
+            std::string path(argv[i]);
+            if (path[0] == '/') {
+                filename = path;
+            } else {
+                filename = std::filesystem::canonical(std::filesystem::current_path() / path);
+            }
         } else {
             cli_args.emplace_back(argv[i]);
         }

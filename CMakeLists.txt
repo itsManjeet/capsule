@@ -15,6 +15,17 @@ include(ExternalProject)
 set(CMAKE_FIND_LIBRARY_SUFFIXES ".so" ".a")
 find_library(DL dl REQUIRED)
 find_library(FFI ffi REQUIRED)
+find_program(MAKE_EXECUTABLE NAMES gmake make mingw32-make REQUIRED)
+ExternalProject_Add(tinycc
+        SOURCE_DIR ${PROJECT_SOURCE_DIR}/external/libtcc
+        CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix=<INSTALL_DIR>
+        BUILD_COMMAND ${MAKE_EXECUTABLE}
+        INSTALL_COMMAND ${MAKE_EXECUTABLE} install)
+ExternalProject_Get_Property(tinycc INSTALL_DIR)
+include_directories(${INSTALL_DIR}/include)
+link_directories(${INSTALL_DIR}/lib)
+set(LIBTCC ${INSTALL_DIR}/lib/libtcc.a)
+
 
 add_executable(${PROJECT_NAME} src/srclang.cxx
         src/Value.hxx src/Value.cxx
@@ -30,8 +41,10 @@ add_executable(${PROJECT_NAME} src/srclang.cxx
         src/Compiler.cxx src/Compiler.hxx
         src/Interpreter.cxx src/Interpreter.hxx
         src/Language.cxx src/Language.hxx
-        src/ProjectManager.cxx src/ProjectManager.hxx)
-target_link_libraries(${PROJECT_NAME} ${FFI} ${DL} -rdynamic)
+        src/ProjectManager.cxx src/ProjectManager.hxx
+        )
+add_dependencies(${PROJECT_NAME} tinycc)
+target_link_libraries(${PROJECT_NAME} ${FFI} ${LIBTCC} ${DL} -rdynamic)
 # target_compile_definitions(${PROJECT_NAME} PUBLIC -DSRCLANG_GC_DEBUG)
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
 enable_testing()

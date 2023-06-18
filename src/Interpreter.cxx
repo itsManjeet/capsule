@@ -738,7 +738,13 @@ bool Interpreter::call_native(Value callee, uint8_t count) {
     }
 
     void *handler = nullptr;
-    handler = dlsym(nullptr, native->id.c_str());
+    if (language->state != nullptr) {
+        handler = tcc_get_symbol(language->state, native->id.c_str());
+    }
+    if (handler == nullptr) {
+        handler = dlsym(nullptr, native->id.c_str());
+    }
+
     if (handler == nullptr) {
         error(dlerror());
         return false;

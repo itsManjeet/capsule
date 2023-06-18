@@ -1,6 +1,6 @@
 #include <utility>
 #include <fstream>
-
+#include <dlfcn.h>
 #include "Language.hxx"
 #include "Builtin.hxx"
 
@@ -50,9 +50,20 @@ void Language::define(const std::string &id, Value value) {
 }
 
 Value Language::execute(const std::string &input, const std::string &filename) {
+    state = tcc_new();
+    if (state == nullptr) {
+        throw std::runtime_error(strerror(errno));
+    }
+    tcc_set_output_type(state, TCC_OUTPUT_MEMORY);
     auto compiler = Compiler(input.begin(), input.end(), filename, this);
     if (!compiler.compile()) {
         return SRCLANG_VALUE_ERROR(strdup(compiler.get_error().c_str()));
+    }
+    if (tcc_compile_string(state, cc_code.c_str()) == -1) {
+        return SRCLANG_VALUE_ERROR(strdup("TCC compilation failed"));
+    }
+    if (tcc_relocate(state, TCC_RELOCATE_AUTO) == -1) {
+        return SRCLANG_VALUE_ERROR(strdup("TCC relocation failed"));
     }
     auto code = std::move(compiler.code());
     return execute(code, compiler.debugInfo());
@@ -66,7 +77,7 @@ Value Language::execute(ByteCode &code, const std::shared_ptr<DebugInfo> &debugI
     return *interpreter.sp;
 }
 
-Value Language::execute(std::filesystem::path filename) {
+Value Language::execute(const std::filesystem::path &filename) {
     if (!std::filesystem::exists(filename)) {
         return SRCLANG_VALUE_ERROR(strdup(("Missing file " + filename.string()).c_str()));
     }
@@ -79,6 +90,7 @@ Value Language::execute(std::filesystem::path filename) {
         );
         return execute(input, filename.string());
     } else {
+        void *handler = nullptr;
         ByteCode *code = ByteCode::read(reader);
         auto debugInfo = std::shared_ptr<DebugInfo>(DebugInfo::read(reader));
         constants = code->constants;
@@ -111,6 +123,8 @@ bool Language::compile(const std::string &filename, std::optional<std::string> o
     );
     reader.close();
 
+    tcc_set_output_type(state, TCC_OUTPUT_DLL);
+
     auto compiler = Compiler(input.begin(), input.end(), filename, this);
     if (!compiler.compile()) {
         return false;
@@ -124,6 +138,14 @@ bool Language::compile(const std::string &filename, std::optional<std::string> o
     code.dump(writer);
     compiler.debugInfo()->dump(writer);
     writer.close();
+
+    if (tcc_compile_string(state, cc_code.c_str()) == -1) {
+        return false;
+    }
+
+    if (tcc_output_file(state, (filename.substr(0, filename.size() - 4) + ".so").c_str()) == -1) {
+        return false;
+    }
 
     return true;
 }

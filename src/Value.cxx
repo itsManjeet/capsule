@@ -52,6 +52,18 @@ void srclang::SRCLANG_VALUE_DUMP(Value v, std::ostream &os) {
             dump_int<bool>(function->is_variadic, os);
             function->debug_info->dump(os);
         }
+            break;
+
+        case ValueType::Native: {
+            auto native = (NativeFunction *) object->pointer;
+            dump_int<ValueType>(native->ret, os);
+            dump_int<size_t>(native->param.size(), os);
+            for (auto i: native->param) {
+                dump_int<ValueType>(i, os);
+            }
+            dump_string(native->id, os);
+        }
+            break;
 
         default:
             throw std::runtime_error("can't dump value '" + SRCLANG_VALUE_TYPE_ID[int(object->type)] + "'");
@@ -112,6 +124,19 @@ Value srclang::SRCLANG_VALUE_READ(std::istream &is) {
             function->debug_info = std::shared_ptr<DebugInfo>(DebugInfo::read(is));
             object->pointer = (void *) function;
         }
+            break;
+
+        case ValueType::Native: {
+            auto native = new NativeFunction();
+            native->ret = read_int<ValueType>(is);
+            auto size = read_int<size_t>(is);
+            for (int i = 0; i < size; i++) {
+                native->param.push_back(read_int<ValueType>(is));
+            }
+            native->id = read_string(is);
+            object->pointer = (void *) native;
+        }
+            break;
 
         default:
             throw std::runtime_error("can't dump value '" + SRCLANG_VALUE_TYPE_ID[int(object->type)] + "'");

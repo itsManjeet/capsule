@@ -221,6 +221,19 @@ bool Compiler::eat() {
         }
     }
 
+    /// cc_code ::= "```" (.*?) "````"
+    std::string const ccCodePrefix = "```";
+    auto ccCodePrefixDist = std::distance(ccCodePrefix.begin(), ccCodePrefix.end());
+    if (std::equal(iter, iter + ccCodePrefixDist, ccCodePrefix.begin(), ccCodePrefix.end())) {
+        iter += ccCodePrefixDist;
+        language->cc_code += '\n';
+        do {
+            language->cc_code += *(iter++);
+        } while (!std::equal(iter, iter + ccCodePrefixDist, ccCodePrefix.begin(), ccCodePrefix.end()));
+        iter += ccCodePrefixDist;
+        return eat();
+    }
+
     /// identifier ::= [a-zA-Z_]([a-zA-Z0-9_]*)
     if (isalpha(*iter) || *iter == '_') {
         do {

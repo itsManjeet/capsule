@@ -7,6 +7,7 @@
 #include "Interpreter.hxx"
 #include "SymbolTable.hxx"
 #include <filesystem>
+#include <libtcc.h>
 
 namespace srclang {
 
@@ -18,6 +19,10 @@ namespace srclang {
         SrcLangList globals;
         SrcLangList constants;
 
+        TCCState *state{nullptr};
+
+        std::string cc_code{};
+
         Language();
 
         void define(std::string const &id, Value value);
@@ -28,9 +33,9 @@ namespace srclang {
 
         Value execute(std::string const &input, std::string const &filename);
 
-        Value execute(ByteCode &code, const std::shared_ptr<DebugInfo>& debugInfo);
+        Value execute(ByteCode &code, const std::shared_ptr<DebugInfo> &debugInfo);
 
-        Value execute(std::filesystem::path filename);
+        Value execute(const std::filesystem::path& filename);
 
         Value call(Value callee, std::vector<Value> const &args);
 
