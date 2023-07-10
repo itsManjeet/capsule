@@ -318,7 +318,11 @@ SRCLANG_BUILTIN(eval) {
 SRCLANG_BUILTIN(alloc) {
     SRCLANG_CHECK_ARGS_EXACT(1);
     SRCLANG_CHECK_ARGS_TYPE(0, ValueType::Integer);
-    void *ptr = malloc(SRCLANG_VALUE_AS_INTEGER(SRCLANG_VALUE_AS_INTEGER(args[0])));
+    auto size = SRCLANG_VALUE_AS_INTEGER(args[0]);
+    void *ptr = malloc(size * sizeof(unsigned char));
+    if (ptr == nullptr) {
+        return SRCLANG_VALUE_ERROR(strerror(errno));
+    }
     return SRCLANG_VALUE_POINTER(ptr);
 }
 

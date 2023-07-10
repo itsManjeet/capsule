@@ -737,6 +737,20 @@ bool Interpreter::call_native(Value callee, uint8_t count) {
         return false;
     }
 
+    static std::map<CType, ffi_type*> ctypes = {
+        {CType::i8,  &ffi_type_sint8},
+        {CType::i16, &ffi_type_sint16},
+        {CType::i32, &ffi_type_sint32},
+        {CType::i64, &ffi_type_sint64},
+        {CType::u8,  &ffi_type_uint8},
+        {CType::u16, &ffi_type_uint16},
+        {CType::u32, &ffi_type_uint32},
+        {CType::u64, &ffi_type_uint64},
+        {CType::f32, &ffi_type_float},
+        {CType::f64, &ffi_type_double},
+        {CType::ptr, &ffi_type_pointer},
+    };
+
     void *handler = nullptr;
     if (language->state != nullptr) {
         handler = tcc_get_symbol(language->state, native->id.c_str());
@@ -756,9 +770,9 @@ bool Interpreter::call_native(Value callee, uint8_t count) {
     int j = 0;
     for (auto i = sp - count; i != sp; i++, j++) {
         auto type = SRCLANG_VALUE_GET_TYPE(*i);
-        if (type != native->param[j]) {
+        if (!is_same(native->param[j], type)) {
             error("ERROR: invalid " + std::to_string(j) + "th parameter, expected '" +
-                  SRCLANG_VALUE_TYPE_ID[int(native->param[j])] + "' but got '" +
+                  CTYPE_ID[int(native->param[j])] + "' but got '" +
                   SRCLANG_VALUE_TYPE_ID[int(type)] +
                   "'");
             return false;
@@ -771,7 +785,7 @@ bool Interpreter::call_native(Value callee, uint8_t count) {
             case ValueType::Integer: {
                 values[j] = &(*i);
                 (*(int64_t *) (values[j])) >>= 3;
-                types[j] = &ffi_type_slong;
+                types[j] = ctypes[native->param[j]];
 
             }
                 break;
@@ -788,7 +802,7 @@ bool Interpreter::call_native(Value callee, uint8_t count) {
                 break;
             case ValueType::Decimal: {
                 values[j] = &(*i);
-                types[j] = &ffi_type_double;
+                types[j] = ctypes[native->param[j]];
             }
                 break;
 

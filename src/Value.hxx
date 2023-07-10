@@ -194,12 +194,62 @@ namespace srclang {
         return value;
     }
 
+    #define SRCLANG_CTYPE_LIST \
+        X(i8) \
+        X(i16) \
+        X(i32) \
+        X(i64) \
+        X(u8) \
+        X(u16) \
+        X(u32) \
+        X(u64) \
+        X(f32) \
+        X(f64) \
+        X(ptr)
+
+    enum class CType : uint8_t {
+        #define X(id) id,
+            SRCLANG_CTYPE_LIST
+        #undef X
+    };
+
+    static const char* CTYPE_ID[] = {
+    #define X(id) #id,
+        SRCLANG_CTYPE_LIST
+    #undef X
+    };
+
+    static inline CType get_ctype(const char* ty) {
+        for(int i = 0; i <= (int)CType::ptr; i++) {
+            if (strcmp(CTYPE_ID[i], ty) == 0) {
+                return CType(i);
+            }
+        }
+        throw std::runtime_error("unknown ctype");
+    }
+
 
     struct NativeFunction {
         std::string id;
-        std::vector<ValueType> param;
+        std::vector<CType> param;
         ValueType ret;
     };
+
+    static inline bool is_same(CType ctype, ValueType valueType) {
+        switch (valueType) {
+            case ValueType::Boolean:
+            case ValueType::Integer:
+                return (ctype >= CType::i8 && ctype <= CType::u64);
+
+            case ValueType::String:
+            case ValueType::Pointer:
+                return ctype == CType::ptr;
+
+            case ValueType::Decimal:
+                return ctype == CType::f32 || ctype == CType::f64;
+        }
+        return false;
+    }
 
     struct BoundedValue {
         Value parent;

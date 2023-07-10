@@ -1,0 +1,31 @@
+Exit   := native exit (i32) int;
+Open   := native fopen (ptr, ptr) ptr;
+Fdopen := native fdopen (i32, ptr) ptr;
+Close  := native fclose (ptr) int;
+Read   := native fread (ptr, i32, u64, ptr) int;
+Write  := native fwrite (ptr, i32, u64, ptr) int;
+Seek   := native fseek (ptr, i32, i32) int;
+Tell   := native ftell (ptr) int;
+Getc   := native fgetc (ptr) char;
+Error  := native error () str;
+
+O_RDONLY := 00000000;
+O_WRONLY := 00000001;
+O_RDWR   := 00000002;
+O_CREAT  := 00000100;
+
+SEEK_SET := 0;
+SEEK_CUR := 1;
+SEEK_END := 2;
+
+EOF      := char(-1);
+
+```
+#include <string.h>
+#include <errno.h>
+
+const char* error() {
+    return strdup(strerror(errno));
+}
+
+```

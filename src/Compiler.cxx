@@ -978,7 +978,7 @@ bool Compiler::import_() {
                       search_path, language);
     compiler.symbol_table = symbol_table;
     if (!compiler.compile()) {
-        error("failed to import '" + search_path + "'", cur.pos);
+        error("failed to import '" + search_path + "'\n" + compiler.get_error(), cur.pos);
         return false;
     }
 
@@ -1046,9 +1046,12 @@ bool Compiler::import_() {
 
 /// condition ::= 'if' <expression> <block> (else statement)?
 bool Compiler::condition() {
-    if (!expression()) {
-        return false;
-    }
+    do {
+        if (!expression()) {
+            return false;
+        }
+    } while(consume(";"));
+    
     auto false_pos = emit(OpCode::JNZ, 0);
     if (!block()) {
         return false;
@@ -1093,7 +1096,7 @@ bool Compiler::native(Symbol *symbol) {
         id = cur.literal;
         if (!eat()) return false;
     }
-    std::vector<ValueType> types;
+    std::vector<CType> types;
     ValueType ret_type;
 
     if (!expect("(")) return false;
@@ -1101,7 +1104,7 @@ bool Compiler::native(Symbol *symbol) {
     while (!consume(")")) {
         if (!check(TokenType::Identifier)) return false;
         try {
-            types.push_back(type(cur.literal));
+            types.push_back(get_ctype(cur.literal.c_str()));
         } catch (std::runtime_error const &e) {
             error(e.what(), cur.pos);
             return false;

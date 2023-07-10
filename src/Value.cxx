@@ -59,7 +59,7 @@ void srclang::SRCLANG_VALUE_DUMP(Value v, std::ostream &os) {
             dump_int<ValueType>(native->ret, os);
             dump_int<size_t>(native->param.size(), os);
             for (auto i: native->param) {
-                dump_int<ValueType>(i, os);
+                dump_int<CType>(i, os);
             }
             dump_string(native->id, os);
         }
@@ -131,7 +131,7 @@ Value srclang::SRCLANG_VALUE_READ(std::istream &is) {
             native->ret = read_int<ValueType>(is);
             auto size = read_int<size_t>(is);
             for (int i = 0; i < size; i++) {
-                native->param.push_back(read_int<ValueType>(is));
+                native->param.push_back(read_int<CType>(is));
             }
             native->id = read_string(is);
             object->pointer = (void *) native;

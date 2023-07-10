@@ -1,9 +1,13 @@
-```
-int add(int a, int b) {
-    return a + b;
+import "file";
+import "sys";
+
+if f := file.Open("build.src", "r"); type(f) == error {
+    println("failed to open build.src, ", f);
+    sys.Exit(1);
 }
-```
 
-add := native (int, int) int;
+defer { file.Close(); };
 
-println (add(10, 30));
+data := file.Read();
+
+println (data);
