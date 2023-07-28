@@ -1,8 +1,9 @@
-#include <utility>
-#include <fstream>
 #include <dlfcn.h>
 
-#include "Language.hxx"
+#include <fstream>
+#include <utility>
+
+#include "../src/Language.hxx"
 #include "ProjectManager.hxx"
 
 using namespace srclang;
@@ -16,6 +17,8 @@ const auto LOGO = R"(
      \/              \/          \/     \//_____/
 
 )";
+
+Language *__srclang_global_language;
 
 int compile(Language *language, std::optional<std::string> path, std::optional<std::string> output) {
     if (path == std::nullopt) {
@@ -32,7 +35,7 @@ int run(Language *language, std::optional<std::string> path) {
     }
     auto result = language->execute(std::filesystem::path(*path));
     if (SRCLANG_VALUE_GET_TYPE(result) == ValueType::Error) {
-        std::cerr << (char *) SRCLANG_VALUE_AS_OBJECT(result)->pointer << std::endl;
+        std::cerr << (char *)SRCLANG_VALUE_AS_OBJECT(result)->pointer << std::endl;
         return 1;
     }
     return 0;
@@ -65,7 +68,8 @@ int printHelp() {
     std::cout << "Copyright (C) 2021 rlxos" << std::endl;
 
     std::cout << "\n"
-                 " COMMANDS:" << std::endl;
+                 " COMMANDS:"
+              << std::endl;
     std::cout << "   run                    Run srclang script and bytecode (source ends with .src)\n"
               << "   interactive            Start srclang interactive shell\n"
               << "   compile                Compile srclang script in bytecode\n"
@@ -74,6 +78,7 @@ int printHelp() {
               << '\n'
               << " FLAGS:\n"
               << "  -debug                  Enable debugging outputs\n"
+              << "  -ir                     Print IR\n"
               << "  -breakpoint             Enable breakpoint at instructions\n"
               << "  -search-path <path>     Append module search path\n"
               << "  -define <key>=<value>   Define variable from command line\n"
@@ -86,6 +91,7 @@ int main(int argc, char **argv) {
     Language language;
 
     auto args = new SrcLangList();
+    __srclang_global_language = &language;
 
     std::string task = "help";
     std::optional<std::string> filename, output;
@@ -93,7 +99,9 @@ int main(int argc, char **argv) {
 
     void *handler = nullptr;
 
-    if (argc >= 2) { task = argv[1]; }
+    if (argc >= 2) {
+        task = argv[1];
+    }
 
     bool prog_args_start = false;
     std::vector<std::string> cli_args;
@@ -109,11 +117,17 @@ int main(int argc, char **argv) {
         }
         if (argv[i][0] == '-') {
             argv[i]++;
-#define CHECK_COUNT(c) if (argc <= c + i) { std::cout << "expecting " << c << " arguments" << std::endl; return 1; }
+#define CHECK_COUNT(c)                                               \
+    if (argc <= c + i) {                                             \
+        std::cout << "expecting " << c << " arguments" << std::endl; \
+        return 1;                                                    \
+    }
             if (strcmp(argv[i], "debug") == 0) {
                 language.options["DEBUG"] = true;
             } else if (strcmp(argv[i], "breakpoint") == 0) {
                 language.options["BREAK"] = true;
+            } else if (strcmp(argv[i], "ir") == 0) {
+                language.options["IR"] = true;
             } else if (strcmp(argv[i], "define") == 0) {
                 CHECK_COUNT(1)
                 auto value = std::string(argv[++i]);
@@ -167,10 +181,14 @@ int main(int argc, char **argv) {
     language.define("__ARGS__", SRCLANG_VALUE_LIST(args));
     ProjectManager projectManager(&language, project_path);
 
-    if (task == "help") return printHelp();
-    else if (task == "run") return run(&language, filename);
-    else if (task == "interactive") return interactive(&language);
-    else if (task == "compile") return compile(&language, filename, output);
+    if (task == "help")
+        return printHelp();
+    else if (task == "run")
+        return run(&language, filename);
+    else if (task == "interactive")
+        return interactive(&language);
+    else if (task == "compile")
+        return compile(&language, filename, output);
 
     try {
         if (task == "new") {
@@ -186,7 +204,6 @@ int main(int argc, char **argv) {
         std::cerr << "ERROR: " << ex.what() << std::endl;
         return 1;
     }
-
 
     return printHelp();
 }

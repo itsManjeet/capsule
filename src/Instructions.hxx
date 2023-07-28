@@ -12,7 +12,9 @@ namespace srclang {
 #define SRCLANG_OPCODE_LIST \
     X(CONST, 1)                \
     X(CONST_INT, 1)            \
-    X(CONST_NULL, 1)           \
+    X(CONST_TRUE, 0)           \
+    X(CONST_FALSE, 0)          \
+    X(CONST_NULL, 0)           \
     X(LOAD, 2)                 \
     X(STORE, 2)                \
     X(ADD, 0)                  \

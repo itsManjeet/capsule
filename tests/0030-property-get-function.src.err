@@ -1,1 +1,1 @@
-  ERROR: KeyNotFound 'bar:str' in container
+  ERROR: InvalidOperation b/w 'bar:str' and '<object(closure)>:closure'

@@ -1,0 +1,13 @@
+condition_1 := fun () {
+    println ("I should run");
+    return false;
+};
+
+condition_2 := fun () {
+    println ("I shouldn't run");
+    return true;
+};
+
+if condition_1() and condition_2() {
+    println ("I must not run");
+}

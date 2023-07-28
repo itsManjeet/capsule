@@ -26,7 +26,6 @@ namespace srclang {
 
 #define SRCLANG_TOKEN_TYPE_LIST \
     X(Reserved)                 \
-    X(Character)                \
     X(Identifier)               \
     X(String)                   \
     X(Number)                   \
@@ -145,8 +144,6 @@ namespace srclang {
 
         bool string_();
 
-        bool char_();
-
         bool unary(OpCode op);
 
         bool block();
@@ -196,8 +193,8 @@ namespace srclang {
         /// loop ::= 'for' <identifier> 'in' <expression> <block>
         bool loop();
 
-        /// import ::= 'import' <string> ('as' <identifier>)?
-        bool import_();
+        /// use ::= 'use' '('  <string> ')'
+        bool use();
 
         /// defer ::= 'defer' <function>
         bool defer();

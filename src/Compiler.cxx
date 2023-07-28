@@ -1,11 +1,12 @@
+#include "Compiler.hxx"
+
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
-#include <algorithm>
 #include <ranges>
-#include "Compiler.hxx"
-#include "Utilities.hxx"
 
 #include "Language.hxx"
+#include "Utilities.hxx"
 
 using namespace srclang;
 
@@ -30,7 +31,6 @@ std::unique_ptr<Instructions> Compiler::pop_scope() {
     instructions.pop_back();
     return std::move(res);
 }
-
 
 Iterator Compiler::get_error_pos(Iterator err_pos, int &line) const {
     line = 1;
@@ -168,11 +168,12 @@ bool Compiler::eat() {
     }
 
     /// string ::= '"' ... '"'
-    if (*iter == '"') {
+    if (*iter == '"' || *iter == '\'') {
+        auto starting = *iter;
         iter++;
         peek.literal.clear();
         bool status = true;
-        while (*iter != '"') {
+        while (*iter != starting) {
             if (iter == end) {
                 error("unterminated string", peek.pos);
                 return false;
@@ -186,31 +187,16 @@ bool Compiler::eat() {
         return true;
     }
 
-    /// char :: '\'' <char> '\''
-    if (*iter == '\'') {
-        iter++;
-        bool status = true;
-        peek.literal = escape(iter, status);
-        if (!status) return false;
-        if (*iter != '\'') {
-            error("unterminated character", peek.pos);
-            return false;
-        }
-        iter++;
-        peek.type = TokenType::Character;
-        return true;
-    }
-
     /// reserved ::=
-    for (std::string k: {"let", "fun", "native", "return", "if", "else", "for",
-                         "break", "continue", "import", "global", "as",
-                         "in", "defer",
+    for (std::string k : {"let", "fun", "native", "return", "if", "else", "for",
+                          "break", "continue", "use", "global", "as",
+                          "in", "defer",
 
-            // specical operators
-                         "#!", "not", "...", ":=",
+                          // specical operators
+                          "#!", "not", "...", ":=",
 
-            // multi char operators
-                         "==", "!=", "<=", ">=", ">>", "<<"}) {
+                          // multi char operators
+                          "==", "!=", "<=", ">=", ">>", "<<"}) {
         auto dist = distance(k.begin(), k.end());
         if (equal(iter, iter + dist, k.begin(), k.end()) &&
             !isalnum(*(iter + dist))) {
@@ -226,10 +212,13 @@ bool Compiler::eat() {
     auto ccCodePrefixDist = std::distance(ccCodePrefix.begin(), ccCodePrefix.end());
     if (std::equal(iter, iter + ccCodePrefixDist, ccCodePrefix.begin(), ccCodePrefix.end())) {
         iter += ccCodePrefixDist;
-        language->cc_code += '\n';
+        std::string ccode;
         do {
-            language->cc_code += *(iter++);
+            ccode += *(iter++);
         } while (!std::equal(iter, iter + ccCodePrefixDist, ccCodePrefix.begin(), ccCodePrefix.end()));
+        if (language->cc_code.find(ccode) == std::string::npos) {
+            language->cc_code += "\n" + ccode;
+        }
         iter += ccCodePrefixDist;
         return eat();
     }
@@ -258,7 +247,7 @@ bool Compiler::eat() {
         } while (isdigit(*iter) || *iter == '.' || *iter == '_');
         if (*iter == 'b' ||
             *iter ==
-            'h') {  // include 'b' for binary and 'h' for hexadecimal
+                'h') {  // include 'b' for binary and 'h' for hexadecimal
             iter++;
         }
         peek.literal = std::string_view(peek.pos, iter);
@@ -271,31 +260,31 @@ bool Compiler::eat() {
 
 Compiler::Precedence Compiler::precedence(std::string tok) {
     static std::map<std::string, Precedence> prec = {
-            {":=",  P_Assignment},
-            {"=",   P_Assignment},
-            {"or",  P_Or},
-            {"and", P_And},
-            {"&",   P_Land},
-            {"|",   P_Lor},
-            {"==",  P_Equality},
-            {"!=",  P_Equality},
-            {">",   P_Comparison},
-            {"<",   P_Comparison},
-            {">=",  P_Comparison},
-            {"<=",  P_Comparison},
-            {">>",  P_Shift},
-            {"<<",  P_Shift},
-            {"+",   P_Term},
-            {"-",   P_Term},
-            {"*",   P_Factor},
-            {"/",   P_Factor},
-            {"%",   P_Factor},
-            {"not", P_Unary},
-            {"-",   P_Unary},
-            {"$",   P_Unary},
-            {".",   P_Call},
-            {"[",   P_Call},
-            {"(",   P_Call},
+        {":=", P_Assignment},
+        {"=", P_Assignment},
+        {"or", P_Or},
+        {"and", P_And},
+        {"&", P_Land},
+        {"|", P_Lor},
+        {"==", P_Equality},
+        {"!=", P_Equality},
+        {">", P_Comparison},
+        {"<", P_Comparison},
+        {">=", P_Comparison},
+        {"<=", P_Comparison},
+        {">>", P_Shift},
+        {"<<", P_Shift},
+        {"+", P_Term},
+        {"-", P_Term},
+        {"*", P_Factor},
+        {"/", P_Factor},
+        {"%", P_Factor},
+        {"not", P_Unary},
+        {"-", P_Unary},
+        {"$", P_Unary},
+        {".", P_Call},
+        {"[", P_Call},
+        {"(", P_Call},
     };
     auto i = prec.find(tok);
     if (i == prec.end()) {
@@ -303,7 +292,6 @@ Compiler::Precedence Compiler::precedence(std::string tok) {
     }
     return i->second;
 }
-
 
 bool Compiler::number() {
     bool is_float = false;
@@ -313,7 +301,7 @@ bool Compiler::number() {
         base = 8;
         cur.literal = cur.literal.substr(1);
     }
-    for (auto i: cur.literal) {
+    for (auto i : cur.literal) {
         if (i == '.') {
             if (is_float) {
                 error("multiple floating point detected", cur.pos);
@@ -333,11 +321,7 @@ bool Compiler::number() {
     }
     Value val;
     try {
-        if (is_float) {
-            val = SRCLANG_VALUE_DECIMAL(stod(number_value));
-        } else {
-            val = SRCLANG_VALUE_INTEGER(stoi(number_value, 0, base));
-        }
+        val = SRCLANG_VALUE_NUMBER(stod(number_value));
     } catch (std::invalid_argument const &e) {
         error("Invalid numerical value " + std::string(e.what()), cur.pos);
         return false;
@@ -393,12 +377,6 @@ bool Compiler::string_() {
     return expect(TokenType::String);
 }
 
-bool Compiler::char_() {
-    language->constants.push_back(SRCLANG_VALUE_CHAR(cur.literal[0]));
-    emit(OpCode::CONST, language->constants.size() - 1);
-    return expect(TokenType::Character);
-}
-
 bool Compiler::unary(OpCode op) {
     if (!expression(P_Unary)) {
         return false;
@@ -449,7 +427,6 @@ bool Compiler::function(Symbol *symbol, bool skip_args) {
         }
     }
 
-
     auto fun_debug_info = std::make_shared<DebugInfo>();
     fun_debug_info->filename = filename;
     get_error_pos(pos, fun_debug_info->position);
@@ -475,7 +452,7 @@ bool Compiler::function(Symbol *symbol, bool skip_args) {
         fun_instructions->emit(fun_debug_info.get(), line, OpCode::RET);
     }
 
-    for (auto const &i: free_symbols) {
+    for (auto const &i : free_symbols) {
         emit(OpCode::LOAD, i.scope, i.index);
     }
 
@@ -488,9 +465,9 @@ bool Compiler::function(Symbol *symbol, bool skip_args) {
     }
 
     auto fun = new Function{
-            FunctionType::Function, id, std::move(fun_instructions), nlocals, nparam,
-            is_variadic,
-            fun_debug_info};
+        FunctionType::Function, id, std::move(fun_instructions), nlocals, nparam,
+        is_variadic,
+        fun_debug_info};
     auto fun_value = SRCLANG_VALUE_FUNCTION(fun);
     language->memoryManager.heap.push_back(fun_value);
     language->constants.push_back(fun_value);
@@ -498,7 +475,6 @@ bool Compiler::function(Symbol *symbol, bool skip_args) {
     emit(OpCode::CLOSURE, language->constants.size() - 1, free_symbols.size());
     return true;
 }
-
 
 /// list ::= '[' (<expression> % ',') ']'
 bool Compiler::list() {
@@ -541,8 +517,6 @@ bool Compiler::prefix(bool can_assign) {
         return string_();
     } else if (cur.type == TokenType::Identifier) {
         return identifier(can_assign);
-    } else if (cur.type == TokenType::Character) {
-        return char_();
     } else if (consume("not")) {
         return unary(OpCode::NOT);
     } else if (consume("-")) {
@@ -553,6 +527,10 @@ bool Compiler::prefix(bool can_assign) {
         return list();
     } else if (consume("{")) {
         return map_();
+    } else if (consume("fun")) {
+        return function(nullptr);
+    } else if (consume("use")) {
+        return use();
     } else if (consume("(")) {
         if (!expression()) {
             return false;
@@ -561,8 +539,8 @@ bool Compiler::prefix(bool can_assign) {
     }
 
     error(
-            "Unknown expression type '" + SRCLANG_TOKEN_ID[int(cur.type)] + "'",
-            cur.pos);
+        "Unknown expression type '" + SRCLANG_TOKEN_ID[int(cur.type)] + "'",
+        cur.pos);
     return false;
 }
 
@@ -572,10 +550,23 @@ bool Compiler::assign() {
 }
 
 bool Compiler::binary(OpCode op, int prec) {
-    if (!expression(prec + 1)) {
-        return false;
+    if (op == OpCode::AND) {
+        auto false_pos = emit(OpCode::JNZ, 0);
+        if (!expression(prec + 1)) {
+            return false;
+        }
+        auto jmp = emit(OpCode::JMP, 0);
+        auto after_block_pos = inst()->size();
+        emit(OpCode::CONST_FALSE);
+        inst()->at(false_pos + 1) = after_block_pos;
+        inst()->at(jmp + 1) = inst()->size();
+    } else {
+        if (!expression(prec + 1)) {
+            return false;
+        }
+        emit(op);
     }
-    emit(op);
+
     return true;
 }
 
@@ -615,7 +606,6 @@ bool Compiler::index(bool can_assign) {
         } else {
             if (!expression()) return false;
         }
-
     }
     if (!expect("]")) return false;
     if (can_assign && consume("=") && count == 1) {
@@ -658,23 +648,23 @@ bool Compiler::subscript(bool can_assign) {
 
 bool Compiler::infix(bool can_assign) {
     static std::map<std::string, OpCode> binop = {
-            {"+",   OpCode::ADD},
-            {"-",   OpCode::SUB},
-            {"/",   OpCode::DIV},
-            {"*",   OpCode::MUL},
-            {"==",  OpCode::EQ},
-            {"!=",  OpCode::NE},
-            {"<",   OpCode::LT},
-            {">",   OpCode::GT},
-            {">=",  OpCode::GE},
-            {"<=",  OpCode::LE},
-            {"and", OpCode::AND},
-            {"or",  OpCode::OR},
-            {"|",   OpCode::LOR},
-            {"&",   OpCode::LAND},
-            {">>",  OpCode::LSHIFT},
-            {"<<",  OpCode::RSHIFT},
-            {"%",   OpCode::MOD},
+        {"+", OpCode::ADD},
+        {"-", OpCode::SUB},
+        {"/", OpCode::DIV},
+        {"*", OpCode::MUL},
+        {"==", OpCode::EQ},
+        {"!=", OpCode::NE},
+        {"<", OpCode::LT},
+        {">", OpCode::GT},
+        {">=", OpCode::GE},
+        {"<=", OpCode::LE},
+        {"and", OpCode::AND},
+        {"or", OpCode::OR},
+        {"|", OpCode::LOR},
+        {"&", OpCode::LAND},
+        {">>", OpCode::LSHIFT},
+        {"<<", OpCode::RSHIFT},
+        {"%", OpCode::MOD},
     };
 
     if (consume("=")) {
@@ -727,9 +717,9 @@ bool Compiler::compiler_options() {
 #define CHECK_TYPE_ID(ty)                                          \
     if (variant_typeid(id->second) != typeid(ty)) {                \
         error("invalid value of type '" +                          \
-                  std::string(variant_typeid(id->second).name()) +      \
+                  std::string(variant_typeid(id->second).name()) + \
                   "' for option '" + option_id + "', required '" + \
-                  std::string(typeid(ty).name()) + "'",                 \
+                  std::string(typeid(ty).name()) + "'",            \
               pos);                                                \
         return false;                                              \
     }
@@ -761,8 +751,7 @@ bool Compiler::compiler_options() {
                     CHECK_TYPE_ID(int);
                     value = stoi(cur.literal);
                 }
-            }
-                break;
+            } break;
             default:
                 CHECK_TYPE_ID(void);
         }
@@ -777,16 +766,16 @@ bool Compiler::compiler_options() {
     if (option_id == "VERSION") {
         if (SRCLANG_VERSION > get<float>(value)) {
             error(
-                    "Code need srclang of version above or equal to "
-                    "'" +
+                "Code need srclang of version above or equal to "
+                "'" +
                     std::to_string(SRCLANG_VERSION) + "'",
-                    pos);
+                pos);
             return false;
         }
     } else if (option_id == "SEARCH_PATH") {
         language->options[option_id] =
-                std::filesystem::absolute(get<std::string>(value)).string() + ":" +
-                get<std::string>(language->options[option_id]);
+            std::filesystem::absolute(get<std::string>(value)).string() + ":" +
+            get<std::string>(language->options[option_id]);
     } else if (option_id == "C_LIBRARY") {
         void *handler = dlopen(get<std::string>(value).c_str(), RTLD_GLOBAL | RTLD_NOW);
         if (handler == nullptr) {
@@ -836,7 +825,6 @@ bool Compiler::let() {
         }
     }
 
-
     emit(OpCode::STORE, symbol->scope, symbol->index);
     emit(OpCode::POP);
     return expect(";");
@@ -858,8 +846,7 @@ void Compiler::patch_loop(int loop_start, OpCode to_patch, int pos) {
             case OpCode::BREAK: {
                 if (j == to_patch && inst()->at(i) == 0)
                     inst()->at(i++) = pos;
-            }
-                break;
+            } break;
 
             default:
                 i += SRCLANG_OPCODE_SIZE[int(j)];
@@ -882,7 +869,7 @@ bool Compiler::loop() {
         iter = symbol_table->resolve(cur.literal);
         if (iter == std::nullopt) iter = symbol_table->define(cur.literal);
 
-        language->constants.push_back(SRCLANG_VALUE_INTEGER(0));
+        language->constants.push_back(SRCLANG_VALUE_NUMBER(0));
         emit(OpCode::CONST, language->constants.size() - 1);
         emit(OpCode::STORE, count->scope, count->index);
         emit(OpCode::POP);
@@ -912,7 +899,7 @@ bool Compiler::loop() {
         emit(OpCode::STORE, iter->scope, iter->index);
         emit(OpCode::POP);
 
-        language->constants.push_back(SRCLANG_VALUE_INTEGER(1));
+        language->constants.push_back(SRCLANG_VALUE_NUMBER(1));
         emit(OpCode::CONST, language->constants.size() - 1);
         emit(OpCode::LOAD, count->scope, count->index);
         emit(OpCode::ADD);
@@ -922,7 +909,6 @@ bool Compiler::loop() {
     } else {
         loop_exit = emit(OpCode::JNZ, 0);
     }
-
 
     if (!block()) return false;
 
@@ -939,25 +925,24 @@ bool Compiler::loop() {
     return true;
 }
 
-/// import ::= 'import' <string> ('as' <identifier>)?
-bool Compiler::import_() {
-    if (!check(TokenType::String)) return false;
-    auto path = cur.literal;
-    int line;
-    get_error_pos(cur.pos, line);
+bool Compiler::use() {
+    if (!expect("(")) return false;
+    auto path = cur;
+    if (!expect(TokenType::String)) return false;
+    if (!expect(")")) return false;
 
     std::stringstream ss(std::get<std::string>(language->options["SEARCH_PATH"]));
     std::string search_path;
     bool found = false;
     while (getline(ss, search_path, ':')) {
-        search_path += "/" + path + ".src";
+        search_path += "/" + path.literal + ".src";
         if (std::filesystem::exists(search_path)) {
             found = true;
             break;
         }
     }
     if (!found) {
-        error("missing required module '" + path + "'", cur.pos);
+        error("missing required module '" + path.literal + "'", path.pos);
         return false;
     }
 
@@ -987,7 +972,7 @@ bool Compiler::import_() {
 
     int total = 0;
     // export symbols
-    for (auto i: symbol_table->store) {
+    for (auto i : symbol_table->store) {
         if (i.second.scope == Symbol::Scope::LOCAL &&
             isupper(i.first[0])) {
             language->constants.push_back(SRCLANG_VALUE_STRING(strdup(i.first.c_str())));
@@ -1005,41 +990,19 @@ bool Compiler::import_() {
     instructions->emit(compiler.global_debug_info.get(), 0,
                        OpCode::RET);
 
-
-    for (auto const &i: nfree) {
+    for (auto const &i : nfree) {
         emit(OpCode::LOAD, i.scope, i.index);
     }
 
     auto fun = new Function{
-            FunctionType::Function, "", std::move(instructions), nlocals, 0, false,
-            compiler.global_debug_info};
+        FunctionType::Function, "", std::move(instructions), nlocals, 0, false,
+        compiler.global_debug_info};
     auto val = SRCLANG_VALUE_FUNCTION(fun);
     language->memoryManager.heap.push_back(val);
     language->constants.push_back(val);
 
     emit(OpCode::CLOSURE, language->constants.size() - 1, nfree.size());
     emit(OpCode::CALL, 0);
-    if (!eat()) return false;
-
-    std::string module_name = std::filesystem::path(path).filename().string();
-    if (consume("as")) {
-        if (!check(TokenType::Identifier)) return false;
-        module_name = cur.literal;
-        if (!eat()) return false;
-    }
-    if (symbol_table->resolve(module_name) != std::nullopt) {
-        error("Can't import module with '" + module_name + "', variable already defined", cur.pos);
-        return false;
-    }
-    fun->id = module_name;
-    auto symbol = symbol_table->define(module_name);
-    emit(OpCode::STORE, symbol.scope, symbol.index);
-    emit(OpCode::POP);
-
-    auto fileSymbol = symbol_table->resolve("__FILE__");
-    emit(OpCode::CONST, fileConst);
-    emit(OpCode::STORE, fileSymbol->scope, fileSymbol->index);
-    emit(OpCode::POP);
 
     return true;
 }
@@ -1050,8 +1013,8 @@ bool Compiler::condition() {
         if (!expression()) {
             return false;
         }
-    } while(consume(";"));
-    
+    } while (consume(";"));
+
     auto false_pos = emit(OpCode::JNZ, 0);
     if (!block()) {
         return false;
@@ -1085,7 +1048,7 @@ ValueType Compiler::type(std::string literal) {
         throw std::runtime_error("Invalid type '" + type + "'");
     }
     return SRCLANG_VALUE_AS_TYPE(
-            SRCLANG_VALUE_TYPES[distance(SRCLANG_VALUE_TYPE_ID.begin(), iter)]);
+        SRCLANG_VALUE_TYPES[distance(SRCLANG_VALUE_TYPE_ID.begin(), iter)]);
 };
 
 /// native ::= 'native' <identifier> ( (<type> % ',') ) <type>
@@ -1097,7 +1060,7 @@ bool Compiler::native(Symbol *symbol) {
         if (!eat()) return false;
     }
     std::vector<CType> types;
-    ValueType ret_type;
+    CType ret_type;
 
     if (!expect("(")) return false;
 
@@ -1116,7 +1079,7 @@ bool Compiler::native(Symbol *symbol) {
     }
     if (!check(TokenType::Identifier)) return false;
     try {
-        ret_type = type(cur.literal);
+        ret_type = get_ctype(cur.literal.c_str());
         if (!eat()) return false;
     } catch (std::runtime_error const &e) {
         error(e.what(), cur.pos);
@@ -1148,8 +1111,6 @@ bool Compiler::statement() {
         return condition();
     else if (consume("for"))
         return loop();
-    else if (consume("import"))
-        return import_();
     else if (consume("break")) {
         emit(OpCode::BREAK, 0);
         return true;
@@ -1179,15 +1140,15 @@ bool Compiler::program() {
 }
 
 Compiler::Compiler(Iterator
-                   start, Iterator
-                   end,
-                   const std::string &filename, Language
-                   *language)
-        : iter{start},
-          start{start},
-          end{end},
-          language{language},
-          filename{filename} {
+                       start,
+                   Iterator
+                       end,
+                   const std::string &filename, Language *language)
+    : iter{start},
+      start{start},
+      end{end},
+      language{language},
+      filename{filename} {
     global_debug_info = std::make_shared<DebugInfo>();
     global_debug_info->filename = filename;
     global_debug_info->position = 0;

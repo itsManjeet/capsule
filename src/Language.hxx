@@ -1,13 +1,16 @@
 #ifndef SRCLANG_LANGUAGE_HXX
 #define SRCLANG_LANGUAGE_HXX
 
-#include "Value.hxx"
-#include "Options.hxx"
+#include <libtcc.h>
+
+#include <filesystem>
+#include <tuple>
+
 #include "Compiler.hxx"
 #include "Interpreter.hxx"
+#include "Options.hxx"
 #include "SymbolTable.hxx"
-#include <filesystem>
-#include <libtcc.h>
+#include "Value.hxx"
 
 namespace srclang {
 
@@ -31,18 +34,19 @@ namespace srclang {
 
         bool compile(std::string const &filename, std::optional<std::string> output);
 
+        std::tuple<Value, ByteCode, std::shared_ptr<DebugInfo>> compile(std::string const &input, std::string const &filename, int tcc_output_type);
+
         Value execute(std::string const &input, std::string const &filename);
 
         Value execute(ByteCode &code, const std::shared_ptr<DebugInfo> &debugInfo);
 
-        Value execute(const std::filesystem::path& filename);
+        Value execute(const std::filesystem::path &filename);
 
         Value call(Value callee, std::vector<Value> const &args);
 
         void appendSearchPath(std::string const &path);
-
     };
 
-}
+}  // namespace srclang
 
 #endif

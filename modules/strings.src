@@ -6,8 +6,5 @@ New := fun (sz, fill) {
         buf[i] = fill;
     }
     buf[sz] = 0;
-    return buf;
+    return str(buf);
 };
-
-s := New(10, 32);
-println (str(s));

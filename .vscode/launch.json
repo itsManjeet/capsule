@@ -9,7 +9,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/srclang",
-            "args": ["run", "code.src", "-search-path", "modules"],
+            "args": ["run", "code.src", "-search-path", "modules", "-ir"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [],

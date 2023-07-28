@@ -56,7 +56,7 @@ void srclang::SRCLANG_VALUE_DUMP(Value v, std::ostream &os) {
 
         case ValueType::Native: {
             auto native = (NativeFunction *) object->pointer;
-            dump_int<ValueType>(native->ret, os);
+            dump_int<CType>(native->ret, os);
             dump_int<size_t>(native->param.size(), os);
             for (auto i: native->param) {
                 dump_int<CType>(i, os);
@@ -73,7 +73,7 @@ void srclang::SRCLANG_VALUE_DUMP(Value v, std::ostream &os) {
 Value srclang::SRCLANG_VALUE_READ(std::istream &is) {
     ValueType valueType;
     is.read(reinterpret_cast<char *>(&valueType), sizeof(ValueType));
-    if (valueType <= ValueType::Char) {
+    if (valueType <= ValueType::Number) {
         Value value;
         is.read(reinterpret_cast<char *>(&value), sizeof(Value));
         return value;
@@ -128,7 +128,7 @@ Value srclang::SRCLANG_VALUE_READ(std::istream &is) {
 
         case ValueType::Native: {
             auto native = new NativeFunction();
-            native->ret = read_int<ValueType>(is);
+            native->ret = read_int<CType>(is);
             auto size = read_int<size_t>(is);
             for (int i = 0; i < size; i++) {
                 native->param.push_back(read_int<CType>(is));

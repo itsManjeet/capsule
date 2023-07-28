@@ -1,14 +1,3 @@
-Exit   := native exit (i32) int;
-Open   := native fopen (ptr, ptr) ptr;
-Fdopen := native fdopen (i32, ptr) ptr;
-Close  := native fclose (ptr) int;
-Read   := native fread (ptr, i32, u64, ptr) int;
-Write  := native fwrite (ptr, i32, u64, ptr) int;
-Seek   := native fseek (ptr, i32, i32) int;
-Tell   := native ftell (ptr) int;
-Getc   := native fgetc (ptr) char;
-Error  := native error () str;
-
 O_RDONLY := 00000000;
 O_WRONLY := 00000001;
 O_RDWR   := 00000002;
@@ -18,14 +7,141 @@ SEEK_SET := 0;
 SEEK_CUR := 1;
 SEEK_END := 2;
 
-EOF      := char(-1);
+S_IFMT      := 00170000;
+S_IFSOCK    := 0140000;
+S_IFLNK     := 0120000;
+S_IFREG     := 0100000;
+S_IFBLK     := 0060000;
+S_IFDIR     := 0040000;
+S_IFCHR     := 0020000;
+S_IFIFO     := 0010000;
+S_ISUID     := 0004000;
+S_ISGID     := 0002000;
+S_ISVTX     := 0001000;
+
+S_ISLNK     := fun (m) { return (m & S_IFMT) == S_IFLNK; };
+S_ISREG     := fun (m) { return (m & S_IFMT) == S_IFREG; };
+S_ISDIR     := fun (m) { return (m & S_IFMT) == S_IFDIR; };
+S_ISCHR     := fun (m) { return (m & S_IFMT) == S_IFCHR; };
+S_ISBLK     := fun (m) { return (m & S_IFMT) == S_IFBLK; };
+S_ISFIFIO   := fun (m) { return (m & S_IFMT) == S_IFIFO; };
+S_ISSOCK    := fun (m) { return (m & S_IFMT) == S_IFSOCK; };
+
+EOF         := -1;
+
+Exit        := native exit (i32) i32;
+Open        := native open (ptr, i32) i32;
+Close       := native close (i32) i32;
+Read        := native read (i32, ptr, u64) i64;
+Write       := native write (i32, ptr, u64) i64;
+Seek        := native lseek (i32, i64, i32) i64;
+Opendir     := native opendir (ptr) ptr;
+Closedir    := native closedir (ptr) i32;
+Chdir       := native chdir (ptr) i32;
+Sleep       := native sleep (i32) i32;
+
+_readdir    := native readdir (ptr) ptr;
+_error      := native error () ptr;
+_system     := native system (ptr) i32;
+
+_dirrent_d_name     := native dirent_d_name (ptr) ptr;
+_dirrent_d_ino      := native dirent_d_ino (ptr) i32;
+_dirrent_d_off      := native dirent_d_off (ptr) i64;
+_dirrent_d_reclen   := native dirent_d_reclen (ptr) u16;
+_dirrent_d_type     := native dirent_d_type (ptr) u8;
+
+
+Error  := fun () {
+    return str(_error());
+};
+
+System := fun (cmd) {
+    status := _system(cmd);
+    return (status & 65280) >> 8;
+};
+
+Readdir := fun (p) {
+    d := _readdir(p);
+    if d == null {
+        return null;
+    }
+
+    return {
+        name    : str(_dirrent_d_name (d)),
+        ino     : _dirrent_d_ino (d),
+        offset  : _dirrent_d_off (d),
+        type    : _dirrent_d_type (d),
+        reclen  : _dirrent_d_reclen (d)
+    };
+};
+
+Listdir := fun (path) {
+    if dir := Opendir(path); dir == -1 {
+        return Error();
+    }
+    defer { Closedir(dir); };
+
+    res := [];
+    for true {
+        e := Readdir (dir);
+        if e == null {
+            break;
+        }
+        res = append(res, e.name);
+    }
+    return res;
+};
+
+ReadAll := fun (fd) {
+    curpos := Seek(fd, 0, SEEK_CUR);
+    end := Seek(fd, 0, SEEK_END);
+    buf := alloc(end - curpos);
+    Seek(fd, curpos, SEEK_SET);
+    println ("FD: ", fd);
+    if rd := Read (fd, buf, end - curpos); rd == -1 {
+        free(buf);
+        return Error();
+    }
+    Seek(fd, curpos, SEEK_SET);
+    return buf;
+};
+
+WriteAll := fun (fd, data...) {
+    data = str(data);
+    if s := Write(fd, data, len(data)); s == -1 {
+        return Error();
+    }
+    return true;
+};
+
 
 ```
 #include <string.h>
 #include <errno.h>
+#include <dirent.h>
 
 const char* error() {
     return strdup(strerror(errno));
+}
+
+const char* dirent_d_name (struct dirent *entry) {
+    return strdup(entry->d_name);
+}
+
+int dirent_d_ino (struct dirent *entry) {
+    return entry->d_ino;
+}
+
+long dirent_d_off (struct dirent *entry) {
+    return entry->d_off;
+}
+
+unsigned short dirent_d_reclen (struct dirent *entry) {
+    return entry->d_reclen;
+}
+
+unsigned char dirent_d_type (struct dirent *entry) {
+    return entry->d_type;
 }
 
 ```

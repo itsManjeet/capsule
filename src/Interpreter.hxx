@@ -68,11 +68,7 @@ namespace srclang {
 
         bool call_builtin(Value callee, uint8_t count);
 
-        bool call_typecast_int(uint8_t count);
-
-        bool call_typecast_float(uint8_t count);
-
-        bool call_typecast_char(uint8_t count);
+        bool call_typecast_num(uint8_t count);
 
         bool call_typecast_string(uint8_t count);
 

@@ -1,13 +1,36 @@
-import "file";
-import "sys";
+app := use("app");
+sys := use("sys");
 
-if f := file.Open("build.src", "r"); type(f) == error {
-    println("failed to open build.src, ", f);
+if status := app.Create({
+    id: "srclang",
+    version: "0.0.1",
+    about: "Source Programming Language",
+    usage: "<COMMAND> <FLAGS> [ARGS...]",
+    commands: [
+        {
+            id: "run",
+            about: "execute the code",
+            handler: fun (ctxt) {
+
+            }
+        },
+        {
+            id: "compile",
+            about: "compile the code into bytecode",
+            handler: fun (ctxt) {
+
+            }
+        }
+    ],
+
+    flags: [
+        {
+            id: "search-path",
+            about: "specify search path",
+            count: 1
+        }
+    ]
+}).Run(__ARGS__); type(status) == error {
+    println("ERROR: ", status);
     sys.Exit(1);
 }
-
-defer { file.Close(); };
-
-data := file.Read();
-
-println (data);

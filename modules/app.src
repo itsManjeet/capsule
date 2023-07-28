@@ -1,0 +1,48 @@
+strings := use("strings");
+
+Create := fun (config) {
+    self := config;
+    if self.help == null {
+        self.help = fun (ctxt) {
+            println (ctxt.app.id, ": ", ctxt.app.usage);
+            println (ctxt.app.about);
+            if self.commands != null {
+                println ("\nCOMMANDS:");
+                for command in self.commands {
+                    println ("  ", command.id, strings.New(20-len(command.id), 32), command.about);
+                }
+            }
+            if self.flags != null {
+                println ("\nFLAGS:");
+                for flag in self.flags {
+                    println ("  -", flag.id, strings.New(19-len(flag.id), 32), flag.about);
+                }
+            }
+            return true;
+        };
+    }
+
+    if self.handler == null {
+        self.handler = self.help;
+    }
+
+    self.Run = fun (args) {
+        ctxt := {
+            app: self,
+            args: args
+        };
+        handler := self.handler;
+        if len(args) > 0 {           
+            for cmd in self.commands {
+                if cmd.id == args[0] {
+                    handler = cmd.handler;
+                    ctxt.cmd = cmd;
+                }
+            }
+        }
+        
+        return handler(ctxt);
+    };
+
+    return self;
+};

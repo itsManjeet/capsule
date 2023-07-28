@@ -5,4 +5,4 @@ let Foo = fun () {
 };
 
 let foo = Foo ();
-foo.bar;
+println(foo.bar);

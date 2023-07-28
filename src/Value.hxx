@@ -16,9 +16,7 @@ namespace srclang {
 #define SRCLANG_VALUE_TYPE_LIST \
     X(Null, "null_t")           \
     X(Boolean, "bool")          \
-    X(Decimal, "float")         \
-    X(Integer, "int")           \
-    X(Char, "char")             \
+    X(Number, "num")            \
     X(String, "str")            \
     X(List, "list")             \
     X(Map, "map")               \
@@ -53,58 +51,39 @@ namespace srclang {
 #define SRCLANG_VALUE_TAG_NULL 1
 #define SRCLANG_VALUE_TAG_FALSE 2
 #define SRCLANG_VALUE_TAG_TRUE 3
-#define SRCLANG_VALUE_TAG_INT 4
-#define SRCLANG_VALUE_TAG_TYPE 5
-#define SRCLANG_VALUE_TAG_CHAR 6
+#define SRCLANG_VALUE_TAG_TYPE 4
+#define SRCLANG_VALUE_TAG_1 5
+#define SRCLANG_VALUE_TAG_2 6
 #define SRCLANG_VALUE_TAG_3 7
 
 #define SRCLANG_VALUE_IS_BOOL(val) (((val) | 1) == SRCLANG_VALUE_TRUE)
 #define SRCLANG_VALUE_IS_NULL(val) ((val) == SRCLANG_VALUE_NULL)
-#define SRCLANG_VALUE_IS_DECIMAL(val) \
+#define SRCLANG_VALUE_IS_NUMBER(val) \
     (((val)&SRCLANG_VALUE_QNAN) != SRCLANG_VALUE_QNAN)
 #define SRCLANG_VALUE_IS_OBJECT(val)                            \
     (((val) & (SRCLANG_VALUE_QNAN | SRCLANG_VALUE_SIGN_BIT)) == \
      (SRCLANG_VALUE_QNAN | SRCLANG_VALUE_SIGN_BIT))
-
-#define SRCLANG_VALUE_IS_INTEGER(val)                          \
-    (((val) & (SRCLANG_VALUE_QNAN | SRCLANG_VALUE_TAG_INT)) == \
-         (SRCLANG_VALUE_QNAN | SRCLANG_VALUE_TAG_INT) &&       \
-     ((val | SRCLANG_VALUE_SIGN_BIT) != val))
 
 #define SRCLANG_VALUE_IS_TYPE(val)                              \
     (((val) & (SRCLANG_VALUE_QNAN | SRCLANG_VALUE_TAG_TYPE)) == \
          (SRCLANG_VALUE_QNAN | SRCLANG_VALUE_TAG_TYPE) &&       \
      ((val | SRCLANG_VALUE_SIGN_BIT) != val))
 
-#define SRCLANG_VALUE_IS_CHAR(val)                              \
-    (((val) & (SRCLANG_VALUE_QNAN | SRCLANG_VALUE_TAG_CHAR)) == \
-         (SRCLANG_VALUE_QNAN | SRCLANG_VALUE_TAG_CHAR) &&       \
-     ((val | SRCLANG_VALUE_SIGN_BIT) != val))
-
 #define SRCLANG_VALUE_AS_BOOL(val) ((val) == SRCLANG_VALUE_TRUE)
-#define SRCLANG_VALUE_AS_DECIMAL(val) (srclang_value_to_decimal(val))
+#define SRCLANG_VALUE_AS_NUMBER(val) (srclang_value_to_decimal(val))
 #define SRCLANG_VALUE_AS_OBJECT(val)  \
     ((HeapObject*)(uintptr_t)((val) & \
                               ~(SRCLANG_VALUE_SIGN_BIT | SRCLANG_VALUE_QNAN)))
 #define SRCLANG_VALUE_AS_TYPE(val) ((ValueType)((val) >> 3))
-#define SRCLANG_VALUE_AS_INTEGER(val) ((int)((val) >> 3))
-#define SRCLANG_VALUE_AS_CHAR(val) ((char)((val) >> 3))
 
 #define SRCLANG_VALUE_BOOL(b) ((b) ? SRCLANG_VALUE_TRUE : SRCLANG_VALUE_FALSE)
-#define SRCLANG_VALUE_DECIMAL(num) (srclang_decimal_to_value(num))
+#define SRCLANG_VALUE_NUMBER(num) (srclang_decimal_to_value(num))
 #define SRCLANG_VALUE_OBJECT(obj)                         \
     (Value)(SRCLANG_VALUE_SIGN_BIT | SRCLANG_VALUE_QNAN | \
             (uint64_t)(uintptr_t)(obj))
 #define SRCLANG_VALUE_TYPE(ty)                                      \
     ((Value)(SRCLANG_VALUE_QNAN | ((uint64_t)(uint32_t)(ty) << 3) | \
              SRCLANG_VALUE_TAG_TYPE))
-#define SRCLANG_VALUE_INTEGER(val)                                   \
-    ((Value)(SRCLANG_VALUE_QNAN | ((uint64_t)(uint32_t)(val) << 3) | \
-             SRCLANG_VALUE_TAG_INT))
-
-#define SRCLANG_VALUE_CHAR(val)                                      \
-    ((Value)(SRCLANG_VALUE_QNAN | ((uint64_t)(uint32_t)(val) << 3) | \
-             SRCLANG_VALUE_TAG_CHAR))
 
 #define SRCLANG_VALUE_HEAP_OBJECT(type, ptr) \
     SRCLANG_VALUE_OBJECT(                                         \
@@ -205,7 +184,8 @@ namespace srclang {
         X(u64) \
         X(f32) \
         X(f64) \
-        X(ptr)
+        X(ptr) \
+        X(val)
 
     enum class CType : uint8_t {
         #define X(id) id,
@@ -220,7 +200,7 @@ namespace srclang {
     };
 
     static inline CType get_ctype(const char* ty) {
-        for(int i = 0; i <= (int)CType::ptr; i++) {
+        for(int i = 0; i <= (int)CType::val; i++) {
             if (strcmp(CTYPE_ID[i], ty) == 0) {
                 return CType(i);
             }
@@ -232,21 +212,20 @@ namespace srclang {
     struct NativeFunction {
         std::string id;
         std::vector<CType> param;
-        ValueType ret;
+        CType ret;
     };
 
     static inline bool is_same(CType ctype, ValueType valueType) {
+        if (ctype == CType::val) return true;
         switch (valueType) {
             case ValueType::Boolean:
-            case ValueType::Integer:
-                return (ctype >= CType::i8 && ctype <= CType::u64);
+            case ValueType::Number:
+                return (ctype >= CType::i8 && ctype <= CType::u64) ||
+                        (ctype == CType::f32 || ctype == CType::f64);
 
             case ValueType::String:
             case ValueType::Pointer:
                 return ctype == CType::ptr;
-
-            case ValueType::Decimal:
-                return ctype == CType::f32 || ctype == CType::f64;
         }
         return false;
     }
