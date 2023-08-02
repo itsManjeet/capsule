@@ -550,22 +550,11 @@ bool Compiler::assign() {
 }
 
 bool Compiler::binary(OpCode op, int prec) {
-    if (op == OpCode::AND) {
-        auto false_pos = emit(OpCode::JNZ, 0);
-        if (!expression(prec + 1)) {
-            return false;
-        }
-        auto jmp = emit(OpCode::JMP, 0);
-        auto after_block_pos = inst()->size();
-        emit(OpCode::CONST_FALSE);
-        inst()->at(false_pos + 1) = after_block_pos;
-        inst()->at(jmp + 1) = inst()->size();
-    } else {
-        if (!expression(prec + 1)) {
-            return false;
-        }
-        emit(op);
+
+    if (!expression(prec + 1)) {
+        return false;
     }
+    emit(op);
 
     return true;
 }
