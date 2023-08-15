@@ -703,30 +703,29 @@ bool Interpreter::call_native(Value callee, uint8_t count) {
         return false;
     }
     ffi_arg result;
-    Value result_value;
     ffi_call(&cif, FFI_FN(handler), &result, values);
     switch (native->ret) {
         case CType::i8:
         case CType::i16:
         case CType::i32:
         case CType::i64:
-            result_value = SRCLANG_VALUE_NUMBER(static_cast<double>((long)result));
+            result = SRCLANG_VALUE_NUMBER(static_cast<double>((long)result));
             break;
         case CType::u8:
         case CType::u16:
         case CType::u32:
         case CType::u64:
-            result_value = SRCLANG_VALUE_NUMBER(static_cast<double>((unsigned long)result));
+            result = SRCLANG_VALUE_NUMBER(static_cast<double>((unsigned long)result));
             break;
         case CType::ptr:
             if ((void *)result == nullptr) {
-                result_value = SRCLANG_VALUE_NULL;
+                result = SRCLANG_VALUE_NULL;
             } else {
-                result_value = SRCLANG_VALUE_POINTER((void *)result);
+                result = SRCLANG_VALUE_POINTER((void *)result);
             }
             break;
         case CType::val:
-            result_value = (Value)result_value;
+            // std::cout << "NATIVE: " << result << std::endl;
             break;
         default:
             error("ERROR: unsupported return type '" +
@@ -735,7 +734,7 @@ bool Interpreter::call_native(Value callee, uint8_t count) {
     }
 
     sp -= count + 1;
-    *sp++ = result_value;
+    *sp++ = result;
     return true;
 }
 
