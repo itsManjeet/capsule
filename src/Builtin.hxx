@@ -8,6 +8,7 @@
 
 namespace srclang {
     struct Interpreter;
+    class Language;
 
     typedef Value (*Builtin)(std::vector<Value>&, Interpreter*);
 
@@ -29,9 +30,7 @@ namespace srclang {
     X(free)                  \
     X(lower)                 \
     X(upper)                 \
-    X(search)                \
-    X(fork)                  \
-    X(wait)
+    X(search)
 
     struct Interpreter;
 #define X(id) SRCLANG_BUILTIN(id);
@@ -48,7 +47,7 @@ namespace srclang {
 
     extern std::vector<Value> builtins;
 
-    void define_tcc_builtins(TCCState* state);
+    void define_tcc_builtins(Language *language);
 
 }  // namespace srclang
 

@@ -59,7 +59,7 @@ std::tuple<Value, ByteCode, std::shared_ptr<DebugInfo>> Language::compile(std::s
     tcc_set_output_type(state, tcc_output_type);
     std::tuple<Value, ByteCode, std::shared_ptr<DebugInfo>> ret;
 
-    define_tcc_builtins(state);
+    define_tcc_builtins(this);
 
     auto compiler = Compiler(input.begin(), input.end(), filename, this);
     if (!compiler.compile()) {
