@@ -46,8 +46,10 @@ SRCLANG_BUILTIN(print) {
 }
 
 SRCLANG_BUILTIN(println) {
+    std::string sep;
     for (auto const &i : args) {
-        std::cout << SRCLANG_VALUE_GET_STRING(i);
+        std::cout << sep << SRCLANG_VALUE_GET_STRING(i);
+        sep = " ";
     }
     std::cout << std::endl;
     return SRCLANG_VALUE_NUMBER(args.size());
@@ -286,7 +288,6 @@ SRCLANG_BUILTIN(alloc) {
     SRCLANG_CHECK_ARGS_EXACT(1);
     SRCLANG_CHECK_ARGS_TYPE(0, ValueType::Number);
     long size = SRCLANG_VALUE_AS_NUMBER(args[0]);
-    lseek;
     void *ptr = malloc(size * sizeof(unsigned char));
     if (ptr == nullptr) {
         std::stringstream ss;
@@ -311,6 +312,7 @@ void srclang::define_tcc_builtins(Language *language) {
     X(number_new, return SRCLANG_VALUE_NUMBER(a), Value, double a) \
     X(boolean_new, return SRCLANG_VALUE_BOOL(a), Value, int a) \
     X(string_new, return SRCLANG_VALUE_STRING(strdup(a)), Value, const char* a) \
+    X(error_new, return SRCLANG_VALUE_ERROR(strdup(a)), Value, const char* a) \
     X(list_new, return SRCLANG_VALUE_LIST(new SrcLangList()), Value) \
     X(list_size, return ((SrcLangList*)SRCLANG_VALUE_AS_OBJECT(a)->pointer)->size(), double, Value a)\
     X(list_at, return ((SrcLangList*)SRCLANG_VALUE_AS_OBJECT(l)->pointer)->at(a), Value, Value l, int a) \

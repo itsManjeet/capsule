@@ -67,6 +67,12 @@ std::tuple<Value, ByteCode, std::shared_ptr<DebugInfo>> Language::compile(std::s
         return ret;
     }
     if (tcc_compile_string(state, cc_code.c_str()) == -1) {
+        std::stringstream ss(cc_code);
+        std::string line;
+        int line_cout = 1;
+        while (std::getline(ss, line)) {
+            std::cerr << line_cout++ << ": " << line << std::endl;
+        }
         std::get<0>(ret) = SRCLANG_VALUE_ERROR(strdup("TCC compilation failed"));
         return ret;
     }

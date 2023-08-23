@@ -1,0 +1,37 @@
+sys := use ("sys");
+
+socket := sys.Socket ("tcp4");
+if type (socket) == error {
+    println ("failed to create socket ", socket);
+    sys.Exit (1);
+}
+defer { socket.Close(); };
+
+if stat := socket.Bind ("0.0.0.0", 8000); not stat {
+    println ("failed to bind to addr", stat);
+    sys.Exit (1);
+}
+
+if stat = socket.Listen (1); not stat {
+    println ("failed to listen to socket", stat);
+    sys.Exit (1);
+}
+
+println ("Listing at", socket.fd);
+
+for true {
+    newSocket := socket.Accept ();
+    if type (newSocket) == error {
+        println ("ERROR: ", newSocket);
+        break;
+    }
+    println ("got connection at", newSocket.fd);
+
+    mesg := newSocket.Read ();
+    println ("data: ", str(mesg));
+
+    
+    println ("closing connection", newSocket.fd);
+    newSocket.Close();
+
+}
