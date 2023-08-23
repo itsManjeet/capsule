@@ -225,6 +225,7 @@ namespace srclang {
 
             case ValueType::String:
             case ValueType::Pointer:
+            case ValueType::Null:
                 return ctype == CType::ptr;
         }
         return false;

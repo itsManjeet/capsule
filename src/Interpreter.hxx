@@ -5,11 +5,11 @@
 #ifndef SRCLANG_INTERPRETER_HXX
 #define SRCLANG_INTERPRETER_HXX
 
-#include "Value.hxx"
-#include "Function.hxx"
 #include "Builtin.hxx"
-#include "Options.hxx"
 #include "ByteCode.hxx"
+#include "Function.hxx"
+#include "Options.hxx"
+#include "Value.hxx"
 
 namespace srclang {
 
@@ -22,7 +22,6 @@ namespace srclang {
             std::vector<Value>::iterator bp;
             std::vector<Value> defers;
         };
-
 
         int next_gc = 50;
         float GC_HEAP_GROW_FACTOR = 1.0;
@@ -42,15 +41,11 @@ namespace srclang {
 
         void error(std::string const &mesg);
 
-        Interpreter(ByteCode &code, const std::shared_ptr<DebugInfo>& debugInfo, Language *language);
+        Interpreter(ByteCode &code, const std::shared_ptr<DebugInfo> &debugInfo, Language *language);
 
         ~Interpreter();
 
         void add_object(Value val);
-
-        constexpr typename std::vector<Byte>::iterator &ip() { return (fp - 1)->ip; }
-
-        typename std::vector<Frame>::iterator cur() { return (fp - 1); }
 
         void gc();
 
@@ -88,13 +83,13 @@ namespace srclang {
 
         bool run();
 
-        std::string get_error()  {
+        std::string get_error() {
             std::string e = err_stream.str();
             err_stream.clear();
             return e;
         }
     };
 
-} // srclang
+}  // srclang
 
-#endif //SRCLANG_INTERPRETER_HXX
+#endif  // SRCLANG_INTERPRETER_HXX

@@ -19,7 +19,7 @@ void Interpreter::error(std::string const &mesg) {
 
     err_stream << debug_info.back()->filename << ":"
                << debug_info.back()->lines[distance(
-                      cur()->closure->fun->instructions->begin(), cur()->ip)]
+                      fp->closure->fun->instructions->begin(), fp->ip)]
                << std::endl;
     err_stream << "  ERROR: " << mesg;
 }
@@ -48,7 +48,6 @@ Interpreter::Interpreter(ByteCode &code, const std::shared_ptr<DebugInfo> &debug
     fp->closure = new Closure{std::move(fun), {}};
     fp->ip = fp->closure->fun->instructions->begin();
     fp->bp = sp;
-    fp++;
 }
 
 Interpreter::~Interpreter() {
@@ -448,8 +447,6 @@ bool Interpreter::call_closure(Value callee, uint8_t count) {
         *(sp - (count - (closure->fun->nparams - 1))) = var_val;
         sp = (sp - (count - closure->fun->nparams));
         count = closure->fun->nparams;
-
-        print_stack();
     }
 
     if (count != closure->fun->nparams) {
@@ -457,13 +454,13 @@ bool Interpreter::call_closure(Value callee, uint8_t count) {
         return false;
     }
 
+    fp++;
     fp->closure = closure;
     fp->ip = fp->closure->fun->instructions->begin();
     fp->bp = (sp - count);
     sp = fp->bp + fp->closure->fun->nlocals;
-    print_stack();
     debug_info.push_back(fp->closure->fun->debug_info);
-    fp++;
+
     return true;
 }
 
@@ -787,7 +784,7 @@ bool Interpreter::run() {
             if (!debug_info.empty() && debug_info.back() != nullptr) {
                 std::cout << debug_info.back()->filename << ":"
                           << debug_info.back()->lines[distance(
-                                 cur()->closure->fun->instructions->begin(), cur()->ip)]
+                                 fp->closure->fun->instructions->begin(), fp->ip)]
                           << std::endl;
             }
 
@@ -798,19 +795,19 @@ bool Interpreter::run() {
             std::cout << std::endl;
             std::cout << ">> ";
             ByteCode::debug(
-                *cur()->closure->fun->instructions.get(), language->constants,
-                distance(cur()->closure->fun->instructions->begin(), ip()), std::cout);
+                *fp->closure->fun->instructions.get(), language->constants,
+                distance(fp->closure->fun->instructions->begin(), fp->ip), std::cout);
             std::cout << std::endl;
 
             if (break_) std::cin.get();
         }
-        auto inst = static_cast<OpCode>(*ip()++);
+        auto inst = static_cast<OpCode>(*fp->ip++);
         switch (inst) {
             case OpCode::CONST:
-                *sp++ = language->constants[*ip()++];
+                *sp++ = language->constants[*fp->ip++];
                 break;
             case OpCode::CONST_INT:
-                *sp++ = SRCLANG_VALUE_NUMBER((*ip()++));
+                *sp++ = SRCLANG_VALUE_NUMBER((*fp->ip++));
                 break;
             case OpCode::CONST_FALSE:
                 *sp++ = SRCLANG_VALUE_FALSE;
@@ -854,12 +851,12 @@ bool Interpreter::run() {
             } break;
 
             case OpCode::STORE: {
-                auto scope = Symbol::Scope(*ip()++);
-                int pos = *ip()++;
+                auto scope = Symbol::Scope(*fp->ip++);
+                int pos = *fp->ip++;
 
                 switch (scope) {
                     case Symbol::Scope::LOCAL:
-                        *(cur()->bp + pos) = *(sp - 1);
+                        *(fp->bp + pos) = *(sp - 1);
                         break;
                     case Symbol::Scope::GLOBAL:
                         if (pos >= language->globals.size()) {
@@ -876,11 +873,11 @@ bool Interpreter::run() {
             } break;
 
             case OpCode::LOAD: {
-                auto scope = Symbol::Scope(*ip()++);
-                int pos = *ip()++;
+                auto scope = Symbol::Scope(*fp->ip++);
+                int pos = *fp->ip++;
                 switch (scope) {
                     case Symbol::Scope::LOCAL:
-                        *sp++ = *(cur()->bp + pos);
+                        *sp++ = *(fp->bp + pos);
                         break;
                     case Symbol::Scope::GLOBAL:
                         *sp++ = language->globals[pos];
@@ -892,7 +889,7 @@ bool Interpreter::run() {
                         *sp++ = SRCLANG_VALUE_TYPES[pos];
                         break;
                     case Symbol::Scope::FREE:
-                        *sp++ = cur()->closure->free[pos];
+                        *sp++ = fp->closure->free[pos];
                         break;
                     default:
                         error("ERROR: can't load value of scope '" +
@@ -903,8 +900,8 @@ bool Interpreter::run() {
             } break;
 
             case OpCode::CLOSURE: {
-                int funIndex = *ip()++;
-                int nfree = *ip()++;
+                int funIndex = *fp->ip++;
+                int nfree = *fp->ip++;
 
                 auto constant = language->constants[funIndex];
                 auto fun = (Function *)SRCLANG_VALUE_AS_OBJECT(constant)->pointer;
@@ -917,7 +914,7 @@ bool Interpreter::run() {
             } break;
 
             case OpCode::CALL: {
-                int count = *ip()++;
+                int count = *fp->ip++;
                 if (!call(count)) {
                     return false;
                 }
@@ -932,7 +929,7 @@ bool Interpreter::run() {
             } break;
 
             case OpCode::PACK: {
-                auto size = *ip()++;
+                auto size = *fp->ip++;
                 auto list = new std::vector<Value>(sp - size, sp);
                 sp -= size;
                 auto list_value = SRCLANG_VALUE_LIST(list);
@@ -941,7 +938,7 @@ bool Interpreter::run() {
             } break;
 
             case OpCode::MAP: {
-                auto size = *ip()++;
+                auto size = *fp->ip++;
                 auto map = new SrcLangMap();
                 for (auto i = sp - (size * 2); i != sp; i += 2) {
                     map->insert(
@@ -954,7 +951,7 @@ bool Interpreter::run() {
             } break;
 
             case OpCode::INDEX: {
-                auto count = *ip()++;
+                auto count = *fp->ip++;
                 Value pos, end_idx;
                 switch (count) {
                     case 1:
@@ -1078,9 +1075,9 @@ bool Interpreter::run() {
             } break;
 
             case OpCode::SET_SELF: {
-                auto freeIndex = *ip()++;
+                auto freeIndex = *fp->ip++;
 
-                auto currentClosure = cur()->closure;
+                auto currentClosure = fp->closure;
                 currentClosure->free[freeIndex] = SRCLANG_VALUE_CLOSURE(currentClosure);
             } break;
 
@@ -1182,10 +1179,10 @@ bool Interpreter::run() {
 
             case OpCode::RET: {
                 auto value = *--sp;
-                for (unsigned long &defer : std::ranges::reverse_view(cur()->defers)) {
+                for (unsigned long &defer : std::ranges::reverse_view(fp->defers)) {
                     language->call(defer, {});
                 }
-                sp = cur()->bp - 1;
+                sp = fp->bp - 1;
                 fp--;
                 *sp++ = value;
                 debug_info.pop_back();
@@ -1194,25 +1191,25 @@ bool Interpreter::run() {
             case OpCode::JNZ: {
                 auto value = *--sp;
                 if (!SRCLANG_VALUE_AS_BOOL(value)) {
-                    ip() = (cur()->closure->fun->instructions->begin() + *ip());
+                    fp->ip = (fp->closure->fun->instructions->begin() + *fp->ip);
                 } else {
-                    *ip()++;
+                    *fp->ip++;
                 }
             } break;
 
             case OpCode::DEFER: {
                 auto fn = *--sp;
-                cur()->defers.push_back(fn);
+                fp->defers.push_back(fn);
             } break;
 
             case OpCode::CONTINUE:
             case OpCode::BREAK:
             case OpCode::JMP: {
-                ip() = (cur()->closure->fun->instructions->begin() + *ip());
+                fp->ip = (fp->closure->fun->instructions->begin() + *fp->ip);
             } break;
 
             case OpCode::HLT: {
-                for (unsigned long &defer : std::ranges::reverse_view(cur()->defers)) {
+                for (unsigned long &defer : std::ranges::reverse_view(fp->defers)) {
                     language->call(defer, {});
                 }
                 return true;
