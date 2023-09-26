@@ -1,7 +1,13 @@
 #include "MemoryManager.hxx"
+
 #include "Function.hxx"
 
 using namespace srclang;
+
+MemoryManager::~MemoryManager() {
+    sweep();
+    sweep();
+}
 
 void MemoryManager::mark(Value val) {
     if (SRCLANG_VALUE_IS_OBJECT(val)) {
@@ -9,9 +15,9 @@ void MemoryManager::mark(Value val) {
         if (obj->marked) return;
         obj->marked = true;
 #ifdef SRCLANG_GC_DEBUG
-        cout << "  marked "
-                 << uintptr_t(SRCLANG_VALUE_AS_OBJECT(val)->pointer) << "'"
-                 << SRCLANG_VALUE_GET_STRING(val) << "'" << endl;
+        std::cout << "  marked "
+                  << uintptr_t(SRCLANG_VALUE_AS_OBJECT(val)->pointer) << "'"
+                  << SRCLANG_VALUE_GET_STRING(val) << "'" << std::endl;
 #endif
         if (obj->type == ValueType::List) {
             mark(reinterpret_cast<std::vector<Value> *>(obj->pointer)->begin(),
@@ -20,7 +26,7 @@ void MemoryManager::mark(Value val) {
             mark(reinterpret_cast<Closure *>(obj->pointer)->free.begin(),
                  reinterpret_cast<Closure *>(obj->pointer)->free.end());
         } else if (obj->type == ValueType::Map) {
-            for (auto &i: *reinterpret_cast<SrcLangMap *>(obj->pointer)) {
+            for (auto &i : *reinterpret_cast<SrcLangMap *>(obj->pointer)) {
                 mark(i.second);
             }
         }
@@ -42,14 +48,16 @@ void MemoryManager::sweep() {
                 i++;
             } else {
 #ifdef SRCLANG_GC_DEBUG
-                cout << "   deallocating "
-                                                << uintptr_t(obj->pointer) << "'"
-                                                << SRCLANG_VALUE_GET_STRING(*i)
-                                                << "'" << endl;
+                std::cout << "   deallocating "
+                          << uintptr_t(obj->pointer) << "'"
+                          << SRCLANG_VALUE_GET_STRING(*i)
+                          << "'" << std::endl;
 #endif
                 SRCLANG_VALUE_FREE(*i);
                 i = heap.erase(i);
             }
+        } else {
+            i++;
         }
     }
 }

@@ -1,7 +1,8 @@
 #include "Value.hxx"
-#include "Utilities.hxx"
-#include "MemoryManager.hxx"
+
 #include "Function.hxx"
+#include "MemoryManager.hxx"
+#include "Utilities.hxx"
 
 using namespace srclang;
 
@@ -18,21 +19,21 @@ void srclang::SRCLANG_VALUE_DUMP(Value v, std::ostream &os) {
     switch (object->type) {
         case ValueType::String:
         case ValueType::Error:
-            dump_string((const char *) object->pointer, os);
+            dump_string((const char *)object->pointer, os);
             break;
         case ValueType::List: {
-            auto list = (SrcLangList *) object->pointer;
+            auto list = (SrcLangList *)object->pointer;
             dump_int<size_t>(list->size(), os);
-            for (auto &i: *list) {
+            for (auto &i : *list) {
                 SRCLANG_VALUE_DUMP(i, os);
             }
             break;
         }
 
         case ValueType::Map: {
-            auto map_ = (SrcLangMap *) object->pointer;
+            auto map_ = (SrcLangMap *)object->pointer;
             dump_int<size_t>(map_->size(), os);
-            for (auto &i: *map_) {
+            for (auto &i : *map_) {
                 dump_string(i.first, os);
                 SRCLANG_VALUE_DUMP(i.second, os);
             }
@@ -40,30 +41,28 @@ void srclang::SRCLANG_VALUE_DUMP(Value v, std::ostream &os) {
         }
 
         case ValueType::Function: {
-            auto function = (Function *) object->pointer;
+            auto function = (Function *)object->pointer;
             os.write(reinterpret_cast<const char *>(&function->type), sizeof(function->type));
             dump_string(function->id, os);
             dump_int<size_t>(function->instructions->size(), os);
-            for (auto i: *function->instructions) {
+            for (auto i : *function->instructions) {
                 os.write(reinterpret_cast<const char *>(&i), sizeof(i));
             }
             dump_int<int>(function->nlocals, os);
             dump_int<int>(function->nparams, os);
             dump_int<bool>(function->is_variadic, os);
             function->debug_info->dump(os);
-        }
-            break;
+        } break;
 
         case ValueType::Native: {
-            auto native = (NativeFunction *) object->pointer;
+            auto native = (NativeFunction *)object->pointer;
             dump_int<CType>(native->ret, os);
             dump_int<size_t>(native->param.size(), os);
-            for (auto i: native->param) {
+            for (auto i : native->param) {
                 dump_int<CType>(i, os);
             }
             dump_string(native->id, os);
-        }
-            break;
+        } break;
 
         default:
             throw std::runtime_error("can't dump value '" + SRCLANG_VALUE_TYPE_ID[int(object->type)] + "'");
@@ -83,7 +82,7 @@ Value srclang::SRCLANG_VALUE_READ(std::istream &is) {
     switch (object->type) {
         case ValueType::String:
         case ValueType::Error:
-            object->pointer = (void *) strdup(read_string(is).c_str());
+            object->pointer = (void *)strdup(read_string(is).c_str());
             break;
         case ValueType::List: {
             auto list = new SrcLangList();
@@ -91,7 +90,7 @@ Value srclang::SRCLANG_VALUE_READ(std::istream &is) {
             for (auto i = 0; i < size; i++) {
                 list->push_back(SRCLANG_VALUE_READ(is));
             }
-            object->pointer = (void *) list;
+            object->pointer = (void *)list;
             break;
         }
 
@@ -103,7 +102,7 @@ Value srclang::SRCLANG_VALUE_READ(std::istream &is) {
                 Value v = SRCLANG_VALUE_READ(is);
                 map_->insert({k, v});
             }
-            object->pointer = (void *) map_;
+            object->pointer = (void *)map_;
             break;
         }
 
@@ -122,9 +121,8 @@ Value srclang::SRCLANG_VALUE_READ(std::istream &is) {
             function->nparams = read_int<int>(is);
             function->is_variadic = read_int<bool>(is);
             function->debug_info = std::shared_ptr<DebugInfo>(DebugInfo::read(is));
-            object->pointer = (void *) function;
-        }
-            break;
+            object->pointer = (void *)function;
+        } break;
 
         case ValueType::Native: {
             auto native = new NativeFunction();
@@ -134,9 +132,8 @@ Value srclang::SRCLANG_VALUE_READ(std::istream &is) {
                 native->param.push_back(read_int<CType>(is));
             }
             native->id = read_string(is);
-            object->pointer = (void *) native;
-        }
-            break;
+            object->pointer = (void *)native;
+        } break;
 
         default:
             throw std::runtime_error("can't dump value '" + SRCLANG_VALUE_TYPE_ID[int(object->type)] + "'");
@@ -145,36 +142,43 @@ Value srclang::SRCLANG_VALUE_READ(std::istream &is) {
     return SRCLANG_VALUE_OBJECT(object);
 }
 
-
 void srclang::SRCLANG_VALUE_FREE(Value value) {
     if (!SRCLANG_VALUE_IS_OBJECT(value)) {
         return;
     }
     auto type = SRCLANG_VALUE_GET_TYPE(value);
     auto object = SRCLANG_VALUE_AS_OBJECT(value);
-    switch (type) {
-        case ValueType::String:
-        case ValueType::Error:
-            free((char *) object->pointer);
-            break;
+    if (!object->is_ref) {
+        switch (type) {
+            case ValueType::String:
+            case ValueType::Error:
+                free((char *)object->pointer);
+                break;
 
-        case ValueType::List:
-            delete reinterpret_cast<SrcLangList *>(object->pointer);
-            break;
+            case ValueType::List:
+                delete reinterpret_cast<SrcLangList *>(object->pointer);
+                break;
 
-        case ValueType::Map:
-            delete reinterpret_cast<SrcLangMap *>(object->pointer);
-            break;
+            case ValueType::Map:
+                delete reinterpret_cast<SrcLangMap *>(object->pointer);
+                break;
 
-        case ValueType::Function:
-            delete reinterpret_cast<Function *>(object->pointer);
-            break;
+            case ValueType::Function:
+                delete reinterpret_cast<Function *>(object->pointer);
+                break;
 
-        case ValueType::Pointer:
-            break;
+            case ValueType::Closure:
+                delete reinterpret_cast<Closure *>(object->pointer);
+                break;
 
-        default:
-            throw std::runtime_error("can't clean value of type '" + SRCLANG_VALUE_TYPE_ID[int(type)] + "'");
+            case ValueType::Pointer:
+            case ValueType::Builtin:
+                break;
+
+            default:
+                throw std::runtime_error("can't clean value of type '" + SRCLANG_VALUE_TYPE_ID[int(type)] + "'");
+        }
     }
+
     delete object;
 }

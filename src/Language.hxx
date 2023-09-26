@@ -28,7 +28,13 @@ namespace srclang {
 
         Language();
 
+        ~Language();
+
         void define(std::string const &id, Value value);
+
+        size_t add_constant(Value value);
+
+        Value register_object(Value value);
 
         Value resolve(std::string const &id);
 

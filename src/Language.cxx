@@ -43,12 +43,27 @@ Language::Language()
     define("null", SRCLANG_VALUE_NULL);
 }
 
+Language::~Language() {
+    tcc_delete(state);
+}
+
 void Language::define(const std::string &id, Value value) {
     auto symbol = symbolTable.resolve(id);
     if (symbol == std::nullopt) {
         symbol = symbolTable.define(id);
     }
     globals[symbol->index] = value;
+    register_object(value);
+}
+
+Value Language::register_object(Value value) {
+    memoryManager.heap.push_back(value);
+    return value;
+}
+
+size_t Language::add_constant(Value value) {
+    constants.push_back(register_object(value));
+    return constants.size() - 1;
 }
 
 std::tuple<Value, ByteCode, std::shared_ptr<DebugInfo>> Language::compile(std::string const &input, std::string const &filename, int tcc_output_type) {
@@ -63,7 +78,7 @@ std::tuple<Value, ByteCode, std::shared_ptr<DebugInfo>> Language::compile(std::s
 
     auto compiler = Compiler(input.begin(), input.end(), filename, this);
     if (!compiler.compile()) {
-        std::get<0>(ret) = SRCLANG_VALUE_ERROR(strdup(compiler.get_error().c_str()));
+        std::get<0>(ret) = register_object(SRCLANG_VALUE_ERROR(strdup(compiler.get_error().c_str())));
         return ret;
     }
     if (tcc_compile_string(state, cc_code.c_str()) == -1) {
@@ -105,7 +120,7 @@ Value Language::execute(const std::string &input, const std::string &filename) {
 Value Language::execute(ByteCode &code, const std::shared_ptr<DebugInfo> &debugInfo) {
     auto interpreter = Interpreter(code, debugInfo, this);
     if (!interpreter.run()) {
-        return SRCLANG_VALUE_ERROR(strdup(interpreter.get_error().c_str()));
+        return register_object(SRCLANG_VALUE_ERROR(strdup(interpreter.get_error().c_str())));
     }
     return *interpreter.sp;
 }

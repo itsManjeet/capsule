@@ -9,22 +9,26 @@ namespace srclang {
     struct HeapObject {
         ValueType type{};
         void *pointer{nullptr};
+        bool is_ref{false};
 
         bool marked{false};
     };
 
+    static inline void srclang_value_set_ref(Value value) {
+        if (!SRCLANG_VALUE_IS_OBJECT(value)) return;
+        SRCLANG_VALUE_AS_OBJECT(value)->is_ref = true;
+    }
+
     class MemoryManager {
-    private:
-
-
-    public:
+       private:
+       public:
         using Heap = std::vector<Value>;
 
         Heap heap;
 
         MemoryManager() = default;
 
-        ~MemoryManager() = default;
+        ~MemoryManager();
 
         void mark(Value val);
 
@@ -33,6 +37,6 @@ namespace srclang {
         void sweep();
     };
 
-} // srclang
+}  // srclang
 
-#endif //SRCLANG_MEMORYMANAGER_HXX
+#endif  // SRCLANG_MEMORYMANAGER_HXX

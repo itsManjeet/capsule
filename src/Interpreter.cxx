@@ -1078,7 +1078,8 @@ bool Interpreter::run() {
                 auto freeIndex = *fp->ip++;
 
                 auto currentClosure = fp->closure;
-                currentClosure->free[freeIndex] = SRCLANG_VALUE_CLOSURE(currentClosure);
+                currentClosure->free[freeIndex] = language->register_object(SRCLANG_VALUE_CLOSURE(currentClosure));
+                SRCLANG_VALUE_SET_REF(currentClosure->free[freeIndex])
             } break;
 
             case OpCode::SET: {

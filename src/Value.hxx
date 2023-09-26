@@ -1,14 +1,12 @@
 #ifndef SRCLANG_VALUE_HXX
 #define SRCLANG_VALUE_HXX
 
-#include <string>
 #include <cstdint>
-#include <vector>
-#include <string>
-#include <map>
 #include <cstring>
 #include <iostream>
-
+#include <map>
+#include <string>
+#include <vector>
 
 namespace srclang {
 #define SRCLANG_VERSION 20230221
@@ -37,7 +35,7 @@ namespace srclang {
 
     static const std::vector<std::string> SRCLANG_VALUE_TYPE_ID = {
 #define X(id, name) name,
-            SRCLANG_VALUE_TYPE_LIST
+        SRCLANG_VALUE_TYPE_LIST
 #undef X
     };
 
@@ -59,7 +57,7 @@ namespace srclang {
 #define SRCLANG_VALUE_IS_BOOL(val) (((val) | 1) == SRCLANG_VALUE_TRUE)
 #define SRCLANG_VALUE_IS_NULL(val) ((val) == SRCLANG_VALUE_NULL)
 #define SRCLANG_VALUE_IS_NUMBER(val) \
-    (((val)&SRCLANG_VALUE_QNAN) != SRCLANG_VALUE_QNAN)
+    (((val) & SRCLANG_VALUE_QNAN) != SRCLANG_VALUE_QNAN)
 #define SRCLANG_VALUE_IS_OBJECT(val)                            \
     (((val) & (SRCLANG_VALUE_QNAN | SRCLANG_VALUE_SIGN_BIT)) == \
      (SRCLANG_VALUE_QNAN | SRCLANG_VALUE_SIGN_BIT))
@@ -71,9 +69,9 @@ namespace srclang {
 
 #define SRCLANG_VALUE_AS_BOOL(val) ((val) == SRCLANG_VALUE_TRUE)
 #define SRCLANG_VALUE_AS_NUMBER(val) (srclang_value_to_decimal(val))
-#define SRCLANG_VALUE_AS_OBJECT(val)  \
-    ((HeapObject*)(uintptr_t)((val) & \
-                              ~(SRCLANG_VALUE_SIGN_BIT | SRCLANG_VALUE_QNAN)))
+#define SRCLANG_VALUE_AS_OBJECT(val)   \
+    ((HeapObject *)(uintptr_t)((val) & \
+                               ~(SRCLANG_VALUE_SIGN_BIT | SRCLANG_VALUE_QNAN)))
 #define SRCLANG_VALUE_AS_TYPE(val) ((ValueType)((val) >> 3))
 
 #define SRCLANG_VALUE_BOOL(b) ((b) ? SRCLANG_VALUE_TRUE : SRCLANG_VALUE_FALSE)
@@ -86,40 +84,42 @@ namespace srclang {
              SRCLANG_VALUE_TAG_TYPE))
 
 #define SRCLANG_VALUE_HEAP_OBJECT(type, ptr) \
-    SRCLANG_VALUE_OBJECT(                                         \
+    SRCLANG_VALUE_OBJECT(                    \
         (new HeapObject{(type), (ptr)}))
 
-#define SRCLANG_VALUE_STRING(str)                       \
-    SRCLANG_VALUE_HEAP_OBJECT(                          \
-        ValueType::String, (void*)str)
+#define SRCLANG_VALUE_STRING(str) \
+    SRCLANG_VALUE_HEAP_OBJECT(    \
+        ValueType::String, (void *)str)
 
-#define SRCLANG_VALUE_LIST(list)                                              \
-    SRCLANG_VALUE_HEAP_OBJECT(ValueType::List, (void*)list)
+#define SRCLANG_VALUE_LIST(list) \
+    SRCLANG_VALUE_HEAP_OBJECT(ValueType::List, (void *)list)
 
-#define SRCLANG_VALUE_MAP(map)                                                \
-    SRCLANG_VALUE_HEAP_OBJECT(                                                \
-        ValueType::Map, (void*)map)
+#define SRCLANG_VALUE_MAP(map) \
+    SRCLANG_VALUE_HEAP_OBJECT( \
+        ValueType::Map, (void *)map)
 
-#define SRCLANG_VALUE_ERROR(err)                  \
-    SRCLANG_VALUE_HEAP_OBJECT(                    \
-        ValueType::Error, (void*)err)
+#define SRCLANG_VALUE_ERROR(err) \
+    SRCLANG_VALUE_HEAP_OBJECT(   \
+        ValueType::Error, (void *)err)
 
-#define SRCLANG_VALUE_NATIVE(native)                                          \
-    SRCLANG_VALUE_HEAP_OBJECT(ValueType::Native, (void*)native)
+#define SRCLANG_VALUE_NATIVE(native) \
+    SRCLANG_VALUE_HEAP_OBJECT(ValueType::Native, (void *)native)
 
-#define SRCLANG_VALUE_BUILTIN(id)                                    \
-    SRCLANG_VALUE_HEAP_OBJECT(                                       \
-        ValueType::Builtin, (void*)srclang::builtin_##id)
+#define SRCLANG_VALUE_BUILTIN(id) \
+    SRCLANG_VALUE_HEAP_OBJECT(    \
+        ValueType::Builtin, (void *)srclang::builtin_##id)
 
-#define SRCLANG_VALUE_FUNCTION(fun)                                           \
-    SRCLANG_VALUE_HEAP_OBJECT(                                                \
-        ValueType::Function, (void*)fun)
+#define SRCLANG_VALUE_FUNCTION(fun) \
+    SRCLANG_VALUE_HEAP_OBJECT(      \
+        ValueType::Function, (void *)fun)
 
-#define SRCLANG_VALUE_CLOSURE(fun)                                       \
-    SRCLANG_VALUE_HEAP_OBJECT(                                                \
-        ValueType::Closure, (void*)fun)
+#define SRCLANG_VALUE_CLOSURE(fun) \
+    SRCLANG_VALUE_HEAP_OBJECT(     \
+        ValueType::Closure, (void *)fun)
 
 #define SRCLANG_VALUE_POINTER(ptr) SRCLANG_VALUE_HEAP_OBJECT(ValueType::Pointer, ptr)
+
+#define SRCLANG_VALUE_SET_REF(val) srclang_value_set_ref(val);
 
 #define SRCLANG_VALUE_TRUE \
     ((Value)(uint64_t)(SRCLANG_VALUE_QNAN | SRCLANG_VALUE_TAG_TRUE))
@@ -127,7 +127,6 @@ namespace srclang {
     ((Value)(uint64_t)(SRCLANG_VALUE_QNAN | SRCLANG_VALUE_TAG_FALSE))
 #define SRCLANG_VALUE_NULL \
     ((Value)(uint64_t)(SRCLANG_VALUE_QNAN | SRCLANG_VALUE_TAG_NULL))
-
 
 #define SRCLANG_VALUE_DEBUG(val) SRCLANG_VALUE_GET_STRING(val) + ":" + SRCLANG_VALUE_TYPE_ID[(int)SRCLANG_VALUE_GET_TYPE(val)]
 
@@ -137,10 +136,10 @@ namespace srclang {
                                  "' but '" + std::to_string(args.size()) + \
                                  "' provided");
 
-#define SRCLANG_CHECK_ARGS_ATLEAST(count)                                    \
-    if (args.size() < count)                                                 \
-        throw std::runtime_error("Expected atleast '" + std::to_string(count) +    \
-                                 "' but '" + std::to_string(args.size()) + \
+#define SRCLANG_CHECK_ARGS_ATLEAST(count)                                       \
+    if (args.size() < count)                                                    \
+        throw std::runtime_error("Expected atleast '" + std::to_string(count) + \
+                                 "' but '" + std::to_string(args.size()) +      \
                                  "' provided");
 
 #define SRCLANG_CHECK_ARGS_RANGE(start, end)                               \
@@ -157,7 +156,6 @@ namespace srclang {
 
     void SRCLANG_VALUE_DUMP(Value v, std::ostream &os);
 
-
     typedef std::vector<Value> SrcLangList;
     typedef std::map<std::string, Value> SrcLangMap;
 
@@ -173,41 +171,40 @@ namespace srclang {
         return value;
     }
 
-    #define SRCLANG_CTYPE_LIST \
-        X(i8) \
-        X(i16) \
-        X(i32) \
-        X(i64) \
-        X(u8) \
-        X(u16) \
-        X(u32) \
-        X(u64) \
-        X(f32) \
-        X(f64) \
-        X(ptr) \
-        X(val)
+#define SRCLANG_CTYPE_LIST \
+    X(i8)                  \
+    X(i16)                 \
+    X(i32)                 \
+    X(i64)                 \
+    X(u8)                  \
+    X(u16)                 \
+    X(u32)                 \
+    X(u64)                 \
+    X(f32)                 \
+    X(f64)                 \
+    X(ptr)                 \
+    X(val)
 
     enum class CType : uint8_t {
-        #define X(id) id,
-            SRCLANG_CTYPE_LIST
-        #undef X
-    };
-
-    static const char* CTYPE_ID[] = {
-    #define X(id) #id,
+#define X(id) id,
         SRCLANG_CTYPE_LIST
-    #undef X
+#undef X
     };
 
-    static inline CType get_ctype(const char* ty) {
-        for(int i = 0; i <= (int)CType::val; i++) {
+    static const char *CTYPE_ID[] = {
+#define X(id) #id,
+        SRCLANG_CTYPE_LIST
+#undef X
+    };
+
+    static inline CType get_ctype(const char *ty) {
+        for (int i = 0; i <= (int)CType::val; i++) {
             if (strcmp(CTYPE_ID[i], ty) == 0) {
                 return CType(i);
             }
         }
         throw std::runtime_error("unknown ctype");
     }
-
 
     struct NativeFunction {
         std::string id;
@@ -221,7 +218,7 @@ namespace srclang {
             case ValueType::Boolean:
             case ValueType::Number:
                 return (ctype >= CType::i8 && ctype <= CType::u64) ||
-                        (ctype == CType::f32 || ctype == CType::f64);
+                       (ctype == CType::f32 || ctype == CType::f64);
 
             case ValueType::String:
             case ValueType::Pointer:
@@ -238,7 +235,7 @@ namespace srclang {
 
     static const std::vector<Value> SRCLANG_VALUE_TYPES = {
 #define X(id, name) SRCLANG_VALUE_TYPE(ValueType::id),
-            SRCLANG_VALUE_TYPE_LIST
+        SRCLANG_VALUE_TYPE_LIST
 #undef X
     };
 

@@ -198,7 +198,7 @@ bool Compiler::eat() {
                           // multi char operators
                           "==", "!=", "<=", ">=", ">>", "<<"}) {
         auto dist = distance(k.begin(), k.end());
-        if (equal(iter, iter + dist, k.begin(), k.end()) &&
+        if (dist <= distance(iter, end) && equal(iter, iter + dist, k.begin(), k.end()) &&
             !isalnum(*(iter + dist))) {
             iter += dist;
             peek.literal = std::string(k.begin(), k.end());
@@ -550,7 +550,6 @@ bool Compiler::assign() {
 }
 
 bool Compiler::binary(OpCode op, int prec) {
-
     if (!expression(prec + 1)) {
         return false;
     }
@@ -1149,8 +1148,7 @@ Compiler::Compiler(Iterator
 
     error_stream.clear();
 
-    language->constants.push_back(SRCLANG_VALUE_STRING(strdup(filename.c_str())));
-    fileConst = language->constants.size() - 1;
+    fileConst = language->add_constant(SRCLANG_VALUE_STRING(strdup(filename.c_str())));
 }
 
 bool Compiler::compile() {
