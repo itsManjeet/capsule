@@ -64,29 +64,3 @@ int ByteCode::debug(Instructions const &instructions,
     return offset;
 }
 
-void ByteCode::dump(std::ostream &os) {
-    dump_int<size_t>(instructions->size(), os);
-    for (auto byte: *instructions) {
-        dump_int<Byte>(byte, os);
-    }
-    dump_int<size_t>(constants.size(), os);
-    for (auto i: constants) {
-        SRCLANG_VALUE_DUMP(i, os);
-    }
-}
-
-
-ByteCode *ByteCode::read(std::istream &is) {
-    auto size = read_int<size_t>(is);
-    auto bytecode = new ByteCode();
-    bytecode->instructions = std::make_unique<Instructions>();
-    for (auto i = 0; i < size; i++) {
-        bytecode->instructions->push_back(read_int<Byte>(is));
-    }
-    size = read_int<size_t>(is);
-    for (auto i = 0; i < size; i++) {
-        bytecode->constants.push_back(SRCLANG_VALUE_READ(is));
-    }
-    return bytecode;
-}
-

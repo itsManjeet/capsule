@@ -22,7 +22,7 @@
 namespace srclang {
     using Iterator = std::string::const_iterator;
 
-    class Language;
+    struct Language;
 
 #define SRCLANG_TOKEN_TYPE_LIST \
     X(Reserved)                 \
@@ -70,7 +70,6 @@ namespace srclang {
         std::vector<std::string> loaded_imports;
         std::vector<std::unique_ptr<Instructions >> instructions;
         DebugInfo *debug_info;
-        int fileConst;
         std::shared_ptr<DebugInfo> global_debug_info;
 
         Instructions *inst();

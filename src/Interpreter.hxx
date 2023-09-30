@@ -10,6 +10,7 @@
 #include "Function.hxx"
 #include "Options.hxx"
 #include "Value.hxx"
+#include <sstream>
 
 namespace srclang {
 
@@ -40,6 +41,8 @@ namespace srclang {
         bool debug, break_;
 
         void error(std::string const &mesg);
+
+        void grace_full_exit();
 
         Interpreter(ByteCode &code, const std::shared_ptr<DebugInfo> &debugInfo, Language *language);
 

@@ -75,7 +75,7 @@ namespace srclang {
 #define SRCLANG_VALUE_AS_TYPE(val) ((ValueType)((val) >> 3))
 
 #define SRCLANG_VALUE_BOOL(b) ((b) ? SRCLANG_VALUE_TRUE : SRCLANG_VALUE_FALSE)
-#define SRCLANG_VALUE_NUMBER(num) (srclang_decimal_to_value(num))
+#define SRCLANG_VALUE_NUMBER(num) (srclang_decimal_to_value((double)(num)))
 #define SRCLANG_VALUE_OBJECT(obj)                         \
     (Value)(SRCLANG_VALUE_SIGN_BIT | SRCLANG_VALUE_QNAN | \
             (uint64_t)(uintptr_t)(obj))
@@ -119,7 +119,9 @@ namespace srclang {
 
 #define SRCLANG_VALUE_POINTER(ptr) SRCLANG_VALUE_HEAP_OBJECT(ValueType::Pointer, ptr)
 
-#define SRCLANG_VALUE_SET_REF(val) srclang_value_set_ref(val);
+#define SRCLANG_VALUE_SET_REF(val) srclang_value_set_ref(val)
+#define SRCLANG_VALUE_SET_SIZE(val, sz) srclang_value_set_size(val, sz)
+#define SRCLANG_VALUE_GET_SIZE(val) srclang_value_get_size(val)
 
 #define SRCLANG_VALUE_TRUE \
     ((Value)(uint64_t)(SRCLANG_VALUE_QNAN | SRCLANG_VALUE_TAG_TRUE))
@@ -154,7 +156,6 @@ namespace srclang {
                                  "' to be '" +                        \
                                  SRCLANG_VALUE_TYPE_ID[int(ty)] + "'");
 
-    void SRCLANG_VALUE_DUMP(Value v, std::ostream &os);
 
     typedef std::vector<Value> SrcLangList;
     typedef std::map<std::string, Value> SrcLangMap;
@@ -242,10 +243,6 @@ namespace srclang {
     ValueType SRCLANG_VALUE_GET_TYPE(Value val);
 
     std::string SRCLANG_VALUE_GET_STRING(Value val);
-
-    void SRCLANG_VALUE_DUMP(Value v, std::ostream &os);
-
-    Value SRCLANG_VALUE_READ(std::istream &is);
 
     void SRCLANG_VALUE_FREE(Value value);
 }

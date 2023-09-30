@@ -40,24 +40,25 @@ void MemoryManager::mark(Heap::iterator start, Heap::iterator end) {
 }
 
 void MemoryManager::sweep() {
-    for (auto i = heap.begin(); i != heap.end();) {
-        if (SRCLANG_VALUE_IS_OBJECT(*i)) {
-            auto obj = SRCLANG_VALUE_AS_OBJECT(*i);
-            if (obj->marked) {
-                obj->marked = false;
-                i++;
-            } else {
-#ifdef SRCLANG_GC_DEBUG
-                std::cout << "   deallocating "
-                          << uintptr_t(obj->pointer) << "'"
-                          << SRCLANG_VALUE_GET_STRING(*i)
-                          << "'" << std::endl;
-#endif
-                SRCLANG_VALUE_FREE(*i);
-                i = heap.erase(i);
-            }
+    auto iter = heap.begin();
+    while (iter != heap.end()) {
+        if (!SRCLANG_VALUE_IS_OBJECT(*iter)) {
+            iter++;
+            continue;
+        };
+        auto object = SRCLANG_VALUE_AS_OBJECT(*iter);
+        if (object->marked) {
+            object->marked = false;
+            iter++;
         } else {
-            i++;
+#ifdef SRCLANG_GC_DEBUG
+            std::cout << "   deallocating "
+                << uintptr_t(object->pointer) << "'"
+                << SRCLANG_VALUE_GET_STRING(*iter)
+                << "'" << std::endl;
+#endif
+            SRCLANG_VALUE_FREE(*iter);
+            iter = heap.erase(iter);
         }
     }
 }

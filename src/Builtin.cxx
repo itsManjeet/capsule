@@ -1,8 +1,5 @@
 #include "Builtin.hxx"
 
-#include <pthread.h>
-#include <sys/wait.h>
-
 #include "Interpreter.hxx"
 #include "Language.hxx"
 
@@ -57,7 +54,6 @@ SRCLANG_BUILTIN(println) {
 
 SRCLANG_BUILTIN(len) {
     SRCLANG_CHECK_ARGS_EXACT(1);
-    int length;
     switch (
         SRCLANG_VALUE_GET_TYPE(args[0])) {
         case ValueType::String:
@@ -67,6 +63,9 @@ SRCLANG_BUILTIN(len) {
             return SRCLANG_VALUE_NUMBER(
                 ((std::vector<Value> *)SRCLANG_VALUE_AS_OBJECT(args[0])->pointer)
                     ->size());
+        case ValueType::Pointer:
+            return SRCLANG_VALUE_NUMBER(SRCLANG_VALUE_AS_OBJECT(args[0])->size);
+
         default:
             return SRCLANG_VALUE_NUMBER(sizeof(Value));
     }
@@ -92,7 +91,10 @@ SRCLANG_BUILTIN(append) {
                         (char *)(SRCLANG_VALUE_AS_OBJECT(args[1])->pointer);
                     auto len2 = strlen(str2);
                     str = (char *)realloc(str, len + len2 + 1);
-                    strcat(str, str2);
+                    if (str == nullptr) {
+                        throw std::runtime_error("realloc() failed, srclang::append(), " + std::string(strerror(errno)));
+                    }
+                    strcat_s(str, len + len2 + 1, str2);
                 } break;
                 default:
                     throw std::runtime_error("invalid append operation");
@@ -109,18 +111,6 @@ SRCLANG_BUILTIN(append) {
 }
 
 SRCLANG_BUILTIN(range) {
-    if (args.size() == 1 &&
-        SRCLANG_VALUE_GET_TYPE(args[0]) == ValueType::Map) {
-        auto map = reinterpret_cast<SrcLangMap *>(SRCLANG_VALUE_AS_OBJECT(args[0])->pointer);
-        auto keys = new SrcLangList();
-        for (auto i = map->begin(); i != map->end(); i++) {
-            auto v = SRCLANG_VALUE_STRING(strdup(i->first.c_str()));
-            keys->push_back(v);
-        }
-        auto list = SRCLANG_VALUE_LIST(keys);
-        return list;
-    }
-
     SRCLANG_CHECK_ARGS_RANGE(1, 3);
     SRCLANG_CHECK_ARGS_TYPE(0, ValueType::Number);
     int start = 0;
@@ -191,6 +181,20 @@ SRCLANG_BUILTIN(clone) {
                     new SrcLangList(list->begin(), list->end());
                 return SRCLANG_VALUE_LIST(new_list);
             };
+            case ValueType::Pointer: {
+                auto object = SRCLANG_VALUE_AS_OBJECT(args[0]);
+                if (object->is_ref) {
+                    return args[0];
+                }
+                auto buffer = malloc(object->size);
+                if (buffer == nullptr) {
+                    throw std::runtime_error("can't malloc() for srclang::clone() " + std::string(strerror(errno)));
+                }
+                memcpy_s(buffer, object->size, object->pointer, object->size);
+                auto value = SRCLANG_VALUE_POINTER(buffer);
+                SRCLANG_VALUE_SET_SIZE(value, object->size);
+                return value;
+            } break;
             default:
                 if (SRCLANG_VALUE_IS_OBJECT(args[0])) {
                     return SRCLANG_VALUE_ERROR(
@@ -294,41 +298,49 @@ SRCLANG_BUILTIN(alloc) {
         ss << "failed to allocate '" << size << "' size, " << strerror(errno);
         return SRCLANG_VALUE_ERROR(strdup(ss.str().c_str()));
     }
-    return SRCLANG_VALUE_POINTER(ptr);
+    auto value = SRCLANG_VALUE_POINTER(ptr);
+    SRCLANG_VALUE_SET_SIZE(value, size);
+    return value;
 }
+
+SRCLANG_BUILTIN(setref) {
+    SRCLANG_CHECK_ARGS_EXACT(2);
+    SRCLANG_CHECK_ARGS_TYPE(0, ValueType::Pointer);
+    SRCLANG_CHECK_ARGS_TYPE(1, ValueType::Boolean);
+
+    SRCLANG_VALUE_AS_OBJECT(args[0])->is_ref = SRCLANG_VALUE_AS_BOOL(args[1]);
+    return args[0];
+}
+
+SRCLANG_BUILTIN(isref) {
+    SRCLANG_CHECK_ARGS_EXACT(1);
+    SRCLANG_CHECK_ARGS_TYPE(0, ValueType::Pointer);
+
+    return SRCLANG_VALUE_BOOL(SRCLANG_VALUE_AS_OBJECT(args[0])->is_ref);
+}
+
+SRCLANG_BUILTIN(setsize) {
+    SRCLANG_CHECK_ARGS_EXACT(2);
+    SRCLANG_CHECK_ARGS_TYPE(0, ValueType::Pointer);
+    SRCLANG_CHECK_ARGS_TYPE(1, ValueType::Number);
+
+    SRCLANG_VALUE_AS_OBJECT(args[0])->size = (size_t) SRCLANG_VALUE_AS_NUMBER(args[1]);
+    return args[0];
+}
+
+SRCLANG_BUILTIN(exit) {
+    SRCLANG_CHECK_ARGS_EXACT(1);
+    SRCLANG_CHECK_ARGS_TYPE(0, ValueType::Number);
+
+    auto status = (int) SRCLANG_VALUE_AS_NUMBER(args[0]);
+    interpreter->grace_full_exit();
+    exit(status);
+}
+
 
 SRCLANG_BUILTIN(free) {
     SRCLANG_CHECK_ARGS_EXACT(1);
     SRCLANG_CHECK_ARGS_TYPE(0, ValueType::Pointer);
     free(SRCLANG_VALUE_AS_OBJECT(args[0])->pointer);
     return SRCLANG_VALUE_TRUE;
-}
-
-extern "C" Language *__srclang_global_language;
-
-void srclang::define_tcc_builtins(Language *language) {
-#define SRCLANG_TCC_BUILTINS \
-    X(call_fun, return __srclang_global_language->call(a,{});, Value, Value a) \
-    X(number_new, return SRCLANG_VALUE_NUMBER(a), Value, double a) \
-    X(boolean_new, return SRCLANG_VALUE_BOOL(a), Value, int a) \
-    X(string_new, return SRCLANG_VALUE_STRING(strdup(a)), Value, const char* a) \
-    X(error_new, return SRCLANG_VALUE_ERROR(strdup(a)), Value, const char* a) \
-    X(list_new, return SRCLANG_VALUE_LIST(new SrcLangList()), Value) \
-    X(list_size, return ((SrcLangList*)SRCLANG_VALUE_AS_OBJECT(a)->pointer)->size(), double, Value a)\
-    X(list_at, return ((SrcLangList*)SRCLANG_VALUE_AS_OBJECT(l)->pointer)->at(a), Value, Value l, int a) \
-    X(list_append, ((SrcLangList*)SRCLANG_VALUE_AS_OBJECT(l)->pointer)->push_back(a), void, Value l, Value a) \
-    X(list_pop, Value res = ((SrcLangList*)SRCLANG_VALUE_AS_OBJECT(l)->pointer)->back(); return res, Value, Value l) \
-    X(map_new, return SRCLANG_VALUE_MAP(new SrcLangMap()), Value) \
-    X(map_size, return ((SrcLangMap*)SRCLANG_VALUE_AS_OBJECT(m)->pointer)->size(), double, Value m)\
-    X(map_at, return ((SrcLangMap*)SRCLANG_VALUE_AS_OBJECT(m)->pointer)->at(k), Value, Value m, const char* k) \
-    X(map_set, ((SrcLangMap*)SRCLANG_VALUE_AS_OBJECT(m)->pointer)->insert({k, v}), void, Value m, const char* k, Value v)
-
-    language->cc_code += "\ntypedef unsigned long Value;\n";
-#define X(id, body, ret, ...) \
-    tcc_add_symbol (language->state, "srclang_" #id, (void*)+[](__VA_ARGS__) -> ret { body ;}); \
-    language->cc_code +=  #ret " srclang_" #id "( " #__VA_ARGS__ ");\n";
-
-    SRCLANG_TCC_BUILTINS
-#undef X
-
 }

@@ -11,10 +11,6 @@ namespace srclang {
         std::string filename;
         std::vector<int> lines;
         int position{};
-
-        void dump(std::ostream &os);
-
-        static DebugInfo *read(std::istream &is);
     };
 
 } // srclang

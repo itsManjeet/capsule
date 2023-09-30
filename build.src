@@ -1,13 +1,2 @@
-New := fun (sz, fill) {
-    if buf := alloc(sz); type(buf) == error {
-        return buf;
-    }
-    for i in range(sz) {
-        buf[i] = fill;
-    }
-    buf[sz] = 0;
-    return buf;
-};
-
-s := New(10, 32);
-println (str(s));
+PROJECT_NAME	:= "srclang";
+PROJECT_VERSION := "0.0.1";

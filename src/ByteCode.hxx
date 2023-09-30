@@ -33,10 +33,6 @@ namespace srclang {
             }
             return os;
         }
-
-        void dump(std::ostream &os);
-
-        static ByteCode *read(std::istream &is);
     };
 
 } // srclang

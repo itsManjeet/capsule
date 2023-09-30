@@ -6,7 +6,7 @@
 #include <map>
 
 namespace srclang {
-    class Language;
+    struct Language;
 
     class ProjectManager {
     private:

@@ -1,14 +1,12 @@
 #ifndef SRCLANG_BUILTIN_HXX
 #define SRCLANG_BUILTIN_HXX
 
-#include <libtcc.h>
-
 #include "MemoryManager.hxx"
 #include "Value.hxx"
 
 namespace srclang {
     struct Interpreter;
-    class Language;
+    struct Language;
 
     typedef Value (*Builtin)(std::vector<Value>&, Interpreter*);
 
@@ -30,7 +28,12 @@ namespace srclang {
     X(free)                  \
     X(lower)                 \
     X(upper)                 \
-    X(search)
+    X(search)                \
+    X(setref)                \
+    X(isref)                 \
+    X(setsize)               \
+    X(exit)
+    
 
     struct Interpreter;
 #define X(id) SRCLANG_BUILTIN(id);
@@ -46,8 +49,6 @@ namespace srclang {
     };
 
     extern std::vector<Value> builtins;
-
-    void define_tcc_builtins(Language *language);
 
 }  // namespace srclang
 

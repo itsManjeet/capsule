@@ -10,6 +10,7 @@ namespace srclang {
         ValueType type{};
         void *pointer{nullptr};
         bool is_ref{false};
+        size_t size{ 0 };
 
         bool marked{false};
     };
@@ -17,6 +18,16 @@ namespace srclang {
     static inline void srclang_value_set_ref(Value value) {
         if (!SRCLANG_VALUE_IS_OBJECT(value)) return;
         SRCLANG_VALUE_AS_OBJECT(value)->is_ref = true;
+    }
+
+    static inline void srclang_value_set_size(Value value, size_t size) {
+        if (!SRCLANG_VALUE_IS_OBJECT(value)) return;
+        SRCLANG_VALUE_AS_OBJECT(value)->size = size;
+    }
+
+    static inline size_t srclang_value_get_size(Value value) {
+        if (!SRCLANG_VALUE_IS_OBJECT(value)) return 0;
+        return SRCLANG_VALUE_AS_OBJECT(value)->size;
     }
 
     class MemoryManager {

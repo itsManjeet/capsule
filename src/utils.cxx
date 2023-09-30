@@ -75,7 +75,7 @@ string srclang::SRCLANG_VALUE_GET_STRING(Value val) {
 
                     case ValueType::Pointer: {
                         stringstream ss;
-                        ss << "0x" << std::hex << reinterpret_cast<unsigned long>(object->pointer);
+                        ss << "0x" << std::hex << object->pointer;
                         return ss.str();
                     }
 

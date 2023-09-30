@@ -1,5 +1,3 @@
-#include <dlfcn.h>
-
 #include <fstream>
 #include <utility>
 
@@ -20,14 +18,6 @@ const auto LOGO = R"(
 
 Language *__srclang_global_language;
 
-int compile(Language *language, std::optional<std::string> path, std::optional<std::string> output) {
-    if (path == std::nullopt) {
-        std::cerr << "No input file specified" << std::endl;
-        return 1;
-    }
-    return language->compile(*path, std::move(output));
-}
-
 int run(Language *language, std::optional<std::string> path) {
     if (path == std::nullopt) {
         std::cerr << "No input file specified" << std::endl;
@@ -35,7 +25,7 @@ int run(Language *language, std::optional<std::string> path) {
     }
     auto result = language->execute(std::filesystem::path(*path));
     if (SRCLANG_VALUE_GET_TYPE(result) == ValueType::Error) {
-        std::cerr << (char *)SRCLANG_VALUE_AS_OBJECT(result)->pointer << std::endl;
+        std::cerr << (char *) SRCLANG_VALUE_AS_OBJECT(result)->pointer << std::endl;
         return 1;
     }
     return 0;
@@ -72,8 +62,8 @@ int printHelp() {
               << std::endl;
     std::cout << "   run                    Run srclang script and bytecode (source ends with .src)\n"
               << "   interactive            Start srclang interactive shell\n"
-              << "   compile                Compile srclang script in bytecode\n"
               << "   new <name>             Setup run srclang project\n"
+              << "   test                   Run test cases\n"
               << "   help                   Print this help message\n"
               << '\n'
               << " FLAGS:\n"
@@ -93,7 +83,7 @@ int main(int argc, char **argv) {
     auto args = new SrcLangList();
     __srclang_global_language = &language;
 
-    std::string task = "help";
+    std::string task = "interactive";
     std::optional<std::string> filename, output;
     std::filesystem::path project_path = std::filesystem::current_path();
 
@@ -145,13 +135,6 @@ int main(int argc, char **argv) {
             } else if (strcmp(argv[i], "o") == 0) {
                 CHECK_COUNT(1);
                 output = argv[++i];
-            } else if (strcmp(argv[i], "lib") == 0) {
-                CHECK_COUNT(1);
-                handler = dlopen(argv[++i], RTLD_GLOBAL | RTLD_NOW);
-                if (handler == nullptr) {
-                    std::cerr << "ERROR: " << dlerror() << std::endl;
-                    return 1;
-                }
             } else if (strcmp(argv[i], "project-path") == 0) {
                 CHECK_COUNT(1);
                 std::string path(argv[++i]);
@@ -171,13 +154,17 @@ int main(int argc, char **argv) {
             if (path[0] == '/') {
                 filename = path;
             } else {
-                filename = std::filesystem::canonical(std::filesystem::current_path() / path);
+                filename = std::filesystem::canonical(std::filesystem::current_path() / path).string();
             }
         } else {
             cli_args.emplace_back(argv[i]);
         }
     }
 
+    auto filename_Object = SRCLANG_VALUE_STRING((filename.has_value() ? filename->c_str() : "<script>"));
+    SRCLANG_VALUE_SET_REF(filename_Object);
+
+    language.define("__FILE__", filename_Object);
     language.define("__ARGS__", SRCLANG_VALUE_LIST(args));
     ProjectManager projectManager(&language, project_path);
 
@@ -187,8 +174,6 @@ int main(int argc, char **argv) {
         return run(&language, filename);
     else if (task == "interactive")
         return interactive(&language);
-    else if (task == "compile")
-        return compile(&language, filename, output);
 
     try {
         if (task == "new") {
