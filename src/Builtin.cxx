@@ -347,6 +347,9 @@ SRCLANG_BUILTIN(exit) {
 SRCLANG_BUILTIN(free) {
     SRCLANG_CHECK_ARGS_EXACT(1);
     SRCLANG_CHECK_ARGS_TYPE(0, ValueType::Pointer);
+    SRCLANG_VALUE_SET_REF(args[0]);
+    SRCLANG_VALUE_SET_SIZE(args[0], 0);
     free(SRCLANG_VALUE_AS_OBJECT(args[0])->pointer);
+    SRCLANG_VALUE_AS_OBJECT(args[0])->pointer = nullptr;
     return SRCLANG_VALUE_TRUE;
 }
