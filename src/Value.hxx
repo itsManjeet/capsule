@@ -21,7 +21,6 @@ namespace srclang {
     X(Function, "function")     \
     X(Closure, "closure")       \
     X(Builtin, "builtin")       \
-    X(Native, "native")         \
     X(Error, "error")           \
     X(Bounded, "bounded")       \
     X(Type, "type")             \
@@ -102,9 +101,6 @@ namespace srclang {
     SRCLANG_VALUE_HEAP_OBJECT(   \
         ValueType::Error, (void *)err)
 
-#define SRCLANG_VALUE_NATIVE(native) \
-    SRCLANG_VALUE_HEAP_OBJECT(ValueType::Native, (void *)native)
-
 #define SRCLANG_VALUE_BUILTIN(id) \
     SRCLANG_VALUE_HEAP_OBJECT(    \
         ValueType::Builtin, (void *)srclang::builtin_##id)
@@ -170,63 +166,6 @@ namespace srclang {
         Value value;
         memcpy(&value, &num, sizeof(double));
         return value;
-    }
-
-#define SRCLANG_CTYPE_LIST \
-    X(i8)                  \
-    X(i16)                 \
-    X(i32)                 \
-    X(i64)                 \
-    X(u8)                  \
-    X(u16)                 \
-    X(u32)                 \
-    X(u64)                 \
-    X(f32)                 \
-    X(f64)                 \
-    X(ptr)                 \
-    X(val)
-
-    enum class CType : uint8_t {
-#define X(id) id,
-        SRCLANG_CTYPE_LIST
-#undef X
-    };
-
-    static const char *CTYPE_ID[] = {
-#define X(id) #id,
-        SRCLANG_CTYPE_LIST
-#undef X
-    };
-
-    static inline CType get_ctype(const char *ty) {
-        for (int i = 0; i <= (int)CType::val; i++) {
-            if (strcmp(CTYPE_ID[i], ty) == 0) {
-                return CType(i);
-            }
-        }
-        throw std::runtime_error("unknown ctype");
-    }
-
-    struct NativeFunction {
-        std::string id;
-        std::vector<CType> param;
-        CType ret;
-    };
-
-    static inline bool is_same(CType ctype, ValueType valueType) {
-        if (ctype == CType::val) return true;
-        switch (valueType) {
-            case ValueType::Boolean:
-            case ValueType::Number:
-                return (ctype >= CType::i8 && ctype <= CType::u64) ||
-                       (ctype == CType::f32 || ctype == CType::f64);
-
-            case ValueType::String:
-            case ValueType::Pointer:
-            case ValueType::Null:
-                return ctype == CType::ptr;
-        }
-        return false;
     }
 
     struct BoundedValue {

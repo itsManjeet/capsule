@@ -137,14 +137,21 @@ namespace srclang {
             return inst()->emit(debug_info, line, t, ts...);
         }
 
+        /// comment ::= '//' (.*) '\n'
+
+        /// number ::= [0-9_.]+[bh]
         bool number();
 
+        /// identifier ::= [a-zA-Z_]([a-zA-Z0-9_]*)
         bool identifier(bool can_assign);
 
+        /// string ::= '"' ... '"'
         bool string_();
 
+        /// unary ::= ('+' | '-' | 'not') <expression> 
         bool unary(OpCode op);
 
+        /// block ::= '{' <stmt>* '}'
         bool block();
 
         bool value(Symbol *symbol);
@@ -159,10 +166,19 @@ namespace srclang {
         /// map ::= '{' ((<identifier> ':' <expression>) % ',') '}'
         bool map_();
 
+        /// prefix ::= number
+        ///        ::= string
+        ///        ::= identifier
+        ///        ::= unary
+        ///        ::= command
+        ///        ::= list
+        ///        ::= map
+        ///        ::= function
+        ///        ::= use
+        ///        ::= '(' expression ')'
         bool prefix(bool can_assign);
 
-        bool assign();
-
+        /// binary ::= expr ('+' | '-' | '*' | '/' | '==' | '!=' | '<' | '>' | '>=' | '<=' | 'and' | 'or' | '|' | '&' | '>>' | '<<' | '%') expr
         bool binary(OpCode op, int prec);
 
         /// call ::= '(' (expr % ',' ) ')'
@@ -174,8 +190,13 @@ namespace srclang {
         /// subscript ::= <expression> '.' <expression>
         bool subscript(bool can_assign);
 
+        /// infix ::= call
+        ///       ::= subscript
+        ///       ::= index
+        ///       ::= binary
         bool infix(bool can_assign);
 
+        /// expression ::= prefix infix*
         bool expression(int prec = P_Assignment);
 
         /// compiler_options ::= #![<option>(<value>)]
@@ -184,6 +205,7 @@ namespace srclang {
         /// let ::= 'let' 'global'? <identifier> '=' <expression>
         bool let();
 
+        /// return ::= 'return' <expression>
         bool return_();
 
         void patch_loop(int loop_start, OpCode to_patch, int pos);
@@ -200,19 +222,23 @@ namespace srclang {
 
         /// condition ::= 'if' <expression> <block> (else statement)?
         bool condition();
-
+        
+        /// type ::= 'identifier'
         ValueType type(std::string literal);
 
-        /// native ::= 'native' <identifier> ( (<type> % ',') ) <type>
-        bool native(Symbol *symbol);
-
-        /// statement ::= set
-        ///           ::= let
+        /// statement ::= let
         ///           ::= return
         ///           ::= ';'
+        ///           ::= condition
+        ///           ::= loop
+        ///           ::= break
+        ///           ::= continue
+        ///           ::= defer
+        ///           ::= compiler_options
         ///           ::= expression ';'
         bool statement();
 
+        /// program ::= statement*
         bool program();
 
     public:

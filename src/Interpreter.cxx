@@ -331,8 +331,8 @@ bool Interpreter::binary(Value lhs, Value rhs, OpCode op) {
                 if (buf == nullptr) {
                     throw std::runtime_error("malloc() failed for string + string, " + std::string(strerror(errno)));
                 }
-                memcpy_s(buf, size, a, a_size);
-                memcpy_s(buf + a_size, size - a_size, b, b_size);
+                memcpy(buf, a, a_size);
+                memcpy(buf + a_size, b, b_size);
                
                 buf[size] = '\0';
                 auto val = SRCLANG_VALUE_STRING(buf);
@@ -604,21 +604,6 @@ bool Interpreter::call_typecast(Value callee, uint8_t count) {
     }
 }
 
-bool Interpreter::call_native(Value callee, uint8_t count) {
-    auto native = reinterpret_cast<NativeFunction *>(
-            SRCLANG_VALUE_AS_OBJECT(callee)->pointer);
-    if (native->param.size() != count) {
-        error("Expected '" + std::to_string(native->param.size()) + "' but '" +
-              std::to_string(count) + "' provided");
-        return false;
-    }
-
-    Value result = SRCLANG_VALUE_NULL;
-    sp -= count + 1;
-    *sp++ = result;
-    return true;
-}
-
 bool Interpreter::call_bounded(Value callee, uint8_t count) {
     auto bounded = (BoundedValue *) SRCLANG_VALUE_AS_OBJECT(callee)->pointer;
     *(sp - count - 1) = bounded->value;
@@ -645,8 +630,6 @@ bool Interpreter::call(uint8_t count) {
                 return call_closure(callee, count);
             case ValueType::Builtin:
                 return call_builtin(callee, count);
-            case ValueType::Native:
-                return call_native(callee, count);
             case ValueType::Bounded:
                 return call_bounded(callee, count);
             default:

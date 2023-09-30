@@ -1,7 +1,0 @@
-defer { println ("defer 1"); };
-doGraceFullExit := fun () {
-	defer { println ("defer inside"); };
-	exit (0);
-};
-
-doGraceFullExit();

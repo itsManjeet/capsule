@@ -94,7 +94,7 @@ SRCLANG_BUILTIN(append) {
                     if (str == nullptr) {
                         throw std::runtime_error("realloc() failed, srclang::append(), " + std::string(strerror(errno)));
                     }
-                    strcat_s(str, len + len2 + 1, str2);
+                    strcat(str, str2);
                 } break;
                 default:
                     throw std::runtime_error("invalid append operation");
@@ -170,7 +170,8 @@ SRCLANG_BUILTIN(clone) {
     SRCLANG_CHECK_ARGS_EXACT(1);
     if (SRCLANG_VALUE_IS_OBJECT(args[0])) {
         switch (SRCLANG_VALUE_GET_TYPE(args[0])) {
-            case ValueType::String: {
+            case ValueType::String:
+            case ValueType::Error: {
                 return SRCLANG_VALUE_STRING(
                     strdup((char *)SRCLANG_VALUE_AS_OBJECT(args[0])->pointer));
             };
@@ -190,7 +191,7 @@ SRCLANG_BUILTIN(clone) {
                 if (buffer == nullptr) {
                     throw std::runtime_error("can't malloc() for srclang::clone() " + std::string(strerror(errno)));
                 }
-                memcpy_s(buffer, object->size, object->pointer, object->size);
+                memcpy(buffer, object->pointer, object->size);
                 auto value = SRCLANG_VALUE_POINTER(buffer);
                 SRCLANG_VALUE_SET_SIZE(value, object->size);
                 return value;
@@ -285,7 +286,12 @@ SRCLANG_BUILTIN(eval) {
     SRCLANG_CHECK_ARGS_EXACT(1);
     SRCLANG_CHECK_ARGS_TYPE(0, ValueType::String);
     const char *buffer = (const char *)SRCLANG_VALUE_AS_OBJECT(args[0])->pointer;
-    return interpreter->language->execute(buffer, "<inline>");
+    auto result = interpreter->language->execute(buffer, "<inline>");
+    if (SRCLANG_VALUE_GET_TYPE(result) == ValueType::Error) {
+        // we are already registering object at language
+        return builtin_clone({result}, interpreter);
+    }
+    return result;
 }
 
 SRCLANG_BUILTIN(alloc) {

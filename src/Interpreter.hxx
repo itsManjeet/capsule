@@ -78,8 +78,6 @@ namespace srclang {
 
         bool call_typecast(Value callee, uint8_t count);
 
-        bool call_native(Value callee, uint8_t count);
-
         bool call_bounded(Value callee, uint8_t count);
 
         bool call(uint8_t count);

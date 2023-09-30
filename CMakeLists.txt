@@ -7,8 +7,6 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(POSITION_INDEPENDENT_CODE ON)
 
-add_compile_definitions(-DSRCLANG_GC_DEBUG)
-
 add_executable(${PROJECT_NAME} src/srclang.cxx
         src/Value.hxx src/Value.cxx
         src/utils.cxx src/Utilities.hxx
@@ -25,7 +23,7 @@ add_executable(${PROJECT_NAME} src/srclang.cxx
         src/Language.cxx src/Language.hxx
         src/ProjectManager.cxx src/ProjectManager.hxx
         )
-# target_compile_definitions(${PROJECT_NAME} PUBLIC -DSRCLANG_GC_DEBUG)
+target_link_libraries(${PROJECT_NAME} -static)
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
 enable_testing()
 file(GLOB_RECURSE TestFiles "tests/*.src")

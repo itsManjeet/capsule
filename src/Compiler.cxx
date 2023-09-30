@@ -34,6 +34,7 @@ std::unique_ptr<Instructions> Compiler::pop_scope() {
 Iterator Compiler::get_error_pos(Iterator err_pos, int &line) const {
     line = 1;
     Iterator i = start;
+    if (i == end) return start;
     Iterator line_start = start;
     while (i != err_pos) {
         bool eol = false;
@@ -153,7 +154,7 @@ bool Compiler::eat() {
         return *iter++;
     };
 
-    /// comment ::= '//' (.*) '\n'
+    
     if (*iter == '/' && *(iter + 1) == '/') {
         iter += 2;
         while (*iter != '\n') {
@@ -167,7 +168,6 @@ bool Compiler::eat() {
         return eat();
     }
 
-    /// string ::= '"' ... '"'
     if (*iter == '"' || *iter == '\'') {
         auto starting = *iter;
         iter++;
@@ -187,8 +187,7 @@ bool Compiler::eat() {
         return true;
     }
 
-    /// reserved ::=
-    for (std::string k: {"let", "fun", "native", "return", "if", "else", "for",
+    for (std::string k: {"let", "fun", "return", "if", "else", "for",
                          "break", "continue", "use", "global", "as",
                          "in", "defer",
 
@@ -207,7 +206,6 @@ bool Compiler::eat() {
         }
     }
 
-    /// identifier ::= [a-zA-Z_]([a-zA-Z0-9_]*)
     if (isalpha(*iter) || *iter == '_') {
         do {
             iter++;
@@ -217,14 +215,12 @@ bool Compiler::eat() {
         return true;
     }
 
-    /// punct ::=
     if (ispunct(*iter)) {
         peek.literal = std::string_view(peek.pos, ++iter);
         peek.type = TokenType::Reserved;
         return true;
     }
 
-    /// digit ::= [0-9]
     if (isdigit(*iter)) {
         do {
             iter++;
@@ -330,11 +326,9 @@ bool Compiler::identifier(bool can_assign) {
     auto symbol = symbol_table->resolve(id.literal);
 
     if (can_assign && consume(":=")) {
-        if (symbol != std::nullopt) {
-            error("Already defined variable '" + id.literal + "'", id.pos);
-            return false;
+        if (symbol == std::nullopt) {
+            symbol = symbol_table->define(id.literal);
         }
-        symbol = symbol_table->define(id.literal);
         if (!value(&*symbol)) return false;
         emit(OpCode::STORE, symbol->scope, symbol->index);
     } else {
@@ -528,11 +522,6 @@ bool Compiler::prefix(bool can_assign) {
     return false;
 }
 
-bool Compiler::assign() {
-    error("not yet implemented", cur.pos);
-    return false;
-}
-
 bool Compiler::binary(OpCode op, int prec) {
     if (!expression(prec + 1)) {
         return false;
@@ -639,9 +628,7 @@ bool Compiler::infix(bool can_assign) {
             {"%",   OpCode::MOD},
     };
 
-    if (consume("=")) {
-        return assign();
-    } else if (consume("(")) {
+    if (consume("(")) {
         return call();
     } else if (consume(".")) {
         return subscript(can_assign);
@@ -780,10 +767,6 @@ bool Compiler::let() {
     }
     if (consume("fun")) {
         if (!function(&(*symbol))) {
-            return false;
-        }
-    } else if (consume("native")) {
-        if (!native(&(*symbol))) {
             return false;
         }
     } else {
@@ -1019,55 +1002,7 @@ ValueType Compiler::type(std::string literal) {
             SRCLANG_VALUE_TYPES[distance(SRCLANG_VALUE_TYPE_ID.begin(), iter)]);
 };
 
-/// native ::= 'native' <identifier> ( (<type> % ',') ) <type>
-bool Compiler::native(Symbol *symbol) {
-    auto id = symbol->name;
 
-    if (cur.type == TokenType::Identifier) {
-        id = cur.literal;
-        if (!eat()) return false;
-    }
-    std::vector<CType> types;
-    CType ret_type;
-
-    if (!expect("(")) return false;
-
-    while (!consume(")")) {
-        if (!check(TokenType::Identifier)) return false;
-        try {
-            types.push_back(get_ctype(cur.literal.c_str()));
-        } catch (std::runtime_error const &e) {
-            error(e.what(), cur.pos);
-            return false;
-        }
-        if (!eat()) return false;
-
-        if (consume(")")) break;
-        if (!expect(",")) return false;
-    }
-    if (!check(TokenType::Identifier)) return false;
-    try {
-        ret_type = get_ctype(cur.literal.c_str());
-        if (!eat()) return false;
-    } catch (std::runtime_error const &e) {
-        error(e.what(), cur.pos);
-        return false;
-    }
-
-    auto native = new NativeFunction{id, types, ret_type};
-    Value val = SRCLANG_VALUE_NATIVE(native);
-    language->memoryManager.heap.push_back(val);
-    language->constants.push_back(val);
-    emit(OpCode::CONST, language->constants.size() - 1);
-    emit(OpCode::STORE, symbol->scope, symbol->index);
-    return true;
-}
-
-/// statement ::= set
-///           ::= let
-///           ::= return
-///           ::= ';'
-///           ::= expression ';'
 bool Compiler::statement() {
     if (consume("let"))
         return let();
@@ -1140,8 +1075,6 @@ bool Compiler::compile() {
 bool Compiler::value(Symbol *symbol) {
     if (consume("fun")) {
         return function(symbol);
-    } else if (symbol != nullptr && consume("native")) {
-        return native(symbol);
     }
     return expression();
 }
