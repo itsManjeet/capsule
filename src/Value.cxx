@@ -37,7 +37,7 @@ void srclang::SRCLANG_VALUE_FREE(Value value) {
                 break;
 
             case ValueType::Pointer:
-                free(object->pointer);
+                object->cleanup(object->pointer);
                 break;
 
             case ValueType::Builtin:

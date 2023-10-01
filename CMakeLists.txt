@@ -23,7 +23,7 @@ add_executable(${PROJECT_NAME} src/srclang.cxx
         src/Language.cxx src/Language.hxx
         src/ProjectManager.cxx src/ProjectManager.hxx
         )
-target_link_libraries(${PROJECT_NAME} -static)
+target_link_libraries(${PROJECT_NAME} ffi tcc)
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
 enable_testing()
 file(GLOB_RECURSE TestFiles "tests/*.src")

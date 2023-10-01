@@ -117,6 +117,7 @@ namespace srclang {
 
 #define SRCLANG_VALUE_SET_REF(val) srclang_value_set_ref(val)
 #define SRCLANG_VALUE_SET_SIZE(val, sz) srclang_value_set_size(val, sz)
+#define SRCLANG_VALUE_SET_CLEANUP(val, cl) srclang_value_set_cleanup(val, cl)
 #define SRCLANG_VALUE_GET_SIZE(val) srclang_value_get_size(val)
 
 #define SRCLANG_VALUE_TRUE \

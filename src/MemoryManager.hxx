@@ -13,11 +13,16 @@ namespace srclang {
         size_t size{ 0 };
 
         bool marked{false};
+
+        void (*cleanup)(void*) = free;
     };
 
-    static inline void srclang_value_set_ref(Value value) {
-        if (!SRCLANG_VALUE_IS_OBJECT(value)) return;
+    #define SRCLANG_CLEANUP_FN(fn) ((void (*)(void*))fn)
+
+    static inline Value srclang_value_set_ref(Value value) {
+        if (!SRCLANG_VALUE_IS_OBJECT(value)) return value;
         SRCLANG_VALUE_AS_OBJECT(value)->is_ref = true;
+        return value;
     }
 
     static inline void srclang_value_set_size(Value value, size_t size) {
@@ -28,6 +33,12 @@ namespace srclang {
     static inline size_t srclang_value_get_size(Value value) {
         if (!SRCLANG_VALUE_IS_OBJECT(value)) return 0;
         return SRCLANG_VALUE_AS_OBJECT(value)->size;
+    }
+
+    static inline Value srclang_value_set_cleanup(Value value, void (*c)(void*)) {
+        if (!SRCLANG_VALUE_IS_OBJECT(value)) return value;
+        SRCLANG_VALUE_AS_OBJECT(value)->cleanup = c;
+        return value;
     }
 
     class MemoryManager {

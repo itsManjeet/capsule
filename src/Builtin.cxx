@@ -2,6 +2,9 @@
 
 #include "Interpreter.hxx"
 #include "Language.hxx"
+#include <ffi.h>
+#include <dlfcn.h>
+#include <libtcc.h>
 
 using namespace srclang;
 
@@ -352,4 +355,172 @@ SRCLANG_BUILTIN(free) {
     free(SRCLANG_VALUE_AS_OBJECT(args[0])->pointer);
     SRCLANG_VALUE_AS_OBJECT(args[0])->pointer = nullptr;
     return SRCLANG_VALUE_TRUE;
+}
+
+SRCLANG_BUILTIN(system) {
+    SRCLANG_CHECK_ARGS_RANGE(1, 2);
+    SRCLANG_CHECK_ARGS_TYPE(0, ValueType::String);
+    const char* command = (const char*) SRCLANG_VALUE_AS_OBJECT(args[0])->pointer;
+
+    FILE* pipe = popen(command, "r");
+    if (pipe == nullptr) {
+        return SRCLANG_VALUE_SET_REF(SRCLANG_VALUE_ERROR("popen() failed"));
+    }
+
+    Value callback = SRCLANG_VALUE_NULL;
+
+    if (args.size() == 2) {
+        SRCLANG_CHECK_ARGS_TYPE(1, ValueType::Closure);
+        callback = args[1];
+    }
+
+    char buffer[BUFSIZ];
+    while (fgets(buffer, BUFSIZ, pipe) != nullptr) {
+        if (!SRCLANG_VALUE_IS_NULL(callback)) {
+            auto result = builtin_call({callback, SRCLANG_VALUE_SET_REF(SRCLANG_VALUE_STRING(buffer))}, interpreter);
+            if (SRCLANG_VALUE_GET_TYPE(result) == ValueType::Error) {
+                pclose(pipe);
+                return result;
+            }
+        }
+    }
+    int status = pclose(pipe);
+    return SRCLANG_VALUE_NUMBER(WEXITSTATUS(status));
+}
+
+SRCLANG_BUILTIN(internalCC) {
+    SRCLANG_CHECK_ARGS_EXACT(1);
+    SRCLANG_CHECK_ARGS_TYPE(0, ValueType::String);
+
+    const char* code = (const char*) SRCLANG_VALUE_AS_OBJECT(args[0])->pointer;
+    TCCState* state = tcc_new();
+    if (state == nullptr) {
+        throw std::runtime_error("tcc_new() failed");
+    }
+    tcc_set_output_type(state, TCC_OUTPUT_MEMORY);
+
+    if (tcc_compile_string(state, code) == -1) {
+        return SRCLANG_VALUE_SET_REF(SRCLANG_VALUE_ERROR("compilation failed"));
+    }
+
+    if (tcc_relocate(state, nullptr) == -1) {
+        return SRCLANG_VALUE_SET_REF(SRCLANG_VALUE_ERROR("relocation failed"));
+    }
+
+    return SRCLANG_VALUE_SET_CLEANUP(SRCLANG_VALUE_OBJECT(state), SRCLANG_CLEANUP_FN(tcc_delete));
+}
+
+SRCLANG_BUILTIN(internalFFI) {
+    SRCLANG_CHECK_ARGS_EXACT(4);
+    SRCLANG_CHECK_ARGS_TYPE(0, ValueType::String);
+    SRCLANG_CHECK_ARGS_TYPE(1, ValueType::Number);
+    SRCLANG_CHECK_ARGS_TYPE(2, ValueType::List);
+
+    void* handler = nullptr;
+    void* fn = nullptr;
+    switch (SRCLANG_VALUE_GET_TYPE(args[3])) {
+        case ValueType::String:
+            handler = dlopen((const char*) SRCLANG_VALUE_AS_OBJECT(args[3])->pointer, RTLD_GLOBAL|RTLD_NOW);
+            if (handler == nullptr) return SRCLANG_VALUE_SET_REF(SRCLANG_VALUE_STRING(dlerror()));
+        case ValueType::Null:
+            fn = dlsym(nullptr, (const char*) SRCLANG_VALUE_AS_OBJECT(args[0])->pointer);
+            if (fn == nullptr) {
+                return SRCLANG_VALUE_SET_REF(SRCLANG_VALUE_ERROR(dlerror()));
+            }
+            break;
+        
+        case ValueType::Pointer:
+            fn = tcc_get_symbol((TCCState*) SRCLANG_VALUE_AS_OBJECT(args[4])->pointer,(const char*) SRCLANG_VALUE_AS_OBJECT(args[0])->pointer);
+            if (fn ==nullptr) {
+                return SRCLANG_VALUE_SET_REF(SRCLANG_VALUE_ERROR("undefined symbol"));
+            }
+        default:
+            return SRCLANG_VALUE_SET_REF(SRCLANG_VALUE_ERROR("expected 4th arg to be either string or pointer"));
+    }
+
+    auto args_list = (SrcLangList*) SRCLANG_VALUE_AS_OBJECT(args[2])->pointer;
+    
+    ffi_cif cif;
+    std::vector<void*> values(args_list->size());
+    std::vector<ffi_type*> types(args_list->size());
+
+    std::vector<unsigned long> unsigned_value_holder(args_list->size());
+    std::vector<signed long> signed_value_holder(args_list->size());
+    std::vector<double> float_value_holder(args_list->size());
+
+    std::vector<ffi_type*> type_map = {
+        &ffi_type_sint8,
+        &ffi_type_sint16,
+        &ffi_type_sint32,
+        &ffi_type_sint64,
+
+        &ffi_type_uint8,
+        &ffi_type_uint16,
+        &ffi_type_uint32,
+        &ffi_type_uint64,
+
+        &ffi_type_float,
+        &ffi_type_double,
+        
+        &ffi_type_pointer,
+    };
+
+    for (int i = 0; i < args_list->size(); i++) {
+        if (SRCLANG_VALUE_GET_TYPE(args_list->at(i)) != ValueType::List) {
+            throw std::runtime_error("expected parameters to be pair of datatype and value");
+        }
+        auto param = (SrcLangList*) SRCLANG_VALUE_AS_OBJECT(args_list->at(i))->pointer;
+        if (param->size() != 2) {
+            throw std::runtime_error("expected parameters to be pair of datatype and value");
+        }
+        auto datatype = (int) SRCLANG_VALUE_AS_NUMBER(param->at(0));
+        types[i] = type_map[datatype];
+
+        auto value = param->at(1);
+    
+        switch (datatype) {
+            case 1: // i8
+            case 2: // i16
+            case 3: // i32
+            case 4: // i64
+            {
+                signed_value_holder[i] = static_cast<signed long>(SRCLANG_VALUE_AS_NUMBER(value));
+                values[i] = &signed_value_holder[i];
+            } break;
+
+
+            case 5: // u8
+            case 6: // u16
+            case 7: // u32
+            case 8: // u64
+            {
+                unsigned_value_holder[i] = static_cast<unsigned long>(SRCLANG_VALUE_AS_NUMBER(value));
+                values[i] = &unsigned_value_holder[i];
+                types[i] = &ffi_type_uint64;
+            } break;
+
+            case 9: // f32
+            case 10: // f64
+            {
+                float_value_holder[i] = SRCLANG_VALUE_AS_NUMBER(value);
+                values[i] = &float_value_holder[i];
+                types[i] = &ffi_type_double;
+            } break;
+
+
+            case 11: // ptr
+                values[i] = &SRCLANG_VALUE_AS_OBJECT(value)->pointer;
+                types[i] = &ffi_type_pointer;
+                break;
+        }
+    }
+
+    if (ffi_prep_cif(&cif, FFI_DEFAULT_ABI, args_list->size(), type_map[(int)SRCLANG_VALUE_AS_NUMBER(args[1])], types.data()) != FFI_OK) {
+        return SRCLANG_VALUE_SET_REF(SRCLANG_VALUE_ERROR("ffi_prep_cif() failed"));
+    }
+
+    ffi_arg result;
+    ffi_call(&cif, FFI_FN(handler), &result, values.data());
+
+    return SRCLANG_VALUE_NUMBER(result);
 }

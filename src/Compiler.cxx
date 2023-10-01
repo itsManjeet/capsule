@@ -146,6 +146,8 @@ bool Compiler::eat() {
                     return '\\';
                 case '\'':
                     return '\'';
+                case '"':
+                    return '"';
                 default:
                     error("invalid escape sequence", iterator - 1);
                     status = false;
@@ -261,7 +263,6 @@ Compiler::Precedence Compiler::precedence(std::string tok) {
             {"%",   P_Factor},
             {"not", P_Unary},
             {"-",   P_Unary},
-            {"$",   P_Unary},
             {".",   P_Call},
             {"[",   P_Call},
             {"(",   P_Call},
@@ -499,8 +500,6 @@ bool Compiler::prefix(bool can_assign) {
         return unary(OpCode::NOT);
     } else if (consume("-")) {
         return unary(OpCode::NEG);
-    } else if (consume("$")) {
-        return unary(OpCode::COMMAND);
     } else if (consume("[")) {
         return list();
     } else if (consume("{")) {

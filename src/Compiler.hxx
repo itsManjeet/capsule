@@ -170,7 +170,6 @@ namespace srclang {
         ///        ::= string
         ///        ::= identifier
         ///        ::= unary
-        ///        ::= command
         ///        ::= list
         ///        ::= map
         ///        ::= function

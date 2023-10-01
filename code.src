@@ -1,0 +1,11 @@
+ffi := use("ffi");
+
+code := internalCC ("
+#include <stdio.h>
+
+void print(const char* mesg) {
+    printf(\"%s\n\", mesg);
+}
+");
+
+ffi.Call("print", ffi.I32, [[ffi.Ptr, "Hello World"]], code);

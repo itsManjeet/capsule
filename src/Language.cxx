@@ -11,8 +11,8 @@ Language::Language()
     : globals(65536),
       options({
           {"VERSION", SRCLANG_VERSION},
-          {"GC_HEAP_GROW_FACTOR", 1.0f},
-          {"GC_INITIAL_TRIGGER", 200},
+          {"GC_HEAP_GROW_FACTOR", 1.3f},
+          {"GC_INITIAL_TRIGGER", 10},
           {"SEARCH_PATH", ""},
           {"IR", false},
           {"EXPERIMENTAL_FEATURES", false},
