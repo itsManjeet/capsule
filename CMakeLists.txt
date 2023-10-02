@@ -20,10 +20,8 @@ add_executable(${PROJECT_NAME} src/srclang.cxx
         src/Options.cxx src/Options.hxx
         src/Compiler.cxx src/Compiler.hxx
         src/Interpreter.cxx src/Interpreter.hxx
-        src/Language.cxx src/Language.hxx
-        src/ProjectManager.cxx src/ProjectManager.hxx
-        )
-target_link_libraries(${PROJECT_NAME} -static -rdynamic)
+        src/Language.cxx src/Language.hxx)
+target_link_libraries(${PROJECT_NAME} readline)
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
 enable_testing()
 file(GLOB_RECURSE TestFiles "tests/*.src")

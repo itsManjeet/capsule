@@ -1,8 +1,10 @@
+#include <readline/history.h>
+#include <readline/readline.h>
+
 #include <fstream>
 #include <utility>
 
-#include "../src/Language.hxx"
-#include "ProjectManager.hxx"
+#include "Language.hxx"
 
 using namespace srclang;
 
@@ -31,19 +33,46 @@ int run(Language *language, std::optional<std::string> path) {
     return 0;
 }
 
+bool is_complete(std::string const &input) {
+    std::vector<char> stack;
+    for (int i = 0; i < input.length(); i++) {
+        switch (input[i]) {
+            case '{':
+            case '[':
+            case '(':
+                stack.push_back(input[i]);
+                break;
+            case '}':
+                if (stack.back() == '{') stack.pop_back();
+                break;
+            case ']':
+                if (stack.back() == '[') stack.pop_back();
+                break;
+            case ')':
+                if (stack.back() == '(') stack.pop_back();
+                break;
+        }
+    }
+    return stack.empty() && input.back() != '\\';
+}
+
 int interactive(Language *language) {
     std::cout << LOGO << std::endl;
     std::cout << "Source Programming Language" << std::endl;
-    std::cout << "Copyright (C) 2021 rlxos" << std::endl;
+    std::cout << "Copyright (C) 2023 rlxos" << std::endl;
 
     while (true) {
-        std::cout << "> ";
-        std::string input;
-        if (!std::getline(std::cin, input, '\n')) {
-            continue;
-        }
+        std::string input = readline((const char *)SRCLANG_VALUE_AS_OBJECT(language->resolve("PS"))->pointer);
+        if (input.empty()) continue;
 
         if (input == ".exit") break;
+
+        while (!is_complete(input)) {
+            std::string sub_input = readline("... ");
+            input += sub_input;
+        }
+
+        add_history(input.c_str());
 
         auto result = language->execute(input, "<script>");
         std::cout << ":: " << SRCLANG_VALUE_GET_STRING(result) << std::endl;
@@ -62,8 +91,6 @@ int printHelp() {
               << std::endl;
     std::cout << "   run                    Run srclang script and bytecode (source ends with .src)\n"
               << "   interactive            Start srclang interactive shell\n"
-              << "   new <name>             Setup run srclang project\n"
-              << "   test                   Run test cases\n"
               << "   help                   Print this help message\n"
               << '\n'
               << " FLAGS:\n"
@@ -161,12 +188,9 @@ int main(int argc, char **argv) {
         }
     }
 
-    auto filename_Object = SRCLANG_VALUE_STRING((filename.has_value() ? filename->c_str() : "<script>"));
-    SRCLANG_VALUE_SET_REF(filename_Object);
-
-    language.define("__FILE__", filename_Object);
+    language.define("__FILE__", SRCLANG_VALUE_SET_REF(SRCLANG_VALUE_STRING((filename.has_value() ? filename->c_str() : "<script>"))));
     language.define("__ARGS__", SRCLANG_VALUE_LIST(args));
-    ProjectManager projectManager(&language, project_path);
+    language.define("PS", SRCLANG_VALUE_SET_REF(SRCLANG_VALUE_STRING(">> ")));
 
     if (task == "help")
         return printHelp();
@@ -174,21 +198,6 @@ int main(int argc, char **argv) {
         return run(&language, filename);
     else if (task == "interactive")
         return interactive(&language);
-
-    try {
-        if (task == "new") {
-            if (cli_args.empty()) throw std::runtime_error("no project name specified");
-            projectManager.create(cli_args[0]);
-        } else if (task == "test") {
-            projectManager.test();
-        } else {
-            return printHelp();
-        }
-        return 0;
-    } catch (std::exception const &ex) {
-        std::cerr << "ERROR: " << ex.what() << std::endl;
-        return 1;
-    }
 
     return printHelp();
 }
