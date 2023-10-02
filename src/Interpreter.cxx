@@ -74,11 +74,9 @@ void Interpreter::add_object(Value val) {
     gc();
 #else
     if (language->memoryManager.heap.size() > next_gc && next_gc < LIMIT_NEXT_GC) {
-        std::cout << "TRIGGERING GC:" << std::endl;
         gc();
         language->memoryManager.heap.shrink_to_fit();
         next_gc = language->memoryManager.heap.size() * GC_HEAP_GROW_FACTOR;
-        std::cout << "NEXT GC:" << next_gc << std::endl;
     }
 #endif
     language->memoryManager.heap.push_back(val);
