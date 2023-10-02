@@ -30,8 +30,6 @@ namespace srclang {
     X(upper)                 \
     X(search)                \
     X(system)                \
-    X(internalFFI)           \
-    X(internalCC)            \
     X(setref)                \
     X(isref)                 \
     X(setsize)               \
