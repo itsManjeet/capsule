@@ -51,6 +51,7 @@ namespace srclang {
     X(RET, 0)               \
     X(JNZ, 1)               \
     X(JMP, 1)               \
+    X(CHK, 1)               \
     X(DEFER, 0)             \
     X(SIZE, 0)              \
     X(HLT, 0)

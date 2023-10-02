@@ -1,13 +1,17 @@
-condition_1 := fun () {
-    println ("I should run");
-    return false;
+condition_1 := fun (v) {
+    println ("CONDITION 1");
+    return v;
 };
 
-condition_2 := fun () {
-    println ("I shouldn't run");
-    return true;
+condition_2 := fun (v) {
+    println ("CONDITION 2");
+    return v;
 };
 
-if condition_1() and condition_2() {
-    println ("I must not run");
+if condition_1(false) and condition_2(true) {
+    println ("I MUST NOT RUN");
+}
+
+if condition_1(true) and condition_2(true) {
+    println ("I MUST RUN");
 }

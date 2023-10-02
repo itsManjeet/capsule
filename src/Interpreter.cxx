@@ -182,6 +182,11 @@ bool Interpreter::binary(Value lhs, Value rhs, OpCode op) {
         return true;
     }
 
+    if (op == OpCode::OR) {
+        *sp++ = (is_falsy(lhs) ? rhs : lhs);
+        return true;
+    }
+
     if (SRCLANG_VALUE_IS_NULL(lhs) && SRCLANG_VALUE_IS_NULL(rhs)) {
         *sp++ = op == OpCode::EQ ? SRCLANG_VALUE_TRUE : SRCLANG_VALUE_FALSE;
         return true;
@@ -840,31 +845,27 @@ bool Interpreter::run() {
                     switch (count) {
                         case 1: {
                             if (strlen(buffer) <= index || index < 0) {
-                                error(
-                                    "ERROR: out-of-index trying to access "
-                                    "'" +
-                                    std::to_string(index) +
-                                    "' from string of size '" +
-                                    std::to_string(strlen(buffer)) + "'");
-                                return false;
+                                *sp++ = SRCLANG_VALUE_NULL;
+                            } else {
+                                *sp++ = SRCLANG_VALUE_STRING(strdup(std::string(1, buffer[index]).c_str()));
                             }
-                            *sp++ = SRCLANG_VALUE_STRING(strdup(std::string(1, buffer[index]).c_str()));
+
                         } break;
                         case 2: {
                             int end = SRCLANG_VALUE_AS_NUMBER(end_idx);
                             if (index < 0) index = len + index;
                             if (end < 0) end = len + end + 1;
                             if (end - index < 0 || end - index >= len) {
-                                error("Out-of-range");
-                                return false;
+                                *sp++ = SRCLANG_VALUE_NULL;
+                            } else {
+                                char *buf = (char *)malloc(sizeof(char) * (end - index + 1));
+                                memcpy(buf, buffer + index, end - index);
+
+                                buf[end - index] = '\0';
+                                *sp++ = SRCLANG_VALUE_STRING(buf);
+
+                                add_object(*(sp - 1));
                             }
-                            char *buf = (char *)malloc(sizeof(char) * (end - index + 1));
-                            memcpy(buf, buffer + index, end - index);
-
-                            buf[end - index] = '\0';
-                            *sp++ = SRCLANG_VALUE_STRING(buf);
-
-                            add_object(*(sp - 1));
                         } break;
                         default:
                             error(
@@ -883,13 +884,11 @@ bool Interpreter::run() {
                     switch (count) {
                         case 1:
                             if (list.size() <= index || index < 0) {
-                                error("out-of-index trying to access '" +
-                                      std::to_string(index) +
-                                      "' from list of size '" +
-                                      std::to_string(list.size()) + "'");
-                                return false;
+                                *sp++ = SRCLANG_VALUE_NULL;
+                            } else {
+                                *sp++ = list[index];
                             }
-                            *sp++ = list[index];
+
                             break;
                         case 2: {
                             int end = SRCLANG_VALUE_AS_NUMBER(end_idx);
@@ -1047,6 +1046,16 @@ bool Interpreter::run() {
                 fp--;
                 *sp++ = value;
                 debug_info.pop_back();
+            } break;
+
+            case OpCode::CHK: {
+                auto condition = *fp->ip++;
+                auto position = *fp->ip++;
+                if (SRCLANG_VALUE_AS_BOOL(*(sp - 1)) && condition == 1) {
+                    fp->ip = (fp->closure->fun->instructions->begin() + position);
+                } else if (!SRCLANG_VALUE_AS_BOOL(*(sp - 1)) && condition == 0) {
+                    fp->ip = (fp->closure->fun->instructions->begin() + position);
+                }
             } break;
 
             case OpCode::JNZ: {

@@ -520,10 +520,22 @@ bool Compiler::prefix(bool can_assign) {
 }
 
 bool Compiler::binary(OpCode op, int prec) {
+    int pos = 0;
+    switch (op) {
+        case OpCode::OR:
+            pos = emit(OpCode::CHK, 1, 0);
+            break;
+        case OpCode::AND:
+            pos = emit(OpCode::CHK, 0, 0);
+            break;
+    }
     if (!expression(prec + 1)) {
         return false;
     }
     emit(op);
+    if (op == OpCode::OR || op == OpCode::AND) {
+        inst()->at(pos + 2) = inst()->size();
+    }
 
     return true;
 }
