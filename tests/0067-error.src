@@ -1,0 +1,3 @@
+if not error("hey") {
+    println("I MUST PRINT");
+}

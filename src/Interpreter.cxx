@@ -417,7 +417,8 @@ bool Interpreter::is_falsy(Value val) {
            (SRCLANG_VALUE_IS_BOOL(val) &&
             SRCLANG_VALUE_AS_BOOL(val) == false) ||
            (SRCLANG_VALUE_IS_NUMBER(val) &&
-            SRCLANG_VALUE_AS_NUMBER(val) == 0);
+            SRCLANG_VALUE_AS_NUMBER(val) == 0) ||
+           (SRCLANG_VALUE_IS_OBJECT(val) && SRCLANG_VALUE_AS_OBJECT(val)->type == ValueType::Error);
 }
 
 void Interpreter::print_stack() {
