@@ -2,21 +2,21 @@
 #define SRCLANG_PROJECTMANAGER_HXX
 
 #include <filesystem>
-#include <string>
 #include <map>
+#include <string>
 
 namespace srclang {
     struct Language;
 
     class ProjectManager {
-    private:
+       private:
         Language *language{nullptr};
         std::map<std::string, std::string> config;
         std::filesystem::path projectPath;
 
         void load();
 
-    public:
+       public:
         explicit ProjectManager(Language *language, std::filesystem::path projectPath);
 
         void create(std::string const &projectName);
@@ -24,6 +24,6 @@ namespace srclang {
         void test();
     };
 
-} // srclang
+}  // srclang
 
-#endif //SRCLANG_PROJECTMANAGER_HXX
+#endif  // SRCLANG_PROJECTMANAGER_HXX

@@ -1,14 +1,15 @@
 #include "ProjectManager.hxx"
-#include "../src/Language.hxx"
+
 #include <fstream>
 #include <utility>
+
+#include "../src/Language.hxx"
 
 using namespace srclang;
 
 ProjectManager::ProjectManager(Language *language, std::filesystem::path projectPath)
-        : language{language},
-          projectPath(std::move(projectPath)) {
-
+    : language{language},
+      projectPath(std::move(projectPath)) {
 }
 
 void ProjectManager::load() {
@@ -21,7 +22,7 @@ void ProjectManager::load() {
     {
         auto status = localLang.execute(buildConfig);
         if (SRCLANG_VALUE_GET_TYPE(status) == ValueType::Error) {
-            throw std::runtime_error((const char *) SRCLANG_VALUE_AS_OBJECT(status)->pointer);
+            throw std::runtime_error((const char *)SRCLANG_VALUE_AS_OBJECT(status)->pointer);
         }
     }
 
@@ -35,7 +36,7 @@ void ProjectManager::load() {
         if (SRCLANG_VALUE_GET_TYPE(value) != ValueType::String) {
             throw std::runtime_error("not a string value '" + key + "'");
         }
-        return (const char *) SRCLANG_VALUE_AS_OBJECT(value)->pointer;
+        return (const char *)SRCLANG_VALUE_AS_OBJECT(value)->pointer;
     };
 
     auto fallbackConfig = [&](std::string const &key, std::string const &value) -> std::string {
@@ -56,7 +57,7 @@ void ProjectManager::create(std::string const &projectName) {
         throw std::runtime_error("Project already exists '" + buildConfig.string() + "'");
     }
 
-    for (auto dir: {"exec", "modules", "data", "tests", "native"}) {
+    for (auto dir : {"exec", "modules", "data", "tests", "native"}) {
         std::filesystem::create_directories(projectPath / projectName / dir);
     }
 
@@ -76,7 +77,7 @@ void ProjectManager::test() {
     int TOTAL_TEST_CASES = 0;
     int TOTAL_FAILED = 0;
 
-    for (auto const &test: std::filesystem::recursive_directory_iterator(testPath)) {
+    for (auto const &test : std::filesystem::recursive_directory_iterator(testPath)) {
         if (test.is_regular_file() &&
             test.path().has_extension() &&
             test.path().filename().string().starts_with("test_") &&

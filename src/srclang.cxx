@@ -25,7 +25,7 @@ int run(Language *language, std::optional<std::string> path) {
     }
     auto result = language->execute(std::filesystem::path(*path));
     if (SRCLANG_VALUE_GET_TYPE(result) == ValueType::Error) {
-        std::cerr << (char *) SRCLANG_VALUE_AS_OBJECT(result)->pointer << std::endl;
+        std::cerr << (char *)SRCLANG_VALUE_AS_OBJECT(result)->pointer << std::endl;
         return 1;
     }
     return 0;

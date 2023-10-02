@@ -1,8 +1,9 @@
 #ifndef SRCLANG_SYMBOLTABLE_HXX
 #define SRCLANG_SYMBOLTABLE_HXX
 
-#include "Value.hxx"
 #include <optional>
+
+#include "Value.hxx"
 
 namespace srclang {
 
@@ -25,19 +26,18 @@ namespace srclang {
 
     static const std::vector<std::string> SRCLANG_SYMBOL_ID = {
 #define X(id) #id,
-            SRCLANG_SYMBOL_SCOPE_LIST
+        SRCLANG_SYMBOL_SCOPE_LIST
 #undef X
     };
 
-
     class SymbolTable {
-    public:
+       public:
         SymbolTable *parent{nullptr};
         std::map<std::string, Symbol> store;
         std::vector<Symbol> free;
         int definitions{0};
 
-    public:
+       public:
         explicit SymbolTable(SymbolTable *parent = nullptr);
 
         Symbol define(const std::string &name);
@@ -50,4 +50,4 @@ namespace srclang {
     };
 }
 
-#endif //SRCLANG_SYMBOLTABLE_HXX
+#endif  // SRCLANG_SYMBOLTABLE_HXX

@@ -330,7 +330,7 @@ SRCLANG_BUILTIN(setsize) {
     SRCLANG_CHECK_ARGS_TYPE(0, ValueType::Pointer);
     SRCLANG_CHECK_ARGS_TYPE(1, ValueType::Number);
 
-    SRCLANG_VALUE_AS_OBJECT(args[0])->size = (size_t) SRCLANG_VALUE_AS_NUMBER(args[1]);
+    SRCLANG_VALUE_AS_OBJECT(args[0])->size = (size_t)SRCLANG_VALUE_AS_NUMBER(args[1]);
     return args[0];
 }
 
@@ -338,11 +338,10 @@ SRCLANG_BUILTIN(exit) {
     SRCLANG_CHECK_ARGS_EXACT(1);
     SRCLANG_CHECK_ARGS_TYPE(0, ValueType::Number);
 
-    auto status = (int) SRCLANG_VALUE_AS_NUMBER(args[0]);
+    auto status = (int)SRCLANG_VALUE_AS_NUMBER(args[0]);
     interpreter->grace_full_exit();
     exit(status);
 }
-
 
 SRCLANG_BUILTIN(free) {
     SRCLANG_CHECK_ARGS_EXACT(1);
@@ -357,9 +356,9 @@ SRCLANG_BUILTIN(free) {
 SRCLANG_BUILTIN(system) {
     SRCLANG_CHECK_ARGS_RANGE(1, 2);
     SRCLANG_CHECK_ARGS_TYPE(0, ValueType::String);
-    const char* command = (const char*) SRCLANG_VALUE_AS_OBJECT(args[0])->pointer;
+    const char *command = (const char *)SRCLANG_VALUE_AS_OBJECT(args[0])->pointer;
 
-    FILE* pipe = popen(command, "r");
+    FILE *pipe = popen(command, "r");
     if (pipe == nullptr) {
         return SRCLANG_VALUE_SET_REF(SRCLANG_VALUE_ERROR("popen() failed"));
     }

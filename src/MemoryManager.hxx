@@ -1,4 +1,3 @@
-
 #ifndef SRCLANG_MEMORYMANAGER_HXX
 #define SRCLANG_MEMORYMANAGER_HXX
 
@@ -10,14 +9,14 @@ namespace srclang {
         ValueType type{};
         void *pointer{nullptr};
         bool is_ref{false};
-        size_t size{ 0 };
+        size_t size{0};
 
         bool marked{false};
 
-        void (*cleanup)(void*) = free;
+        void (*cleanup)(void *) = free;
     };
 
-    #define SRCLANG_CLEANUP_FN(fn) ((void (*)(void*))fn)
+#define SRCLANG_CLEANUP_FN(fn) ((void (*)(void *))fn)
 
     static inline Value srclang_value_set_ref(Value value) {
         if (!SRCLANG_VALUE_IS_OBJECT(value)) return value;
@@ -35,7 +34,7 @@ namespace srclang {
         return SRCLANG_VALUE_AS_OBJECT(value)->size;
     }
 
-    static inline Value srclang_value_set_cleanup(Value value, void (*c)(void*)) {
+    static inline Value srclang_value_set_cleanup(Value value, void (*c)(void *)) {
         if (!SRCLANG_VALUE_IS_OBJECT(value)) return value;
         SRCLANG_VALUE_AS_OBJECT(value)->cleanup = c;
         return value;

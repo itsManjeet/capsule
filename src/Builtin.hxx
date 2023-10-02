@@ -34,7 +34,6 @@ namespace srclang {
     X(isref)                 \
     X(setsize)               \
     X(exit)
-    
 
     struct Interpreter;
 #define X(id) SRCLANG_BUILTIN(id);

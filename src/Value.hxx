@@ -153,7 +153,6 @@ namespace srclang {
                                  "' to be '" +                        \
                                  SRCLANG_VALUE_TYPE_ID[int(ty)] + "'");
 
-
     typedef std::vector<Value> SrcLangList;
     typedef std::map<std::string, Value> SrcLangMap;
 

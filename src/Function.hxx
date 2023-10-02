@@ -1,15 +1,19 @@
 #ifndef SRCLANG_FUNCTION_HXX
 #define SRCLANG_FUNCTION_HXX
 
+#include <memory>
+
 #include "DebugInfo.hxx"
 #include "Instructions.hxx"
 #include "Value.hxx"
-#include <memory>
 
 namespace srclang {
 
     enum class FunctionType {
-        Function, Method, Initializer, Native
+        Function,
+        Method,
+        Initializer,
+        Native
     };
 
     struct Function {
@@ -22,13 +26,11 @@ namespace srclang {
         std::shared_ptr<DebugInfo> debug_info{nullptr};
     };
 
-
     struct Closure {
         Function *fun;
         std::vector<Value> free{0};
     };
 
-
-} // srclang
+}  // srclang
 
 #endif

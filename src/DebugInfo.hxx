@@ -1,9 +1,9 @@
 #ifndef SRCLANG_DEBUGINFO_HXX
 #define SRCLANG_DEBUGINFO_HXX
 
+#include <iostream>
 #include <string>
 #include <vector>
-#include <iostream>
 
 namespace srclang {
 
@@ -13,6 +13,6 @@ namespace srclang {
         int position{};
     };
 
-} // srclang
+}  // srclang
 
-#endif //SRCLANG_DEBUGINFO_HXX
+#endif  // SRCLANG_DEBUGINFO_HXX

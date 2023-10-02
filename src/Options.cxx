@@ -2,7 +2,6 @@
 
 using namespace srclang;
 
-Options::Options(std::map<std::string, OptionType> const &options) :
-        std::map<std::string, OptionType>(options) {
-
+Options::Options(std::map<std::string, OptionType> const &options)
+    : std::map<std::string, OptionType>(options) {
 }

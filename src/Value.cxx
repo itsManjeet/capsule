@@ -6,7 +6,6 @@
 
 using namespace srclang;
 
-
 void srclang::SRCLANG_VALUE_FREE(Value value) {
     if (!SRCLANG_VALUE_IS_OBJECT(value)) {
         return;

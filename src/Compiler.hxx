@@ -1,23 +1,18 @@
-//
-// Created by itsmanjeet on 11/6/23.
-//
-
 #ifndef SRCLANG_COMPILER_HXX
 #define SRCLANG_COMPILER_HXX
 
+#include <iostream>
+#include <sstream>
 #include <string>
 #include <vector>
-#include <iostream>
 
-#include "Value.hxx"
-#include "SymbolTable.hxx"
-#include "MemoryManager.hxx"
-#include "Instructions.hxx"
 #include "ByteCode.hxx"
 #include "Function.hxx"
+#include "Instructions.hxx"
+#include "MemoryManager.hxx"
 #include "Options.hxx"
-#include <sstream>
-
+#include "SymbolTable.hxx"
+#include "Value.hxx"
 
 namespace srclang {
     using Iterator = std::string::const_iterator;
@@ -39,7 +34,7 @@ namespace srclang {
 
     static const std::vector<std::string> SRCLANG_TOKEN_ID = {
 #define X(id) #id,
-            SRCLANG_TOKEN_TYPE_LIST
+        SRCLANG_TOKEN_TYPE_LIST
 #undef X
     };
 
@@ -55,9 +50,8 @@ namespace srclang {
         }
     };
 
-
     class Compiler {
-    private:
+       private:
         Language *language{nullptr};
         SymbolTable *symbol_table{nullptr};
 
@@ -68,7 +62,7 @@ namespace srclang {
         std::stringstream error_stream;
 
         std::vector<std::string> loaded_imports;
-        std::vector<std::unique_ptr<Instructions >> instructions;
+        std::vector<std::unique_ptr<Instructions>> instructions;
         DebugInfo *debug_info;
         std::shared_ptr<DebugInfo> global_debug_info;
 
@@ -78,14 +72,15 @@ namespace srclang {
 
         std::unique_ptr<Instructions> pop_scope();
 
-        template<typename Message>
+        template <typename Message>
         void error(const Message &mesg, Iterator pos) {
             int line;
             Iterator line_start = get_error_pos(pos, line);
             error_stream << filename << ":" << line << '\n';
             if (pos != end) {
                 error_stream << "ERROR: " << mesg << '\n';
-                error_stream << " | " << get_error_line(line_start) << '\n' << "   ";
+                error_stream << " | " << get_error_line(line_start) << '\n'
+                             << "   ";
                 for (; line_start != pos; ++line_start) error_stream << ' ';
                 error_stream << '^';
             } else {
@@ -93,7 +88,6 @@ namespace srclang {
                 error_stream << mesg << " line " << line;
             }
         }
-
 
         Iterator get_error_pos(Iterator err_pos, int &line) const;
 
@@ -130,7 +124,7 @@ namespace srclang {
 
         Precedence precedence(std::string tok);
 
-        template<typename T, typename... Ts>
+        template <typename T, typename... Ts>
         int emit(T t, Ts... ts) {
             int line;
             get_error_pos(cur.pos, line);
@@ -148,7 +142,7 @@ namespace srclang {
         /// string ::= '"' ... '"'
         bool string_();
 
-        /// unary ::= ('+' | '-' | 'not') <expression> 
+        /// unary ::= ('+' | '-' | 'not') <expression>
         bool unary(OpCode op);
 
         /// block ::= '{' <stmt>* '}'
@@ -158,7 +152,6 @@ namespace srclang {
 
         /// fun '(' args ')' block
         bool function(Symbol *symbol, bool skip_args = false);
-
 
         /// list ::= '[' (<expression> % ',') ']'
         bool list();
@@ -221,7 +214,7 @@ namespace srclang {
 
         /// condition ::= 'if' <expression> <block> (else statement)?
         bool condition();
-        
+
         /// type ::= 'identifier'
         ValueType type(std::string literal);
 
@@ -240,8 +233,7 @@ namespace srclang {
         /// program ::= statement*
         bool program();
 
-    public:
-
+       public:
         Compiler(Iterator start, Iterator end, const std::string &filename, Language *language);
 
         bool compile();
@@ -255,10 +247,8 @@ namespace srclang {
             error_stream.clear();
             return s;
         }
-
     };
 
+}  // srclang
 
-} // srclang
-
-#endif //SRCLANG_COMPILER_HXX
+#endif  // SRCLANG_COMPILER_HXX

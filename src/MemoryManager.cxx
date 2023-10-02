@@ -53,9 +53,9 @@ void MemoryManager::sweep() {
         } else {
 #ifdef SRCLANG_GC_DEBUG
             std::cout << "   deallocating "
-                << uintptr_t(object->pointer) << "'"
-                << SRCLANG_VALUE_GET_STRING(*iter)
-                << "'" << std::endl;
+                      << uintptr_t(object->pointer) << "'"
+                      << SRCLANG_VALUE_GET_STRING(*iter)
+                      << "'" << std::endl;
 #endif
             SRCLANG_VALUE_FREE(*iter);
             iter = heap.erase(iter);
