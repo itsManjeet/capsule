@@ -602,6 +602,19 @@ bool Interpreter::call_typecast(Value callee, uint8_t count) {
     }
 }
 
+bool Interpreter::call_map(Value callee, uint8_t count) {
+    auto container = (SrcLangMap *)SRCLANG_VALUE_AS_OBJECT(callee)->pointer;
+    auto callback = container->find("__call__");
+    if (callback == container->end()) {
+        error("'__call__' is not defined in container");
+        return false;
+    }
+    auto bounded_value = SRCLANG_VALUE_BOUNDED((new BoundedValue{callee, callback->second}));
+    add_object(bounded_value);
+    *(sp - count - 1) = bounded_value;
+    return call_bounded(bounded_value, count);
+}
+
 bool Interpreter::call_bounded(Value callee, uint8_t count) {
     auto bounded = (BoundedValue *)SRCLANG_VALUE_AS_OBJECT(callee)->pointer;
     *(sp - count - 1) = bounded->value;
@@ -611,7 +624,7 @@ bool Interpreter::call_bounded(Value callee, uint8_t count) {
     *(sp - count) = bounded->parent;
     sp++;
     if (debug) {
-        std::cout << std::endl;
+        std::cout << "BOUNDED STACK" << std::endl;
         print_stack();
     }
 
@@ -630,6 +643,8 @@ bool Interpreter::call(uint8_t count) {
                 return call_builtin(callee, count);
             case ValueType::Bounded:
                 return call_bounded(callee, count);
+            case ValueType::Map:
+                return call_map(callee, count);
             default:
                 error("ERROR: can't call object '" +
                       SRCLANG_VALUE_DEBUG(callee) +
@@ -921,12 +936,25 @@ bool Interpreter::run() {
                         SRCLANG_VALUE_AS_OBJECT(container)->pointer);
                     auto buf = reinterpret_cast<char *>(
                         SRCLANG_VALUE_AS_OBJECT(pos)->pointer);
-                    auto idx = map.find(buf);
-                    if (idx == map.end()) {
-                        *sp++ = SRCLANG_VALUE_NULL;
+                    auto get_index_callback = map.find("__index__");
+                    if (get_index_callback == map.end()) {
+                        auto idx = map.find(buf);
+                        if (idx == map.end()) {
+                            *sp++ = SRCLANG_VALUE_NULL;
+                        } else {
+                            *sp++ = idx->second;
+                        }
                     } else {
-                        *sp++ = idx->second;
+                        auto bounded_value = SRCLANG_VALUE_BOUNDED((new BoundedValue{container, get_index_callback->second}));
+                        add_object(bounded_value);
+
+                        *sp++ = bounded_value;
+                        *sp++ = pos;
+                        if (!call_bounded(bounded_value, 1)) {
+                            return false;
+                        }
                     }
+
                 } else {
                     error("InvalidOperation b/w '" + SRCLANG_VALUE_DEBUG(pos) + "' and '" +
                           SRCLANG_VALUE_DEBUG(container) + "'");
@@ -993,11 +1021,25 @@ bool Interpreter::run() {
                         SRCLANG_VALUE_AS_OBJECT(container)->pointer);
                     auto buf = reinterpret_cast<char *>(
                         SRCLANG_VALUE_AS_OBJECT(pos)->pointer);
-                    if (map->find(buf) == map->end()) {
-                        map->insert({buf, val});
+                    auto set_index_callback = map->find("__set_index__");
+                    if (set_index_callback == map->end()) {
+                        if (map->find(buf) == map->end()) {
+                            map->insert({buf, val});
+                        } else {
+                            map->at(buf) = val;
+                        }
                     } else {
-                        map->at(buf) = val;
+                        auto bounded_value = SRCLANG_VALUE_BOUNDED((new BoundedValue{container, set_index_callback->second}));
+                        add_object(bounded_value);
+
+                        *sp++ = bounded_value;
+                        *sp++ = pos;
+                        *sp++ = val;
+                        if (!call_bounded(bounded_value, 2)) {
+                            return false;
+                        }
                     }
+
                 } else if (SRCLANG_VALUE_GET_TYPE(container) ==
                                ValueType::Pointer &&
                            SRCLANG_VALUE_GET_TYPE(pos) == ValueType::Number) {

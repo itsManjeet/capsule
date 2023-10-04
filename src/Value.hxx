@@ -113,6 +113,10 @@ namespace srclang {
     SRCLANG_VALUE_HEAP_OBJECT(     \
         ValueType::Closure, (void *)fun)
 
+#define SRCLANG_VALUE_BOUNDED(b) \
+    SRCLANG_VALUE_HEAP_OBJECT(   \
+        ValueType::Bounded, (void *)(b))
+
 #define SRCLANG_VALUE_POINTER(ptr) SRCLANG_VALUE_HEAP_OBJECT(ValueType::Pointer, ptr)
 
 #define SRCLANG_VALUE_SET_REF(val) srclang_value_set_ref(val)

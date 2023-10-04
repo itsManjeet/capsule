@@ -35,6 +35,10 @@ void srclang::SRCLANG_VALUE_FREE(Value value) {
                 delete reinterpret_cast<Closure *>(object->pointer);
                 break;
 
+            case ValueType::Bounded:
+                delete reinterpret_cast<BoundedValue *>(object->pointer);
+                break;
+
             case ValueType::Pointer:
                 object->cleanup(object->pointer);
                 break;

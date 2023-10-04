@@ -33,6 +33,8 @@ namespace srclang {
     X(setref)                \
     X(isref)                 \
     X(setsize)               \
+    X(setval)                \
+    X(getval)                \
     X(exit)
 
     struct Interpreter;

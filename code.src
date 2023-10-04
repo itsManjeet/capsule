@@ -1,0 +1,15 @@
+
+CC := {
+    code: "
+#include <stdio.h>
+printf (\"Hello World\");
+",
+
+    __set_index__: fun (self, pos, value) {
+        if pos == 
+    },
+
+    __index__: fun (self, pos) {
+        return tcc_get_symbol (self.state, pos);
+    }
+};

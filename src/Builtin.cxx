@@ -1,5 +1,9 @@
 #include "Builtin.hxx"
 
+#include <dlfcn.h>
+#include <ffi.h>
+#include <libtcc.h>
+
 #include "Interpreter.hxx"
 #include "Language.hxx"
 
@@ -351,6 +355,32 @@ SRCLANG_BUILTIN(free) {
     free(SRCLANG_VALUE_AS_OBJECT(args[0])->pointer);
     SRCLANG_VALUE_AS_OBJECT(args[0])->pointer = nullptr;
     return SRCLANG_VALUE_TRUE;
+}
+
+SRCLANG_BUILTIN(setval) {
+    SRCLANG_CHECK_ARGS_EXACT(3);
+    SRCLANG_CHECK_ARGS_TYPE(0, ValueType::Map);
+    SRCLANG_CHECK_ARGS_TYPE(1, ValueType::String);
+    auto m = (SrcLangMap *)SRCLANG_VALUE_AS_OBJECT(args[0])->pointer;
+    auto p = (const char *)SRCLANG_VALUE_AS_OBJECT(args[1])->pointer;
+
+    m->insert({p, args[2]});
+    return SRCLANG_VALUE_NULL;
+}
+
+SRCLANG_BUILTIN(getval) {
+    SRCLANG_CHECK_ARGS_EXACT(2);
+    SRCLANG_CHECK_ARGS_TYPE(0, ValueType::Map);
+    SRCLANG_CHECK_ARGS_TYPE(1, ValueType::String);
+    auto m = (SrcLangMap *)SRCLANG_VALUE_AS_OBJECT(args[0])->pointer;
+    auto p = (const char *)SRCLANG_VALUE_AS_OBJECT(args[1])->pointer;
+
+    auto iter = m->find(p);
+    if (iter == m->end()) {
+        return SRCLANG_VALUE_NULL;
+    } else {
+        return SRCLANG_VALUE_SET_REF(iter->second);
+    }
 }
 
 SRCLANG_BUILTIN(system) {
