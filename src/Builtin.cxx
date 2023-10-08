@@ -352,6 +352,11 @@ SRCLANG_BUILTIN(setsize) {
     return args[0];
 }
 
+SRCLANG_BUILTIN(bound) {
+    SRCLANG_CHECK_ARGS_EXACT(2);
+    return SRCLANG_VALUE_BOUND(args[0], args[1]);
+}
+
 SRCLANG_BUILTIN(exit) {
     SRCLANG_CHECK_ARGS_EXACT(1);
     SRCLANG_CHECK_ARGS_TYPE(0, ValueType::Number);

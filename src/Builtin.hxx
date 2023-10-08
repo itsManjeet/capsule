@@ -35,6 +35,7 @@ typedef Value (*Builtin)(std::vector<Value>&, Interpreter*);
     X(setsize)                            \
     X(setval)                             \
     X(getval)                             \
+    X(bound)                              \
     /*Platform Independent system calls*/ \
     X(open)                               \
     X(read)                               \
