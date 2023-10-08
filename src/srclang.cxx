@@ -1,5 +1,4 @@
-#include <readline/history.h>
-#include <readline/readline.h>
+
 
 #include <fstream>
 #include <utility>
@@ -17,6 +16,23 @@ const auto LOGO = R"(
      \/              \/          \/     \//_____/
 
 )";
+
+#ifdef _WIN32
+static std::string readline(const char* PS) {
+    std::cout << PS;
+    std::string line;
+    std::getline(std::cin, line, '\n');
+
+    return std::move(line);
+}
+
+static void add_history(const char* line) {
+
+}
+#else
+#include <readline/history.h>
+#include <readline/readline.h>
+#endif
 
 Language *__srclang_global_language;
 

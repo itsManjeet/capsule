@@ -1,5 +1,6 @@
 {
     "files.associations": {
+        "*.bst": "yaml",
         "array": "cpp",
         "atomic": "cpp",
         "bit": "cpp",
@@ -57,6 +58,7 @@
         "cinttypes": "cpp",
         "typeinfo": "cpp",
         "variant": "cpp",
-        "filesystem": "cpp"
+        "filesystem": "cpp",
+        "xtree": "cpp"
     }
 }

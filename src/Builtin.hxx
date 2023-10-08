@@ -5,52 +5,57 @@
 #include "Value.hxx"
 
 namespace srclang {
-    struct Interpreter;
-    struct Language;
+struct Interpreter;
+struct Language;
 
-    typedef Value (*Builtin)(std::vector<Value>&, Interpreter*);
+typedef Value (*Builtin)(std::vector<Value>&, Interpreter*);
 
 #define SRCLANG_BUILTIN(id)                            \
     Value builtin_##id(std::vector<Value> const& args, \
                        Interpreter* interpreter)
-#define SRCLANG_BUILTIN_LIST \
-    X(println)               \
-    X(print)                 \
-    X(gc)                    \
-    X(len)                   \
-    X(append)                \
-    X(range)                 \
-    X(clone)                 \
-    X(eval)                  \
-    X(pop)                   \
-    X(call)                  \
-    X(alloc)                 \
-    X(free)                  \
-    X(lower)                 \
-    X(upper)                 \
-    X(search)                \
-    X(system)                \
-    X(setref)                \
-    X(isref)                 \
-    X(setsize)               \
-    X(setval)                \
-    X(getval)                \
+#define SRCLANG_BUILTIN_LIST              \
+    X(println)                            \
+    X(print)                              \
+    X(gc)                                 \
+    X(len)                                \
+    X(append)                             \
+    X(range)                              \
+    X(clone)                              \
+    X(eval)                               \
+    X(pop)                                \
+    X(call)                               \
+    X(alloc)                              \
+    X(free)                               \
+    X(lower)                              \
+    X(upper)                              \
+    X(search)                             \
+    X(system)                             \
+    X(setref)                             \
+    X(isref)                              \
+    X(setsize)                            \
+    X(setval)                             \
+    X(getval)                             \
+    /*Platform Independent system calls*/ \
+    X(open)                               \
+    X(read)                               \
+    X(write)                              \
+    X(seek)                               \
     X(exit)
 
-    struct Interpreter;
+struct Interpreter;
 #define X(id) SRCLANG_BUILTIN(id);
 
-    SRCLANG_BUILTIN_LIST
+SRCLANG_BUILTIN_LIST
 
 #undef X
 
-    enum Builtins {
+enum Builtins {
 #define X(id) BUILTIN_##id,
-        SRCLANG_BUILTIN_LIST
+    SRCLANG_BUILTIN_LIST
 #undef X
-    };
+};
 
-    extern std::vector<Value> builtins;
+extern std::vector<Value> builtins;
 
 }  // namespace srclang
 

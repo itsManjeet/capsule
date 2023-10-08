@@ -105,6 +105,11 @@ namespace srclang {
     SRCLANG_VALUE_HEAP_OBJECT(    \
         ValueType::Builtin, (void *)srclang::builtin_##id)
 
+
+#define SRCLANG_VALUE_BUILTIN_NEW(v) \
+    SRCLANG_VALUE_HEAP_OBJECT(    \
+        ValueType::Builtin, (void *)(v))
+
 #define SRCLANG_VALUE_FUNCTION(fun) \
     SRCLANG_VALUE_HEAP_OBJECT(      \
         ValueType::Function, (void *)fun)
@@ -116,6 +121,9 @@ namespace srclang {
 #define SRCLANG_VALUE_BOUNDED(b) \
     SRCLANG_VALUE_HEAP_OBJECT(   \
         ValueType::Bounded, (void *)(b))
+
+#define SRCLANG_VALUE_BOUND(p, c) \
+    SRCLANG_VALUE_BOUNDED((new BoundedValue{(p), (c)}))
 
 #define SRCLANG_VALUE_POINTER(ptr) SRCLANG_VALUE_HEAP_OBJECT(ValueType::Pointer, ptr)
 

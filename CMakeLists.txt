@@ -7,6 +7,12 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(POSITION_INDEPENDENT_CODE ON)
 
+if (WIN32)
+set(READLINE "")
+else()
+find_library(READLINE readline REQUIRED)
+endif ()
+
 add_executable(${PROJECT_NAME} src/srclang.cxx
         src/Value.hxx src/Value.cxx
         src/utils.cxx src/Utilities.hxx
@@ -21,7 +27,7 @@ add_executable(${PROJECT_NAME} src/srclang.cxx
         src/Compiler.cxx src/Compiler.hxx
         src/Interpreter.cxx src/Interpreter.hxx
         src/Language.cxx src/Language.hxx)
-target_link_libraries(${PROJECT_NAME} readline)
+target_link_libraries(${PROJECT_NAME} ${READLINE})
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
 enable_testing()
 file(GLOB_RECURSE TestFiles "tests/*.src")

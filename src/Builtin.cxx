@@ -1,13 +1,27 @@
 #include "Builtin.hxx"
 
-#include <dlfcn.h>
-#include <ffi.h>
-#include <libtcc.h>
-
 #include "Interpreter.hxx"
 #include "Language.hxx"
 
 using namespace srclang;
+
+#ifdef _WIN32
+#define popen _popen
+#define pclose _pclose
+#define WEXITSTATUS(status) (((status)&0xFF00) >> 8)
+#endif
+
+#ifdef _WIN32
+#include <WinSock2.h>
+#pragma comment(lib, "ws2_32.lib")
+#else
+#include <arpa/inet.h>
+#include <sys/socket.h>
+#include <unistd.h>
+
+#include <cstdio>
+#include <cstring>
+#endif
 
 std::vector<Value> srclang::builtins = {
 #define X(id) SRCLANG_VALUE_BUILTIN(id),
@@ -350,10 +364,12 @@ SRCLANG_BUILTIN(exit) {
 SRCLANG_BUILTIN(free) {
     SRCLANG_CHECK_ARGS_EXACT(1);
     SRCLANG_CHECK_ARGS_TYPE(0, ValueType::Pointer);
-    SRCLANG_VALUE_SET_REF(args[0]);
-    SRCLANG_VALUE_SET_SIZE(args[0], 0);
-    free(SRCLANG_VALUE_AS_OBJECT(args[0])->pointer);
-    SRCLANG_VALUE_AS_OBJECT(args[0])->pointer = nullptr;
+    auto object = SRCLANG_VALUE_AS_OBJECT(args[0]);
+    if (object->cleanup == nullptr) {
+        object->cleanup = free;
+    }
+    object->cleanup(object->pointer);
+    object->pointer = nullptr;
     return SRCLANG_VALUE_TRUE;
 }
 
@@ -412,4 +428,104 @@ SRCLANG_BUILTIN(system) {
     }
     int status = pclose(pipe);
     return SRCLANG_VALUE_NUMBER(WEXITSTATUS(status));
+}
+
+SRCLANG_BUILTIN(open) {
+    SRCLANG_CHECK_ARGS_EXACT(2);
+    SRCLANG_CHECK_ARGS_TYPE(1, ValueType::String);
+
+    auto mode = (const char *)SRCLANG_VALUE_AS_OBJECT(args[1])->pointer;
+
+    FILE *file = nullptr;
+    switch (SRCLANG_VALUE_GET_TYPE(args[0])) {
+        case ValueType::Number:
+            file = fdopen((int)SRCLANG_VALUE_AS_NUMBER(args[0]), mode);
+            break;
+        case ValueType::String:
+            file = fopen((const char *)SRCLANG_VALUE_AS_OBJECT(args[0])->pointer, mode);
+            break;
+        case ValueType::Pointer:
+            file = (FILE *)SRCLANG_VALUE_AS_OBJECT(args[0])->pointer;
+            break;
+        default:
+            return SRCLANG_VALUE_SET_REF(SRCLANG_VALUE_ERROR(strerror(errno)));
+    }
+
+    if (file == nullptr) {
+        return SRCLANG_VALUE_SET_REF(SRCLANG_VALUE_ERROR(strerror(errno)));
+    }
+
+    return SRCLANG_VALUE_SET_CLEANUP(
+        SRCLANG_VALUE_POINTER(file), +[](void *ptr) {
+            if (ptr != nullptr) fclose((FILE *)ptr);
+        });
+}
+
+SRCLANG_BUILTIN(read) {
+    SRCLANG_CHECK_ARGS_RANGE(1, 2);
+    SRCLANG_CHECK_ARGS_TYPE(0, ValueType::Pointer);
+
+    auto file = (FILE *)SRCLANG_VALUE_AS_OBJECT(args[0])->pointer;
+    long size = BUFSIZ;
+
+    if (args.size() == 2) {
+        SRCLANG_CHECK_ARGS_TYPE(1, ValueType::Number);
+        size = (long)SRCLANG_VALUE_AS_NUMBER(args[1]);
+    }
+
+    void *buffer = malloc(size);
+    if (buffer == nullptr) {
+        return SRCLANG_VALUE_SET_REF(SRCLANG_VALUE_ERROR(strerror(errno)));
+    }
+
+    if (fread(buffer, sizeof(char), size, file) == -1) {
+        free(buffer);
+        return SRCLANG_VALUE_SET_REF(SRCLANG_VALUE_ERROR(strerror(errno)));
+    }
+
+    return SRCLANG_VALUE_SET_CLEANUP(SRCLANG_VALUE_SET_SIZE(SRCLANG_VALUE_POINTER(buffer), size), free);
+}
+
+SRCLANG_BUILTIN(write) {
+    SRCLANG_CHECK_ARGS_EXACT(2);
+
+    SRCLANG_CHECK_ARGS_TYPE(0, ValueType::Pointer);
+    auto file = (FILE *)SRCLANG_VALUE_AS_OBJECT(args[0])->pointer;
+
+    void *buffer = nullptr;
+    long size = 0;
+    switch (SRCLANG_VALUE_GET_TYPE(args[1])) {
+        case ValueType::String:
+            buffer = SRCLANG_VALUE_AS_OBJECT(args[1])->pointer;
+            size = strlen((const char *)buffer);
+            break;
+        case ValueType::Pointer:
+            buffer = SRCLANG_VALUE_AS_OBJECT(args[1])->pointer;
+            size = SRCLANG_VALUE_AS_OBJECT(args[1])->size;
+            break;
+        default:
+            SRCLANG_CHECK_ARGS_TYPE(1, ValueType::String);
+    }
+
+    if (fwrite(buffer, sizeof(char), size, file) == -1) {
+        return SRCLANG_VALUE_SET_REF(SRCLANG_VALUE_ERROR(strerror(errno)));
+    }
+
+    return SRCLANG_VALUE_TRUE;
+}
+
+SRCLANG_BUILTIN(seek) {
+    SRCLANG_CHECK_ARGS_RANGE(1, 3);
+    auto file = (FILE *)SRCLANG_VALUE_AS_OBJECT(args[0])->pointer;
+    int whence = SEEK_CUR;
+    long offset = 0;
+
+    if (args.size() >= 2) offset = SRCLANG_VALUE_AS_NUMBER(args[1]);
+    if (args.size() >= 3) whence = SRCLANG_VALUE_AS_NUMBER(args[2]);
+
+    if (fseek(file, offset, whence) == -1) {
+        return SRCLANG_VALUE_SET_REF(SRCLANG_VALUE_ERROR(strerror(errno)));
+    }
+
+    return SRCLANG_VALUE_NUMBER(ftell(file));
 }
