@@ -17,6 +17,7 @@ find_library(FFI ffi REQUIRED)
 
 include(ExternalProject)
 ExternalProject_Add(tinycc
+        GIT_REPOSITORY git://repo.or.cz/tinycc.git
         SOURCE_DIR ${PROJECT_SOURCE_DIR}/external/libtcc
         CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix=<INSTALL_DIR>
         BUILD_COMMAND ${MAKE_EXECUTABLE}
