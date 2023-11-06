@@ -1,12 +1,11 @@
 #include "ByteCode.hxx"
 
-#include "SymbolTable.hxx"
-#include "Utilities.hxx"
+#include "../Compiler/SymbolTable/SymbolTable.hxx"
 
 using namespace srclang;
 
 int ByteCode::debug(Instructions const &instructions,
-                    std::vector<Value> const &constants, int offset,
+                    std::vector <Value> const &constants, int offset,
                     std::ostream &os) {
     os << std::setfill('0') << std::setw(4) << offset << " ";
     auto op = static_cast<OpCode>(instructions[offset]);
@@ -20,37 +19,43 @@ int ByteCode::debug(Instructions const &instructions,
                    << SRCLANG_VALUE_DEBUG(constants[pos]) << "'";
             }
 
-        } break;
+        }
+            break;
         case OpCode::INDEX:
         case OpCode::PACK:
         case OpCode::MAP:
         case OpCode::SET_SELF: {
-            os << " " << (int)instructions[offset++];
-        } break;
+            os << " " << (int) instructions[offset++];
+        }
+            break;
         case OpCode::CONTINUE:
         case OpCode::BREAK:
         case OpCode::JNZ:
         case OpCode::JMP: {
             auto pos = instructions[offset++];
             os << " '" << pos << "'";
-        } break;
+        }
+            break;
         case OpCode::LOAD:
         case OpCode::STORE: {
             auto scope = instructions[offset++];
             auto pos = instructions[offset++];
             os << " " << pos << " '" << SRCLANG_SYMBOL_ID[scope] << "'";
-        } break;
+        }
+            break;
         case OpCode::CLOSURE: {
             auto constantIndex = instructions[offset++];
             auto nfree = instructions[offset++];
             os << constants[constantIndex] << " " << nfree;
-        } break;
+        }
+            break;
 
         case OpCode::CONST_INT:
         case OpCode::CALL: {
             auto count = instructions[offset++];
             os << " '" << count << "'";
-        } break;
+        }
+            break;
         default:
             offset += SRCLANG_OPCODE_SIZE[int(op)];
             break;

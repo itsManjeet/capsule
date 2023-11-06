@@ -1,14 +1,15 @@
 #ifndef SRCLANG_BUILTIN_HXX
 #define SRCLANG_BUILTIN_HXX
 
-#include "MemoryManager.hxx"
-#include "Value.hxx"
+#include "../MemoryManager/MemoryManager.hxx"
+#include "../../Value/Value.hxx"
+#include <libtcc.h>
 
 namespace srclang {
-struct Interpreter;
-struct Language;
+    struct Interpreter;
+    struct Language;
 
-typedef Value (*Builtin)(std::vector<Value>&, Interpreter*);
+    typedef Value (*Builtin)(std::vector <Value> &, Interpreter *);
 
 #define SRCLANG_BUILTIN(id)                            \
     Value builtin_##id(std::vector<Value> const& args, \
@@ -26,37 +27,30 @@ typedef Value (*Builtin)(std::vector<Value>&, Interpreter*);
     X(call)                               \
     X(alloc)                              \
     X(free)                               \
-    X(lower)                              \
-    X(upper)                              \
-    X(search)                             \
-    X(system)                             \
     X(setref)                             \
     X(isref)                              \
     X(setsize)                            \
     X(setval)                             \
     X(getval)                             \
     X(bound)                              \
-    /*Platform Independent system calls*/ \
-    X(open)                               \
-    X(read)                               \
-    X(write)                              \
-    X(seek)                               \
     X(exit)
 
-struct Interpreter;
+    struct Interpreter;
 #define X(id) SRCLANG_BUILTIN(id);
 
-SRCLANG_BUILTIN_LIST
-
-#undef X
-
-enum Builtins {
-#define X(id) BUILTIN_##id,
     SRCLANG_BUILTIN_LIST
-#undef X
-};
 
-extern std::vector<Value> builtins;
+#undef X
+
+    enum Builtins {
+#define X(id) BUILTIN_##id,
+        SRCLANG_BUILTIN_LIST
+#undef X
+    };
+
+    extern std::vector <Value> builtins;
+
+    void define_tcc_builtins(Language *language);
 
 }  // namespace srclang
 

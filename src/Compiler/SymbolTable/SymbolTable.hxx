@@ -3,7 +3,7 @@
 
 #include <optional>
 
-#include "Value.hxx"
+#include "../../Value/Value.hxx"
 
 namespace srclang {
 

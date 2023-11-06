@@ -11,31 +11,25 @@ if (WIN32)
 set(READLINE "")
 else()
 find_library(READLINE readline REQUIRED)
+
+find_library(DL dl REQUIRED)
+find_library(FFI ffi REQUIRED)
+
+include(ExternalProject)
+ExternalProject_Add(tinycc
+        SOURCE_DIR ${PROJECT_SOURCE_DIR}/external/libtcc
+        CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix=<INSTALL_DIR>
+        BUILD_COMMAND ${MAKE_EXECUTABLE}
+        INSTALL_COMMAND ${MAKE_EXECUTABLE} install)
+ExternalProject_Get_Property(tinycc INSTALL_DIR)
+include_directories(${INSTALL_DIR}/include)
+link_directories(${INSTALL_DIR}/lib)
+set(TCC libtcc.a)
 endif ()
 
-add_executable(${PROJECT_NAME} src/srclang.cxx
-        src/Value.hxx src/Value.cxx
-        src/utils.cxx src/Utilities.hxx
-        src/SymbolTable.cxx src/SymbolTable.hxx
-        src/DebugInfo.cxx src/DebugInfo.hxx
-        src/Instructions.cxx src/Instructions.hxx
-        src/ByteCode.cxx src/ByteCode.hxx
-        src/Function.cxx src/Function.hxx
-        src/MemoryManager.cxx src/MemoryManager.hxx
-        src/Builtin.cxx src/Builtin.hxx
-        src/Options.cxx src/Options.hxx
-        src/Compiler.cxx src/Compiler.hxx
-        src/Interpreter.cxx src/Interpreter.hxx
-        src/Language.cxx src/Language.hxx)
-target_link_libraries(${PROJECT_NAME} ${READLINE})
+add_subdirectory(src)
+
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
 enable_testing()
-file(GLOB_RECURSE TestFiles "tests/*.src")
-foreach(testFile ${TestFiles})
-    get_filename_component(testName ${testFile} NAME_WE)
-    add_test(NAME ${testName}
-        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
-        COMMAND tests/run_test.sh ${PROJECT_BINARY_DIR}/${PROJECT_NAME} tests/${testName}.src)
-endforeach()
-
+add_subdirectory(tests)
 endif ()

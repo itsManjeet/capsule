@@ -3,8 +3,8 @@
 
 #include <memory>
 
-#include "DebugInfo.hxx"
-#include "Instructions.hxx"
+#include "../ByteCode/DebugInfo.hxx"
+#include "../ByteCode/Instructions.hxx"
 #include "Value.hxx"
 
 namespace srclang {
@@ -19,16 +19,16 @@ namespace srclang {
     struct Function {
         FunctionType type{FunctionType::Function};
         std::string id;
-        std::unique_ptr<Instructions> instructions{nullptr};
+        std::unique_ptr <Instructions> instructions{nullptr};
         int nlocals{0};
         int nparams{0};
         bool is_variadic{false};
-        std::shared_ptr<DebugInfo> debug_info{nullptr};
+        std::shared_ptr <DebugInfo> debug_info{nullptr};
     };
 
     struct Closure {
         Function *fun;
-        std::vector<Value> free{0};
+        std::vector <Value> free{0};
     };
 
 }  // srclang

@@ -1,0 +1,366 @@
+string          := use("string");
+
+O_RDONLY        := 00000000;
+O_WRONLY        := 00000001;
+O_RDWR          := 00000002;
+O_CREAT         := 00000100;
+
+SEEK_SET        := 0;
+SEEK_CUR        := 1;
+SEEK_END        := 2;
+
+S_IFMT          := 00170000;
+S_IFSOCK        := 0140000;
+S_IFLNK         := 0120000;
+S_IFREG         := 0100000;
+S_IFBLK         := 0060000;
+S_IFDIR         := 0040000;
+S_IFCHR         := 0020000;
+S_IFIFO         := 0010000;
+S_ISUID         := 0004000;
+S_ISGID         := 0002000;
+S_ISVTX         := 0001000;
+
+S_ISLNK         := fun (m) { return (m & S_IFMT) == S_IFLNK; };
+S_ISREG         := fun (m) { return (m & S_IFMT) == S_IFREG; };
+S_ISDIR         := fun (m) { return (m & S_IFMT) == S_IFDIR; };
+S_ISCHR         := fun (m) { return (m & S_IFMT) == S_IFCHR; };
+S_ISBLK         := fun (m) { return (m & S_IFMT) == S_IFBLK; };
+S_ISFIFIO       := fun (m) { return (m & S_IFMT) == S_IFIFO; };
+S_ISSOCK        := fun (m) { return (m & S_IFMT) == S_IFSOCK; };
+
+EOF             := -1;
+
+AF_UNIX         := 1;
+
+AF_INET         := 2;
+AF_INET6        := 24;
+
+SOCK_STREAM     := 1;
+SOCK_DGRAM      := 2;
+SOCK_RAW        := 3;
+
+SO_REUSEADDR    := 4;
+SO_REUSEPORT    := 512;
+
+SOL_SOCKET      := 65535;
+
+IPPROTO_TCP     := 6;
+IPPROTO_UDP     := 17;
+
+DEFAULT_BUFFER_SIZE := 8192;
+
+Exit            := native exit (i32) i32;
+Open            := native open (ptr, i32, i32) i32;
+Close           := native close (i32) i32;
+Read            := native read (i32, ptr, u64) i64;
+Write           := native write (i32, ptr, u64) i64;
+Seek            := native lseek (i32, i64, i32) i64;
+Opendir         := native opendir (ptr) ptr;
+Closedir        := native closedir (ptr) i32;
+Chdir           := native chdir (ptr) i32;
+Sleep           := native sleep (i32) i32;
+
+_socket         := native socket (i32, i32, i32) i32;
+_accept         := native (i32, i32, ptr, i32) i32;
+_listen         := native listen (i32, i32) i32;
+_setsockoptint  := native (i32, i32, i32, i32) i32;
+
+_readdir        := native readdir (ptr) ptr;
+_error          := native error () ptr;
+_system         := native system (ptr) i32;
+
+_bind           := native (i32, ptr, i32, i32) i32;
+_connect        := native (i32, ptr, i32, i32) i32;
+_hostname_to_ip := native (ptr) val;
+
+_dirent_to_map  := native (ptr) val;
+
+
+Error  := fun () {
+    return error(str(_error()));
+};
+
+System := fun (cmd) {
+    status := _system(cmd);
+    return (status & 65280) >> 8;
+};
+
+Readdir := fun (p) {
+    d := _readdir(p);
+    if d == null {
+        return null;
+    }
+
+    return _dirent_to_map (d);
+};
+
+Listdir := fun (path) {
+    if dir := Opendir(path); dir == -1 {
+        return Error();
+    }
+    defer { Closedir(dir); };
+
+    res := [];
+    for true {
+        e := Readdir (dir);
+        if e == null {
+            break;
+        }
+        res = append(res, e.name);
+    }
+    return res;
+};
+
+ReadAll := fun (fd) {
+    curpos := Seek(fd, 0, SEEK_CUR);
+    end := Seek(fd, 0, SEEK_END);
+    buf := alloc(end - curpos);
+    Seek(fd, curpos, SEEK_SET);
+    println ("FD: ", fd);
+    if rd := Read (fd, buf, end - curpos); rd == -1 {
+        free(buf);
+        return Error();
+    }
+    Seek(fd, curpos, SEEK_SET);
+    return buf;
+};
+
+WriteAll := fun (fd, data...) {
+    data = str(data);
+    if s := Write(fd, data, len(data)); s == -1 {
+        return Error();
+    }
+    return true;
+};
+
+Socket := fun (socketType) {
+    self := {};
+    if type(socketType) == str {
+        self.socketType = string.Lower(socketType);
+        if self.socketType == "unix" {
+            self.domain     = AF_UNIX;
+            self.type       = SOCK_STREAM;
+            self.protocol   = 0;
+        } else if self.socketType == "tcp4" {
+            self.domain     = AF_INET;
+            self.type       = SOCK_STREAM;
+            self.protocol   = IPPROTO_TCP;
+        } else if self.socketType == "tcp6" {
+            self.domain     = AF_INET6;
+            self.type       = SOCK_STREAM;
+            self.protocol   = IPPROTO_TCP;
+        } else if self.socketType == "udp4" {
+            self.domain     = AF_INET;
+            self.type       = SOCK_DGRAM;
+            self.protocol   = IPPROTO_UDP;
+        } else if self.socketType == "udp6" {
+            self.domain     = AF_INET6;
+            self.type       = SOCK_DGRAM;
+            self.protocol   = IPPROTO_UDP;
+        } else {
+            return error ("invalid socket type ", socketType);
+        }
+
+        fd := _socket (self.domain, self.type, self.protocol);
+        if fd == -1 {
+            return Error();
+        }
+        self.fd = fd;
+
+        // if self.domain == AF_INET or self.domain == AF_INET6 {
+        //    if _setsockoptint (self.fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, 1) == -1 {
+        //        return Error();
+        //    }
+        // }
+
+    } else {
+        self.fd = socketType;
+    }
+
+    self.Close = fun () {
+        return Close (self.fd);
+    };
+
+    self.Accept = fun () {
+        nfd := _accept (self.fd, self.domain, self.addr, self.port);
+        if nfd == -1 {
+            return Error();
+        }
+        return Socket(nfd);
+    };
+
+    self.Bind = fun (addr, port...) {
+        if not (string.ToAscii(addr[0]) >= string.ToAscii('0') and string.ToAscii(addr[0]) <= string.ToAscii('9')) {
+            addr = _hostname_to_ip (addr);
+        }
+        if len (port) == 0 {
+            port = 80;
+        } else {
+            port = port[0];
+        }
+
+        self.addr = addr;
+        self.port = port;
+
+        if _bind (self.fd, addr, port, self.domain) == -1 {
+            return Error();
+        }
+        return true;
+    };
+
+    self.Connect = fun (addr, port...) {
+        if not (string.ToAscii(addr[0]) >= string.ToAscii('0') and string.ToAscii(addr[0]) <= string.ToAscii('9')) {
+            addr = _hostname_to_ip (addr);
+        }
+        if len (port) == 0 {
+            port = 80;
+        } else {
+            port = port[0];
+        }
+
+        self.addr = addr;
+        self.port = port;
+
+        if _connect (self.fd, addr, port, self.domain) == -1 {
+            return Error();
+        }
+        return true;
+    };
+
+    self.Listen = fun (backlog) {
+        if _listen (self.fd, backlog) == -1 {
+            return Error();
+        }
+        return true;
+    };
+
+    self.Read = fun (sz...) {
+        if len(sz) == 0 {
+            sz = DEFAULT_BUFFER_SIZE;
+        } else {
+            sz = sz[0];
+        }
+
+        buf := alloc (sz);
+        readSize := Read (self.fd, buf, sz);
+        if readSize == -1 {
+            free (buf);
+            return Error ();
+        }
+
+        return buf;
+    };
+
+    self.Write = fun (data, sz...) {
+        if len(sz) == 0 {
+            sz = len(data);
+        } else {
+            sz = sz[0];
+        }
+        return Write (self.fd, data, sz);
+    };
+
+    return self;
+};
+
+
+```
+#include <string.h>
+#include <errno.h>
+#include <dirent.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <netdb.h>
+
+const char* error() {
+    return strdup(strerror(errno));
+}
+
+Value _dirent_to_map (struct dirent *entry) {
+    Value map = srclang_map_new ();
+
+    srclang_map_set (map, "name", srclang_string_new (strdup(entry->d_name)));
+    srclang_map_set (map, "ino", srclang_number_new (entry->d_ino));
+    srclang_map_set (map, "off", srclang_number_new (entry->d_off));
+    srclang_map_set (map, "reclen", srclang_number_new (entry->d_reclen));
+    srclang_map_set (map, "type", srclang_number_new (entry->d_type));
+
+    return map;
+}
+
+int _setsockoptint (int fd, int level, int option_name, int value) {
+    return setsockopt (fd, level, option_name, &value, sizeof(value));
+}
+
+Value _getsockname (int fd) {
+    struct sockaddr_in addr;
+    socklen_t len = sizeof(addr);
+
+    if (getsockname (fd, (struct sockaddr*) &addr, &len) == -1) {
+        return srclang_number_new (-1);
+    }
+
+    Value map = srclang_map_new ();
+    srclang_map_set (map, "addr", srclang_string_new (strdup (inet_ntoa (addr.sin_addr))));
+    srclang_map_set (map, "port", srclang_number_new ((unsigned) ntohs (addr.sin_port)));
+
+    return map;
+}
+
+int _bind (int fd, const char* hostname, int port, int type) {
+    struct sockaddr_in addr;
+    memset(&addr, 0, sizeof(addr));
+
+    addr.sin_family = type;
+    addr.sin_port = htons (port);
+    inet_aton (hostname, &addr.sin_addr);
+
+    int len = sizeof (addr);
+    return bind (fd, (struct sockaddr *)&addr, len);
+}
+
+int _connect (int fd, const char* hostname, int port, int type) {
+    struct sockaddr_in addr;
+    memset(&addr, 0, sizeof(addr));
+
+    addr.sin_family = type;
+    addr.sin_port = htons (port);
+    inet_aton (hostname, &addr.sin_addr);
+
+    int len = sizeof (addr);
+    return connect (fd, (struct sockaddr *)&addr, len);
+}
+
+int _accept (int fd, int domain, const char *hostname, int port) {
+    struct sockaddr_in addr;
+    memset(&addr, 0, sizeof(addr));
+    addr.sin_family = domain;
+    addr.sin_port = htons (port);
+    inet_aton (hostname, &addr.sin_addr);
+
+    int len = sizeof(addr);
+    return accept (fd, (struct sockaddr *)&addr, (socklen_t*)&len);
+}
+
+Value _hostname_to_ip (const char* hostname) {
+    struct hostent *he;
+    struct in_addr **addr_list;
+    char ip[100];
+
+    int i;
+
+    if ((he = gethostbyname (hostname)) == NULL) {
+        return srclang_error_new (strerror(errno));
+    }
+
+    addr_list = (struct in_addr **) he->h_addr_list;
+    for (i = 0; addr_list[i] != NULL; i++) {
+        strcpy (ip, inet_ntoa (*addr_list[i]));
+        return srclang_string_new (ip);
+    }
+
+    return srclang_error_new ("failed to resolve hostname");
+}
+
+```

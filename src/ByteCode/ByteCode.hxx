@@ -5,7 +5,7 @@
 #include <memory>
 
 #include "Instructions.hxx"
-#include "Value.hxx"
+#include "../Value/Value.hxx"
 
 namespace srclang {
 

@@ -3,23 +3,21 @@
 #include <fstream>
 #include <utility>
 
-#include "Builtin.hxx"
-
 using namespace srclang;
 
 Language::Language()
-    : globals(65536),
-      options({
-          {"VERSION", SRCLANG_VERSION},
-          {"GC_HEAP_GROW_FACTOR", 1.3f},
-          {"GC_INITIAL_TRIGGER", 10},
-          {"SEARCH_PATH", ""},
-          {"IR", false},
-          {"EXPERIMENTAL_FEATURES", false},
-          {"DEBUG", false},
-          {"BREAK", false},
-      }) {
-    for (auto b : builtins) {
+        : globals(65536),
+          options({
+                          {"VERSION", SRCLANG_VERSION},
+                          {"GC_HEAP_GROW_FACTOR",   1.3f},
+                          {"GC_INITIAL_TRIGGER",    10},
+                          {"SEARCH_PATH",           ""},
+                          {"IR",                    false},
+                          {"EXPERIMENTAL_FEATURES", false},
+                          {"DEBUG",                 false},
+                          {"BREAK",                 false},
+                  }) {
+    for (auto b: builtins) {
         memoryManager.heap.push_back(b);
     }
     {
@@ -34,9 +32,15 @@ Language::Language()
     define("true", SRCLANG_VALUE_TRUE);
     define("false", SRCLANG_VALUE_FALSE);
     define("null", SRCLANG_VALUE_NULL);
+
+    state = tcc_new();
+    tcc_set_output_type(state, TCC_OUTPUT_MEMORY);
+
+    define_tcc_builtins(this);
 }
 
 Language::~Language() {
+    tcc_delete(state);
 }
 
 void Language::define(const std::string &id, Value value) {
@@ -58,14 +62,44 @@ size_t Language::add_constant(Value value) {
     return constants.size() - 1;
 }
 
-std::tuple<Value, ByteCode, std::shared_ptr<DebugInfo>> Language::compile(std::string const &input, std::string const &filename) {
-    std::tuple<Value, ByteCode, std::shared_ptr<DebugInfo>> ret;
+std::tuple <Value, ByteCode, std::shared_ptr<DebugInfo>>
+Language::compile(std::string const &input, std::string const &filename) {
+    std::tuple <Value, ByteCode, std::shared_ptr<DebugInfo>> ret;
 
     auto compiler = Compiler(input.begin(), input.end(), filename, this);
     if (!compiler.compile()) {
         std::get<0>(ret) = register_object(SRCLANG_VALUE_ERROR(strdup(compiler.get_error().c_str())));
         return ret;
     }
+
+    auto c_code = cc_code + "\n" + compiler.cc_code();
+
+    tcc_set_error_func(state, (void *) &c_code, +[](void *ptr, const char *message) -> void {
+        auto c_code = (std::string *) ptr;
+        std::stringstream ss(*c_code);
+
+        char file[100], type[50], mesg[1024];
+        int position;
+        sscanf(message, "%49[^:]:%d: %49[^:]: %99[^\n]", file, &position, type, mesg);
+        int line_out = 1;
+        for (std::string line; std::getline(ss, line, '\n');) {
+            if (abs(position - line_out) <= 3) {
+                std::cerr << line_out << " " << line << std::endl;
+            }
+            line_out++;
+        }
+        std::cerr << file << ":" << position << ": " << type << " " << mesg << std::endl;
+    });
+    if (tcc_compile_string(state, c_code.c_str()) == -1) {
+        std::get<0>(ret) = SRCLANG_VALUE_ERROR(strdup("TCC compilation failed"));
+        return ret;
+    }
+
+    if (tcc_relocate(state, TCC_RELOCATE_AUTO) == -1) {
+        std::get<0>(ret) = SRCLANG_VALUE_ERROR(strdup("TCC relocation failed"));
+        return ret;
+    }
+
 
     std::get<0>(ret) = SRCLANG_VALUE_TRUE;
     std::get<1>(ret) = std::move(compiler.code());
@@ -86,7 +120,7 @@ Value Language::execute(const std::string &input, const std::string &filename) {
     return execute(code, debug_info);
 }
 
-Value Language::execute(ByteCode &code, const std::shared_ptr<DebugInfo> &debugInfo) {
+Value Language::execute(ByteCode &code, const std::shared_ptr <DebugInfo> &debugInfo) {
     auto interpreter = Interpreter(code, debugInfo, this);
     if (!interpreter.run()) {
         return register_object(SRCLANG_VALUE_ERROR(strdup(interpreter.get_error().c_str())));
@@ -101,8 +135,8 @@ Value Language::execute(const std::filesystem::path &filename) {
     std::ifstream reader(filename);
 
     std::string input(
-        (std::istreambuf_iterator<char>(reader)),
-        (std::istreambuf_iterator<char>()));
+            (std::istreambuf_iterator<char>(reader)),
+            (std::istreambuf_iterator<char>()));
     return execute(input, filename.string());
 }
 
@@ -123,7 +157,7 @@ Value Language::resolve(const std::string &id) {
     }
 }
 
-Value Language::call(Value callee, const std::vector<Value> &args) {
+Value Language::call(Value callee, const std::vector <Value> &args) {
     ByteCode code;
     code.instructions = std::make_unique<Instructions>();
     code.constants = this->constants;
@@ -132,7 +166,7 @@ Value Language::call(Value callee, const std::vector<Value> &args) {
     code.instructions->push_back(static_cast<const unsigned int>(OpCode::CONST));
     code.instructions->push_back(code.constants.size() - 1);
 
-    for (auto arg : args) {
+    for (auto arg: args) {
         code.constants.push_back(arg);
         code.instructions->push_back(static_cast<const unsigned int>(OpCode::CONST));
         code.instructions->push_back(code.constants.size() - 1);

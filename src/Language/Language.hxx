@@ -4,11 +4,13 @@
 #include <filesystem>
 #include <tuple>
 
-#include "Compiler.hxx"
-#include "Interpreter.hxx"
+#include "../Compiler/Compiler.hxx"
+#include "../Interpreter/Interpreter.hxx"
 #include "Options.hxx"
-#include "SymbolTable.hxx"
-#include "Value.hxx"
+#include "../Compiler/SymbolTable/SymbolTable.hxx"
+#include "../Value/Value.hxx"
+
+#include <libtcc.h>
 
 namespace srclang {
 
@@ -17,8 +19,13 @@ namespace srclang {
         Options options;
         SymbolTable symbolTable;
 
+        TCCState *state{nullptr};
+        std::string cc_code;
+
         SrcLangList globals;
         SrcLangList constants;
+
+        std::vector <std::string> loaded_modules;
 
         Language();
 
@@ -32,16 +39,16 @@ namespace srclang {
 
         Value resolve(std::string const &id);
 
-        std::tuple<Value, ByteCode, std::shared_ptr<DebugInfo>>
+        std::tuple <Value, ByteCode, std::shared_ptr<DebugInfo>>
         compile(std::string const &input, std::string const &filename);
 
         Value execute(std::string const &input, std::string const &filename);
 
-        Value execute(ByteCode &code, const std::shared_ptr<DebugInfo> &debugInfo);
+        Value execute(ByteCode &code, const std::shared_ptr <DebugInfo> &debugInfo);
 
         Value execute(const std::filesystem::path &filename);
 
-        Value call(Value callee, std::vector<Value> const &args);
+        Value call(Value callee, std::vector <Value> const &args);
 
         void appendSearchPath(std::string const &path);
     };

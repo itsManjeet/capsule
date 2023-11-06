@@ -5,10 +5,14 @@
 #include <fstream>
 #include <ranges>
 
-#include "Language.hxx"
-#include "Utilities.hxx"
+#include "../Language/Language.hxx"
 
 using namespace srclang;
+
+template<class V>
+std::type_info const &variant_typeid(V const &v) {
+    return visit([](auto &&x) -> decltype(auto) { return typeid(x); }, v);
+}
 
 ByteCode Compiler::code() {
     return ByteCode{std::move(instructions.back()), language->constants};
@@ -21,7 +25,7 @@ void Compiler::push_scope() {
     instructions.push_back(std::make_unique<Instructions>());
 }
 
-std::unique_ptr<Instructions> Compiler::pop_scope() {
+std::unique_ptr <Instructions> Compiler::pop_scope() {
     auto old = symbol_table;
     symbol_table = symbol_table->parent;
     delete old;
@@ -187,15 +191,15 @@ bool Compiler::eat() {
         return true;
     }
 
-    for (std::string k : {"let", "fun", "return", "if", "else", "for",
-                          "break", "continue", "use", "global", "as",
-                          "in", "defer",
+    for (std::string k: {"let", "fun", "return", "if", "else", "for",
+                         "break", "continue", "use", "global", "as",
+                         "in", "defer", "native",
 
-                          // specical operators
-                          "#!", "not", "...", ":=",
+            // special operators
+                         "#!", "not", "...", ":=",
 
-                          // multi char operators
-                          "==", "!=", "<=", ">=", ">>", "<<"}) {
+            // multi char operators
+                         "==", "!=", "<=", ">=", ">>", "<<"}) {
         auto dist = distance(k.begin(), k.end());
         if (dist < distance(iter, end) && equal(iter, iter + dist, k.begin(), k.end()) &&
             !isalnum(*(iter + dist))) {
@@ -204,6 +208,18 @@ bool Compiler::eat() {
             peek.type = TokenType::Reserved;
             return true;
         }
+    }
+
+    /// cc_code ::= "```" (.*?) "````"
+    std::string const ccCodePrefix = "```";
+    auto ccCodePrefixDist = std::distance(ccCodePrefix.begin(), ccCodePrefix.end());
+    if (std::equal(iter, iter + ccCodePrefixDist, ccCodePrefix.begin(), ccCodePrefix.end())) {
+        iter += ccCodePrefixDist;
+        do {
+            _cc_code += *(iter++);
+        } while (!std::equal(iter, iter + ccCodePrefixDist, ccCodePrefix.begin(), ccCodePrefix.end()));
+        iter += ccCodePrefixDist;
+        return eat();
     }
 
     if (isalpha(*iter) || *iter == '_') {
@@ -227,7 +243,7 @@ bool Compiler::eat() {
         } while (isdigit(*iter) || *iter == '.' || *iter == '_');
         if (*iter == 'b' ||
             *iter ==
-                'h') {  // include 'b' for binary and 'h' for hexadecimal
+            'h') {  // include 'b' for binary and 'h' for hexadecimal
             iter++;
         }
         peek.literal = std::string_view(peek.pos, iter);
@@ -239,31 +255,31 @@ bool Compiler::eat() {
 }
 
 Compiler::Precedence Compiler::precedence(std::string tok) {
-    static std::map<std::string, Precedence> prec = {
-        {":=", P_Assignment},
-        {"=", P_Assignment},
-        {"or", P_Or},
-        {"and", P_And},
-        {"&", P_Land},
-        {"|", P_Lor},
-        {"==", P_Equality},
-        {"!=", P_Equality},
-        {">", P_Comparison},
-        {"<", P_Comparison},
-        {">=", P_Comparison},
-        {"<=", P_Comparison},
-        {">>", P_Shift},
-        {"<<", P_Shift},
-        {"+", P_Term},
-        {"-", P_Term},
-        {"*", P_Factor},
-        {"/", P_Factor},
-        {"%", P_Factor},
-        {"not", P_Unary},
-        {"-", P_Unary},
-        {".", P_Call},
-        {"[", P_Call},
-        {"(", P_Call},
+    static std::map <std::string, Precedence> prec = {
+            {":=",  P_Assignment},
+            {"=",   P_Assignment},
+            {"or",  P_Or},
+            {"and", P_And},
+            {"&",   P_Land},
+            {"|",   P_Lor},
+            {"==",  P_Equality},
+            {"!=",  P_Equality},
+            {">",   P_Comparison},
+            {"<",   P_Comparison},
+            {">=",  P_Comparison},
+            {"<=",  P_Comparison},
+            {">>",  P_Shift},
+            {"<<",  P_Shift},
+            {"+",   P_Term},
+            {"-",   P_Term},
+            {"*",   P_Factor},
+            {"/",   P_Factor},
+            {"%",   P_Factor},
+            {"not", P_Unary},
+            {"-",   P_Unary},
+            {".",   P_Call},
+            {"[",   P_Call},
+            {"(",   P_Call},
     };
     auto i = prec.find(tok);
     if (i == prec.end()) {
@@ -280,7 +296,7 @@ bool Compiler::number() {
         base = 8;
         cur.literal = cur.literal.substr(1);
     }
-    for (auto i : cur.literal) {
+    for (auto i: cur.literal) {
         if (i == '.') {
             if (is_float) {
                 error("multiple floating point detected", cur.pos);
@@ -294,13 +310,15 @@ bool Compiler::number() {
             base = 2;
         } else if (i == 'h') {
             base = 16;
+        } else if (i == 'o') {
+            base = 8;
         } else {
             number_value += i;
         }
     }
     Value val;
     try {
-        val = SRCLANG_VALUE_NUMBER(stod(number_value));
+        val = SRCLANG_VALUE_NUMBER(is_float ? stod(number_value) : std::stol(number_value, nullptr, base));
     } catch (std::invalid_argument const &e) {
         error("Invalid numerical value " + std::string(e.what()), cur.pos);
         return false;
@@ -429,7 +447,7 @@ bool Compiler::function(Symbol *symbol, bool skip_args) {
         fun_instructions->emit(fun_debug_info.get(), line, OpCode::RET);
     }
 
-    for (auto const &i : free_symbols) {
+    for (auto const &i: free_symbols) {
         emit(OpCode::LOAD, i.scope, i.index);
     }
 
@@ -442,9 +460,9 @@ bool Compiler::function(Symbol *symbol, bool skip_args) {
     }
 
     auto fun = new Function{
-        FunctionType::Function, id, std::move(fun_instructions), nlocals, nparam,
-        is_variadic,
-        fun_debug_info};
+            FunctionType::Function, id, std::move(fun_instructions), nlocals, nparam,
+            is_variadic,
+            fun_debug_info};
     auto fun_value = SRCLANG_VALUE_FUNCTION(fun);
     language->memoryManager.heap.push_back(fun_value);
     language->constants.push_back(fun_value);
@@ -514,8 +532,8 @@ bool Compiler::prefix(bool can_assign) {
     }
 
     error(
-        "Unknown expression type '" + SRCLANG_TOKEN_ID[int(cur.type)] + "'",
-        cur.pos);
+            "Unknown expression type '" + SRCLANG_TOKEN_ID[int(cur.type)] + "'",
+            cur.pos);
     return false;
 }
 
@@ -617,24 +635,24 @@ bool Compiler::subscript(bool can_assign) {
 }
 
 bool Compiler::infix(bool can_assign) {
-    static std::map<std::string, OpCode> binop = {
-        {"+", OpCode::ADD},
-        {"-", OpCode::SUB},
-        {"/", OpCode::DIV},
-        {"*", OpCode::MUL},
-        {"==", OpCode::EQ},
-        {"!=", OpCode::NE},
-        {"<", OpCode::LT},
-        {">", OpCode::GT},
-        {">=", OpCode::GE},
-        {"<=", OpCode::LE},
-        {"and", OpCode::AND},
-        {"or", OpCode::OR},
-        {"|", OpCode::LOR},
-        {"&", OpCode::LAND},
-        {">>", OpCode::LSHIFT},
-        {"<<", OpCode::RSHIFT},
-        {"%", OpCode::MOD},
+    static std::map <std::string, OpCode> binop = {
+            {"+",   OpCode::ADD},
+            {"-",   OpCode::SUB},
+            {"/",   OpCode::DIV},
+            {"*",   OpCode::MUL},
+            {"==",  OpCode::EQ},
+            {"!=",  OpCode::NE},
+            {"<",   OpCode::LT},
+            {">",   OpCode::GT},
+            {">=",  OpCode::GE},
+            {"<=",  OpCode::LE},
+            {"and", OpCode::AND},
+            {"or",  OpCode::OR},
+            {"|",   OpCode::LOR},
+            {"&",   OpCode::LAND},
+            {">>",  OpCode::LSHIFT},
+            {"<<",  OpCode::RSHIFT},
+            {"%",   OpCode::MOD},
     };
 
     if (consume("(")) {
@@ -719,7 +737,8 @@ bool Compiler::compiler_options() {
                     CHECK_TYPE_ID(int);
                     value = stoi(cur.literal);
                 }
-            } break;
+            }
+                break;
             default:
                 CHECK_TYPE_ID(void);
         }
@@ -734,16 +753,16 @@ bool Compiler::compiler_options() {
     if (option_id == "VERSION") {
         if (SRCLANG_VERSION > get<float>(value)) {
             error(
-                "Code need srclang of version above or equal to "
-                "'" +
+                    "Code need srclang of version above or equal to "
+                    "'" +
                     std::to_string(SRCLANG_VERSION) + "'",
-                pos);
+                    pos);
             return false;
         }
     } else if (option_id == "SEARCH_PATH") {
         language->options[option_id] =
-            std::filesystem::absolute(get<std::string>(value)).string() + ":" +
-            get<std::string>(language->options[option_id]);
+                std::filesystem::absolute(get<std::string>(value)).string() + ":" +
+                get<std::string>(language->options[option_id]);
     } else {
         language->options[option_id] = value;
     }
@@ -804,7 +823,8 @@ void Compiler::patch_loop(int loop_start, OpCode to_patch, int pos) {
             case OpCode::BREAK: {
                 if (j == to_patch && inst()->at(i) == 0)
                     inst()->at(i++) = pos;
-            } break;
+            }
+                break;
 
             default:
                 i += SRCLANG_OPCODE_SIZE[int(j)];
@@ -816,7 +836,7 @@ void Compiler::patch_loop(int loop_start, OpCode to_patch, int pos) {
 /// loop ::= 'for' <expression> <block>
 /// loop ::= 'for' <identifier> 'in' <expression> <block>
 bool Compiler::loop() {
-    std::optional<Symbol> count, iter, temp_expr;
+    std::optional <Symbol> count, iter, temp_expr;
     static int loop_iterator = 0;
     static int temp_expr_count = 0;
     if (cur.type == TokenType::Identifier &&
@@ -924,13 +944,18 @@ bool Compiler::use() {
         error("failed to import '" + search_path + "'\n" + compiler.get_error(), cur.pos);
         return false;
     }
+    if (std::find(language->loaded_modules.begin(), language->loaded_modules.end(), search_path) ==
+        language->loaded_modules.end()) {
+        language->loaded_modules.push_back(search_path);
+        _cc_code += "\n" + compiler._cc_code;
+    }
 
     auto instructions = std::move(compiler.code().instructions);
     instructions->pop_back();  // pop OpCode::HLT
 
     int total = 0;
     // export symbols
-    for (auto i : symbol_table->store) {
+    for (auto i: symbol_table->store) {
         if (i.second.scope == Symbol::Scope::LOCAL &&
             isupper(i.first[0])) {
             language->constants.push_back(SRCLANG_VALUE_STRING(strdup(i.first.c_str())));
@@ -948,13 +973,13 @@ bool Compiler::use() {
     instructions->emit(compiler.global_debug_info.get(), 0,
                        OpCode::RET);
 
-    for (auto const &i : nfree) {
+    for (auto const &i: nfree) {
         emit(OpCode::LOAD, i.scope, i.index);
     }
 
     auto fun = new Function{
-        FunctionType::Function, "", std::move(instructions), nlocals, 0, false,
-        compiler.global_debug_info};
+            FunctionType::Function, "", std::move(instructions), nlocals, 0, false,
+            compiler.global_debug_info};
     auto val = SRCLANG_VALUE_FUNCTION(fun);
     language->memoryManager.heap.push_back(val);
     language->constants.push_back(val);
@@ -1006,7 +1031,7 @@ ValueType Compiler::type(std::string literal) {
         throw std::runtime_error("Invalid type '" + type + "'");
     }
     return SRCLANG_VALUE_AS_TYPE(
-        SRCLANG_VALUE_TYPES[distance(SRCLANG_VALUE_TYPE_ID.begin(), iter)]);
+            SRCLANG_VALUE_TYPES[distance(SRCLANG_VALUE_TYPE_ID.begin(), iter)]);
 };
 
 bool Compiler::statement() {
@@ -1039,6 +1064,50 @@ bool Compiler::statement() {
     return expect(";");
 }
 
+/// native ::= 'native' <identifier> ( (<type> % ',') ) <type>
+bool Compiler::native(Symbol *symbol) {
+    auto id = symbol->name;
+
+    if (cur.type == TokenType::Identifier) {
+        id = cur.literal;
+        if (!eat()) return false;
+    }
+    std::vector <CType> types;
+    CType ret_type;
+
+    if (!expect("(")) return false;
+
+    while (!consume(")")) {
+        if (!check(TokenType::Identifier)) return false;
+        try {
+            types.push_back(get_ctype(cur.literal.c_str()));
+        } catch (std::runtime_error const &e) {
+            error(e.what(), cur.pos);
+            return false;
+        }
+        if (!eat()) return false;
+
+        if (consume(")")) break;
+        if (!expect(",")) return false;
+    }
+    if (!check(TokenType::Identifier)) return false;
+    try {
+        ret_type = get_ctype(cur.literal.c_str());
+        if (!eat()) return false;
+    } catch (std::runtime_error const &e) {
+        error(e.what(), cur.pos);
+        return false;
+    }
+
+    auto native = new NativeFunction{id, types, ret_type};
+    Value val = SRCLANG_VALUE_NATIVE(native);
+    language->memoryManager.heap.push_back(val);
+    language->constants.push_back(val);
+    emit(OpCode::CONST, language->constants.size() - 1);
+    emit(OpCode::STORE, symbol->scope, symbol->index);
+    return true;
+}
+
 bool Compiler::program() {
     while (cur.type != TokenType::Eof) {
         if (!statement()) {
@@ -1049,15 +1118,15 @@ bool Compiler::program() {
 }
 
 Compiler::Compiler(Iterator
-                       start,
+                   start,
                    Iterator
-                       end,
+                   end,
                    const std::string &filename, Language *language)
-    : iter{start},
-      start{start},
-      end{end},
-      language{language},
-      filename{filename} {
+        : iter{start},
+          start{start},
+          end{end},
+          language{language},
+          filename{filename} {
     global_debug_info = std::make_shared<DebugInfo>();
     global_debug_info->filename = filename;
     global_debug_info->position = 0;
@@ -1081,6 +1150,8 @@ bool Compiler::compile() {
 bool Compiler::value(Symbol *symbol) {
     if (consume("fun")) {
         return function(symbol);
+    } else if (symbol != nullptr && consume("native")) {
+        return native(symbol);
     }
     return expression();
 }

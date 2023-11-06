@@ -1,0 +1,65 @@
+New := fun (sz, fill) {
+    if buf := alloc(sz); type(buf) == error {
+        return buf;
+    }
+    for i in range(sz) {
+        buf[i] = fill;
+    }
+    buf[sz] = 0;
+    return str(buf);
+};
+
+_to_ascii := native (ptr) i8;
+_to_str   := native (i8) ptr;
+
+Lower := fun (s) {
+    c := clone(s);
+    _to_lower := native (ptr) i32;
+    _to_lower(c);
+
+    return c;
+};
+
+Upper := fun (s) {
+    c := clone(s);
+    _to_upper := native (ptr) i32;
+    _to_upper(c);
+    return c;
+};
+
+ToAscii := fun (s) {
+    if len (s) == 1 {
+        return _to_ascii (s[0]);
+    }
+
+    l := [];
+    for i in range (s) {
+        l = append (l, _to_ascii(i));
+    }
+    return l;
+};
+
+
+```
+#include <stdio.h>
+#include <string.h>
+#include <ctype.h>
+
+char _to_ascii (const char* v) {
+    return v[0];
+}
+
+char* _to_str (char val) {
+    char buf[2] = { val, '\0' };
+    return strdup (buf);
+}
+
+void _to_lower(char* p) {
+for ( ; *p; ++p) *p = tolower(*p);
+}
+
+void _to_upper(char* p) {
+for ( ; *p; ++p) *p = toupper(*p);
+}
+
+```

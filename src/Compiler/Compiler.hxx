@@ -6,13 +6,13 @@
 #include <string>
 #include <vector>
 
-#include "ByteCode.hxx"
-#include "Function.hxx"
-#include "Instructions.hxx"
-#include "MemoryManager.hxx"
-#include "Options.hxx"
-#include "SymbolTable.hxx"
-#include "Value.hxx"
+#include "../ByteCode/ByteCode.hxx"
+#include "../Value/Function.hxx"
+#include "../ByteCode/Instructions.hxx"
+#include "../Interpreter/MemoryManager/MemoryManager.hxx"
+#include "../Language/Options.hxx"
+#include "SymbolTable/SymbolTable.hxx"
+#include "../Value/Value.hxx"
 
 namespace srclang {
     using Iterator = std::string::const_iterator;
@@ -32,9 +32,9 @@ namespace srclang {
 #undef X
     };
 
-    static const std::vector<std::string> SRCLANG_TOKEN_ID = {
+    static const std::vector <std::string> SRCLANG_TOKEN_ID = {
 #define X(id) #id,
-        SRCLANG_TOKEN_TYPE_LIST
+            SRCLANG_TOKEN_TYPE_LIST
 #undef X
     };
 
@@ -51,28 +51,29 @@ namespace srclang {
     };
 
     class Compiler {
-       private:
+    private:
         Language *language{nullptr};
         SymbolTable *symbol_table{nullptr};
 
         Token cur, peek;
         Iterator iter, start, end;
         std::string filename;
+        std::string _cc_code;
 
         std::stringstream error_stream;
 
-        std::vector<std::string> loaded_imports;
-        std::vector<std::unique_ptr<Instructions>> instructions;
+        std::vector <std::string> loaded_imports;
+        std::vector <std::unique_ptr<Instructions>> instructions;
         DebugInfo *debug_info;
-        std::shared_ptr<DebugInfo> global_debug_info;
+        std::shared_ptr <DebugInfo> global_debug_info;
 
         Instructions *inst();
 
         void push_scope();
 
-        std::unique_ptr<Instructions> pop_scope();
+        std::unique_ptr <Instructions> pop_scope();
 
-        template <typename Message>
+        template<typename Message>
         void error(const Message &mesg, Iterator pos) {
             int line;
             Iterator line_start = get_error_pos(pos, line);
@@ -124,7 +125,7 @@ namespace srclang {
 
         Precedence precedence(std::string tok);
 
-        template <typename T, typename... Ts>
+        template<typename T, typename... Ts>
         int emit(T t, Ts... ts) {
             int line;
             get_error_pos(cur.pos, line);
@@ -152,6 +153,9 @@ namespace srclang {
 
         /// fun '(' args ')' block
         bool function(Symbol *symbol, bool skip_args = false);
+
+        /// native ::= 'native' <identifier> ( (<type> % ',') ) <type>
+        bool native(Symbol *symbol);
 
         /// list ::= '[' (<expression> % ',') ']'
         bool list();
@@ -233,20 +237,22 @@ namespace srclang {
         /// program ::= statement*
         bool program();
 
-       public:
+    public:
         Compiler(Iterator start, Iterator end, const std::string &filename, Language *language);
 
         bool compile();
 
         ByteCode code();
 
-        std::shared_ptr<DebugInfo> debugInfo() { return global_debug_info; }
+        std::shared_ptr <DebugInfo> debugInfo() { return global_debug_info; }
 
         std::string get_error() {
             auto s = error_stream.str();
             error_stream.clear();
             return s;
         }
+
+        const std::string &cc_code() const { return _cc_code; }
     };
 
 }  // srclang
