@@ -332,33 +332,3 @@ SRCLANG_BUILTIN(getval) {
         return SRCLANG_VALUE_SET_REF(iter->second);
     }
 }
-
-
-extern "C" Language *__srclang_global_language;
-
-void srclang::define_tcc_builtins(Language *language) {
-#define SRCLANG_TCC_BUILTINS \
-    X(call_fun, return __srclang_global_language->call(a,{});, Value, Value a) \
-    X(number_new, return SRCLANG_VALUE_NUMBER(a), Value, double a) \
-    X(boolean_new, return SRCLANG_VALUE_BOOL(a), Value, int a) \
-    X(string_new, return SRCLANG_VALUE_STRING(strdup(a)), Value, const char* a) \
-    X(error_new, return SRCLANG_VALUE_ERROR(strdup(a)), Value, const char* a) \
-    X(list_new, return SRCLANG_VALUE_LIST(new SrcLangList()), Value) \
-    X(list_size, return ((SrcLangList*)SRCLANG_VALUE_AS_OBJECT(a)->pointer)->size(), double, Value a)\
-    X(list_at, return ((SrcLangList*)SRCLANG_VALUE_AS_OBJECT(l)->pointer)->at(a), Value, Value l, int a) \
-    X(list_append, ((SrcLangList*)SRCLANG_VALUE_AS_OBJECT(l)->pointer)->push_back(a), void, Value l, Value a) \
-    X(list_pop, Value res = ((SrcLangList*)SRCLANG_VALUE_AS_OBJECT(l)->pointer)->back(); return res, Value, Value l) \
-    X(map_new, return SRCLANG_VALUE_MAP(new SrcLangMap()), Value) \
-    X(map_size, return ((SrcLangMap*)SRCLANG_VALUE_AS_OBJECT(m)->pointer)->size(), double, Value m)\
-    X(map_at, return ((SrcLangMap*)SRCLANG_VALUE_AS_OBJECT(m)->pointer)->at(k), Value, Value m, const char* k) \
-    X(map_set, ((SrcLangMap*)SRCLANG_VALUE_AS_OBJECT(m)->pointer)->insert({k, v}), void, Value m, const char* k, Value v)
-
-    language->cc_code += "\ntypedef unsigned long Value;\n";
-#define X(id, body, ret, ...) \
-    tcc_add_symbol (language->state, "srclang_" #id, (void*)+[](__VA_ARGS__) -> ret { body ;}); \
-    language->cc_code +=  #ret " srclang_" #id "( " #__VA_ARGS__ ");\n";
-
-    SRCLANG_TCC_BUILTINS
-#undef X
-
-}

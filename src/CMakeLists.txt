@@ -13,5 +13,4 @@ add_executable(${PROJECT_NAME}
         Language/Language.cxx Language/Language.hxx
         srclang.cxx)
 
-add_dependencies(${PROJECT_NAME} tinycc)
-target_link_libraries(${PROJECT_NAME} ${DL} ${FFI} ${TCC})
+target_link_libraries(${PROJECT_NAME} ${DL} ${FFI})

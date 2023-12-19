@@ -944,11 +944,6 @@ bool Compiler::use() {
         error("failed to import '" + search_path + "'\n" + compiler.get_error(), cur.pos);
         return false;
     }
-    if (std::find(language->loaded_modules.begin(), language->loaded_modules.end(), search_path) ==
-        language->loaded_modules.end()) {
-        language->loaded_modules.push_back(search_path);
-        _cc_code += "\n" + compiler._cc_code;
-    }
 
     auto instructions = std::move(compiler.code().instructions);
     instructions->pop_back();  // pop OpCode::HLT

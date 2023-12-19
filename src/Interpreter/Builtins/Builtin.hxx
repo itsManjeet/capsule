@@ -3,7 +3,6 @@
 
 #include "../MemoryManager/MemoryManager.hxx"
 #include "../../Value/Value.hxx"
-#include <libtcc.h>
 
 namespace srclang {
     struct Interpreter;
@@ -47,11 +46,7 @@ namespace srclang {
         SRCLANG_BUILTIN_LIST
 #undef X
     };
-
     extern std::vector <Value> builtins;
-
-    void define_tcc_builtins(Language *language);
-
 }  // namespace srclang
 
 #endif  // SRCLANG_BUILTIN_HXX

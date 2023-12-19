@@ -10,8 +10,6 @@
 #include "../Compiler/SymbolTable/SymbolTable.hxx"
 #include "../Value/Value.hxx"
 
-#include <libtcc.h>
-
 namespace srclang {
 
     struct Language {
@@ -19,13 +17,8 @@ namespace srclang {
         Options options;
         SymbolTable symbolTable;
 
-        TCCState *state{nullptr};
-        std::string cc_code;
-
         SrcLangList globals;
         SrcLangList constants;
-
-        std::vector <std::string> loaded_modules;
 
         Language();
 

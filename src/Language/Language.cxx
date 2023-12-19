@@ -33,14 +33,10 @@ Language::Language()
     define("false", SRCLANG_VALUE_FALSE);
     define("null", SRCLANG_VALUE_NULL);
 
-    state = tcc_new();
-    tcc_set_output_type(state, TCC_OUTPUT_MEMORY);
-
-    define_tcc_builtins(this);
 }
 
 Language::~Language() {
-    tcc_delete(state);
+    
 }
 
 void Language::define(const std::string &id, Value value) {
@@ -71,35 +67,6 @@ Language::compile(std::string const &input, std::string const &filename) {
         std::get<0>(ret) = register_object(SRCLANG_VALUE_ERROR(strdup(compiler.get_error().c_str())));
         return ret;
     }
-
-    auto c_code = cc_code + "\n" + compiler.cc_code();
-
-    tcc_set_error_func(state, (void *) &c_code, +[](void *ptr, const char *message) -> void {
-        auto c_code = (std::string *) ptr;
-        std::stringstream ss(*c_code);
-
-        char file[100], type[50], mesg[1024];
-        int position;
-        sscanf(message, "%49[^:]:%d: %49[^:]: %99[^\n]", file, &position, type, mesg);
-        int line_out = 1;
-        for (std::string line; std::getline(ss, line, '\n');) {
-            if (abs(position - line_out) <= 3) {
-                std::cerr << line_out << " " << line << std::endl;
-            }
-            line_out++;
-        }
-        std::cerr << file << ":" << position << ": " << type << " " << mesg << std::endl;
-    });
-    if (tcc_compile_string(state, c_code.c_str()) == -1) {
-        std::get<0>(ret) = SRCLANG_VALUE_ERROR(strdup("TCC compilation failed"));
-        return ret;
-    }
-
-    if (tcc_relocate(state, TCC_RELOCATE_AUTO) == -1) {
-        std::get<0>(ret) = SRCLANG_VALUE_ERROR(strdup("TCC relocation failed"));
-        return ret;
-    }
-
 
     std::get<0>(ret) = SRCLANG_VALUE_TRUE;
     std::get<1>(ret) = std::move(compiler.code());

@@ -6,7 +6,6 @@
 
 #include <ffi.h>
 #include <dlfcn.h>
-#include <libtcc.h>
 
 #include "../Language/Language.hxx"
 #include "../Compiler/SymbolTable/SymbolTable.hxx"
@@ -504,9 +503,6 @@ bool Interpreter::call_native(Value callee, uint8_t count) {
     };
 
     void *handler = nullptr;
-    if (language->state != nullptr) {
-        handler = tcc_get_symbol(language->state, native->id.c_str());
-    }
     if (handler == nullptr) {
         handler = dlsym(nullptr, native->id.c_str());
     }
