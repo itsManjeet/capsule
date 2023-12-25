@@ -33,10 +33,23 @@ Language::Language()
     define("false", SRCLANG_VALUE_FALSE);
     define("null", SRCLANG_VALUE_NULL);
 
+#ifdef _WIN32
+    load_library("msvcrt");
+#else
+    load_library("c");
+#endif
+
 }
 
 Language::~Language() {
-    
+    for (auto c: libraries) {
+#ifdef _WIN32
+        FreeLibrary(c);
+#else
+        dlclose(c);
+#endif
+    }
+
 }
 
 void Language::define(const std::string &id, Value value) {
@@ -58,9 +71,9 @@ size_t Language::add_constant(Value value) {
     return constants.size() - 1;
 }
 
-std::tuple <Value, ByteCode, std::shared_ptr<DebugInfo>>
+std::tuple<Value, ByteCode, std::shared_ptr<DebugInfo>>
 Language::compile(std::string const &input, std::string const &filename) {
-    std::tuple <Value, ByteCode, std::shared_ptr<DebugInfo>> ret;
+    std::tuple<Value, ByteCode, std::shared_ptr<DebugInfo>> ret;
 
     auto compiler = Compiler(input.begin(), input.end(), filename, this);
     if (!compiler.compile()) {
@@ -87,7 +100,7 @@ Value Language::execute(const std::string &input, const std::string &filename) {
     return execute(code, debug_info);
 }
 
-Value Language::execute(ByteCode &code, const std::shared_ptr <DebugInfo> &debugInfo) {
+Value Language::execute(ByteCode &code, const std::shared_ptr<DebugInfo> &debugInfo) {
     auto interpreter = Interpreter(code, debugInfo, this);
     if (!interpreter.run()) {
         return register_object(SRCLANG_VALUE_ERROR(strdup(interpreter.get_error().c_str())));
@@ -124,18 +137,29 @@ Value Language::resolve(const std::string &id) {
     }
 }
 
-Value Language::call(Value callee, const std::vector <Value> &args) {
+void Language::load_library(const std::string &id) {
+#ifdef _WIN32
+    HMODULE handle = LoadLibrary(id.c_str());
+    if (handle == nullptr) throw std::runtime_error("failed to load library '" + id + "'");
+#else
+    HMODULE handle = dlopen(id.c_str(), RTLD_LAZY | RTLD_LOCAL);
+    if (handler == nullptr) throw std::runtime_error(dlerror());
+#endif
+    libraries.push_back(handle);
+}
+
+Value Language::call(Value callee, const std::vector<Value> &args) {
     ByteCode code;
     code.instructions = std::make_unique<Instructions>();
     code.constants = this->constants;
 
     code.constants.push_back(callee);
-    code.instructions->push_back(static_cast<const unsigned int>(OpCode::CONST));
+    code.instructions->push_back(static_cast<const unsigned int>(OpCode::CONST_));
     code.instructions->push_back(code.constants.size() - 1);
 
     for (auto arg: args) {
         code.constants.push_back(arg);
-        code.instructions->push_back(static_cast<const unsigned int>(OpCode::CONST));
+        code.instructions->push_back(static_cast<const unsigned int>(OpCode::CONST_));
         code.instructions->push_back(code.constants.size() - 1);
     }
 

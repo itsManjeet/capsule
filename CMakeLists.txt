@@ -7,13 +7,13 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(POSITION_INDEPENDENT_CODE ON)
 
-if (WIN32)
-    set(READLINE "")
-else()
-    find_library(READLINE readline REQUIRED)
+find_library(FFI ffi REQUIRED)
+find_library(READLINE readline REQUIRED)
 
+if (WIN32)
+
+else()
     find_library(DL dl REQUIRED)
-    find_library(FFI ffi REQUIRED)
 endif()
 add_subdirectory(src)
 

@@ -1,4 +1,4 @@
-add_executable(${PROJECT_NAME}
+add_library(${PROJECT_NAME}_LIB
         Value/Value.hxx Value/Value.cxx
         Compiler/SymbolTable/SymbolTable.cxx Compiler/SymbolTable/SymbolTable.hxx
         ByteCode/DebugInfo.hxx
@@ -10,7 +10,9 @@ add_executable(${PROJECT_NAME}
         Language/Options.cxx Language/Options.hxx
         Compiler/Compiler.cxx Compiler/Compiler.hxx
         Interpreter/Interpreter.cxx Interpreter/Interpreter.hxx
-        Language/Language.cxx Language/Language.hxx
-        srclang.cxx)
+        Language/Language.cxx Language/Language.hxx)
+target_link_libraries(${PROJECT_NAME}_LIB ${DL} ${FFI} ${READLINE})
+add_executable(${PROJECT_NAME} srclang.cxx)
 
-target_link_libraries(${PROJECT_NAME} ${DL} ${FFI})
+target_link_libraries(${PROJECT_NAME} ${PROJECT_NAME}_LIB)
+

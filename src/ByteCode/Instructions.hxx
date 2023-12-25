@@ -11,7 +11,7 @@ namespace srclang {
     using Byte = uint32_t;
 
 #define SRCLANG_OPCODE_LIST \
-    X(CONST, 1)             \
+    X(CONST_, 1)             \
     X(CONST_INT, 1)         \
     X(CONST_TRUE, 0)        \
     X(CONST_FALSE, 0)       \

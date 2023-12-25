@@ -325,7 +325,7 @@ bool Compiler::number() {
     }
 
     language->constants.push_back(val);
-    emit(OpCode::CONST, language->constants.size() - 1);
+    emit(OpCode::CONST_, language->constants.size() - 1);
     return expect(TokenType::Number);
 }
 
@@ -368,7 +368,7 @@ bool Compiler::string_() {
     auto string_value = SRCLANG_VALUE_STRING(strdup(cur.literal.c_str()));
     language->memoryManager.heap.push_back(string_value);
     language->constants.push_back(string_value);
-    emit(OpCode::CONST, language->constants.size() - 1);
+    emit(OpCode::CONST_, language->constants.size() - 1);
     return expect(TokenType::String);
 }
 
@@ -492,7 +492,7 @@ bool Compiler::map_() {
     while (!consume("}")) {
         if (!check(TokenType::Identifier)) return false;
         language->constants.push_back(SRCLANG_VALUE_STRING(strdup(cur.literal.c_str())));
-        emit(OpCode::CONST, language->constants.size() - 1);
+        emit(OpCode::CONST_, language->constants.size() - 1);
         if (!eat()) return false;
 
         if (!expect(":")) return false;
@@ -617,7 +617,7 @@ bool Compiler::subscript(bool can_assign) {
     auto string_value = SRCLANG_VALUE_STRING(strdup(cur.literal.c_str()));
     language->memoryManager.heap.push_back(string_value);
     language->constants.push_back(string_value);
-    emit(OpCode::CONST, language->constants.size() - 1);
+    emit(OpCode::CONST_, language->constants.size() - 1);
     if (!eat()) return false;
 
     if (can_assign && consume("=")) {
@@ -848,7 +848,7 @@ bool Compiler::loop() {
         if (iter == std::nullopt) iter = symbol_table->define(cur.literal);
 
         language->constants.push_back(SRCLANG_VALUE_NUMBER(0));
-        emit(OpCode::CONST, language->constants.size() - 1);
+        emit(OpCode::CONST_, language->constants.size() - 1);
         emit(OpCode::STORE, count->scope, count->index);
         emit(OpCode::POP);
         if (!eat()) return false;
@@ -878,7 +878,7 @@ bool Compiler::loop() {
         emit(OpCode::POP);
 
         language->constants.push_back(SRCLANG_VALUE_NUMBER(1));
-        emit(OpCode::CONST, language->constants.size() - 1);
+        emit(OpCode::CONST_, language->constants.size() - 1);
         emit(OpCode::LOAD, count->scope, count->index);
         emit(OpCode::ADD);
         emit(OpCode::STORE, count->scope, count->index);
@@ -954,7 +954,7 @@ bool Compiler::use() {
         if (i.second.scope == Symbol::Scope::LOCAL &&
             isupper(i.first[0])) {
             language->constants.push_back(SRCLANG_VALUE_STRING(strdup(i.first.c_str())));
-            instructions->emit(compiler.global_debug_info.get(), 0, OpCode::CONST, language->constants.size() - 1);
+            instructions->emit(compiler.global_debug_info.get(), 0, OpCode::CONST_, language->constants.size() - 1);
             instructions->emit(compiler.global_debug_info.get(), 0, OpCode::LOAD, i.second.scope,
                                i.second.index);
             total++;
@@ -1098,7 +1098,7 @@ bool Compiler::native(Symbol *symbol) {
     Value val = SRCLANG_VALUE_NATIVE(native);
     language->memoryManager.heap.push_back(val);
     language->constants.push_back(val);
-    emit(OpCode::CONST, language->constants.size() - 1);
+    emit(OpCode::CONST_, language->constants.size() - 1);
     emit(OpCode::STORE, symbol->scope, symbol->index);
     return true;
 }

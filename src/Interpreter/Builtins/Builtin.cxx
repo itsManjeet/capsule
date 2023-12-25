@@ -5,19 +5,8 @@
 
 using namespace srclang;
 
-#ifdef _WIN32
-#define popen _popen
-#define pclose _pclose
-#define WEXITSTATUS(status) (((status)&0xFF00) >> 8)
-#include <WinSock2.h>
-#pragma comment(lib, "ws2_32.lib")
-#else
 
-#include <cstring>
-
-#endif
-
-std::vector <Value> srclang::builtins = {
+std::vector<Value> srclang::builtins = {
 #define X(id) SRCLANG_VALUE_BUILTIN(id),
         SRCLANG_BUILTIN_LIST
 #undef X
@@ -73,7 +62,7 @@ SRCLANG_BUILTIN(len) {
                     strlen((char *) SRCLANG_VALUE_AS_OBJECT(args[0])->pointer));
         case ValueType::List:
             return SRCLANG_VALUE_NUMBER(
-                    ((std::vector <Value> *) SRCLANG_VALUE_AS_OBJECT(args[0])->pointer)
+                    ((std::vector<Value> *) SRCLANG_VALUE_AS_OBJECT(args[0])->pointer)
                             ->size());
         case ValueType::Pointer:
             return SRCLANG_VALUE_NUMBER(SRCLANG_VALUE_AS_OBJECT(args[0])->size);
@@ -256,31 +245,6 @@ SRCLANG_BUILTIN(alloc) {
     return value;
 }
 
-SRCLANG_BUILTIN(setref) {
-    SRCLANG_CHECK_ARGS_EXACT(2);
-    SRCLANG_CHECK_ARGS_TYPE(0, ValueType::Pointer);
-    SRCLANG_CHECK_ARGS_TYPE(1, ValueType::Boolean);
-
-    SRCLANG_VALUE_AS_OBJECT(args[0])->is_ref = SRCLANG_VALUE_AS_BOOL(args[1]);
-    return args[0];
-}
-
-SRCLANG_BUILTIN(isref) {
-    SRCLANG_CHECK_ARGS_EXACT(1);
-    SRCLANG_CHECK_ARGS_TYPE(0, ValueType::Pointer);
-
-    return SRCLANG_VALUE_BOOL(SRCLANG_VALUE_AS_OBJECT(args[0])->is_ref);
-}
-
-SRCLANG_BUILTIN(setsize) {
-    SRCLANG_CHECK_ARGS_EXACT(2);
-    SRCLANG_CHECK_ARGS_TYPE(0, ValueType::Pointer);
-    SRCLANG_CHECK_ARGS_TYPE(1, ValueType::Number);
-
-    SRCLANG_VALUE_AS_OBJECT(args[0])->size = (size_t)SRCLANG_VALUE_AS_NUMBER(args[1]);
-    return args[0];
-}
-
 SRCLANG_BUILTIN(bound) {
     SRCLANG_CHECK_ARGS_EXACT(2);
     return SRCLANG_VALUE_BOUND(args[0], args[1]);
@@ -307,28 +271,14 @@ SRCLANG_BUILTIN(free) {
     return SRCLANG_VALUE_TRUE;
 }
 
-SRCLANG_BUILTIN(setval) {
-    SRCLANG_CHECK_ARGS_EXACT(3);
-    SRCLANG_CHECK_ARGS_TYPE(0, ValueType::Map);
-    SRCLANG_CHECK_ARGS_TYPE(1, ValueType::String);
-    auto m = (SrcLangMap *) SRCLANG_VALUE_AS_OBJECT(args[0])->pointer;
-    auto p = (const char *) SRCLANG_VALUE_AS_OBJECT(args[1])->pointer;
-
-    m->insert({p, args[2]});
-    return SRCLANG_VALUE_NULL;
-}
-
-SRCLANG_BUILTIN(getval) {
-    SRCLANG_CHECK_ARGS_EXACT(2);
-    SRCLANG_CHECK_ARGS_TYPE(0, ValueType::Map);
-    SRCLANG_CHECK_ARGS_TYPE(1, ValueType::String);
-    auto m = (SrcLangMap *) SRCLANG_VALUE_AS_OBJECT(args[0])->pointer;
-    auto p = (const char *) SRCLANG_VALUE_AS_OBJECT(args[1])->pointer;
-
-    auto iter = m->find(p);
-    if (iter == m->end()) {
-        return SRCLANG_VALUE_NULL;
-    } else {
-        return SRCLANG_VALUE_SET_REF(iter->second);
+SRCLANG_BUILTIN(loadlib) {
+    SRCLANG_CHECK_ARGS_EXACT(1);
+    SRCLANG_CHECK_ARGS_TYPE(0, ValueType::String);
+    auto library = (const char *) SRCLANG_VALUE_AS_OBJECT(args[0])->pointer;
+    try {
+        interpreter->language->load_library(library);
+    } catch (const std::exception &exception) {
+        return SRCLANG_VALUE_ERROR(strdup(exception.what()));
     }
+    return SRCLANG_VALUE_TRUE;
 }

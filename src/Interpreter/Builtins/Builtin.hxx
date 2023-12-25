@@ -8,7 +8,7 @@ namespace srclang {
     struct Interpreter;
     struct Language;
 
-    typedef Value (*Builtin)(std::vector <Value> &, Interpreter *);
+    typedef Value (*Builtin)(std::vector<Value> &, Interpreter *);
 
 #define SRCLANG_BUILTIN(id)                            \
     Value builtin_##id(std::vector<Value> const& args, \
@@ -26,13 +26,9 @@ namespace srclang {
     X(call)                               \
     X(alloc)                              \
     X(free)                               \
-    X(setref)                             \
-    X(isref)                              \
-    X(setsize)                            \
-    X(setval)                             \
-    X(getval)                             \
     X(bound)                              \
-    X(exit)
+    X(exit)                               \
+    X(loadlib)
 
     struct Interpreter;
 #define X(id) SRCLANG_BUILTIN(id);
@@ -46,7 +42,7 @@ namespace srclang {
         SRCLANG_BUILTIN_LIST
 #undef X
     };
-    extern std::vector <Value> builtins;
+    extern std::vector<Value> builtins;
 }  // namespace srclang
 
 #endif  // SRCLANG_BUILTIN_HXX

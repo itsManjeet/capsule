@@ -12,7 +12,7 @@ int ByteCode::debug(Instructions const &instructions,
     os << SRCLANG_OPCODE_ID[static_cast<int>(op)];
     offset += 1;
     switch (op) {
-        case OpCode::CONST: {
+        case OpCode::CONST_: {
             auto pos = instructions[offset++];
             if (!constants.empty()) {
                 os << " " << pos << " '"

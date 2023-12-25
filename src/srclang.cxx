@@ -1,4 +1,6 @@
 #include <fstream>
+#include <readline/readline.h>
+#include <readline/history.h>
 
 #include "Language/Language.hxx"
 
@@ -13,28 +15,6 @@ const auto LOGO = R"(
      \/              \/          \/     \//_____/
 
 )";
-
-#ifdef _WIN32
-static std::string readline(const char* PS) {
-    std::cout << PS;
-    std::string line;
-    std::getline(std::cin, line, '\n');
-
-    return std::move(line);
-}
-
-static void add_history(const char* line) {
-
-}
-#else
-
-#include <readline/history.h>
-#include <readline/readline.h>
-
-#endif
-
-Language *__srclang_global_language;
-
 
 int printHelp() {
     std::cout << LOGO << std::endl;
@@ -51,16 +31,39 @@ int printHelp() {
     return 1;
 }
 
+static bool is_complete(const std::string &input) {
+    std::vector<char> stack;
+    std::map<char, char> pairs = {{'(', ')'},
+                                  {'{', '}'},
+                                  {'[', ']'}};
+    for (char c: input) {
+        switch (c) {
+            case '(':
+            case '{':
+            case '[':
+                stack.push_back(c);
+                break;
+            case '}':
+            case ')':
+            case ']':
+                if (stack.empty() || stack.back() != pairs[c]) return true;
+                stack.pop_back();
+                break;
+            default:
+                break;
+        }
+    }
+    return stack.empty();
+}
+
 int main(int argc, char **argv) {
     Language language;
 
     auto args = new SrcLangList();
-    __srclang_global_language = &language;
-
-    std::optional <std::string> filename;
+    std::optional<std::string> filename;
     bool prog_args_start = false;
     bool print_help = false;
-    std::vector <std::string> cli_args;
+    std::vector<std::string> cli_args;
 
     for (int i = 1; i < argc; i++) {
         if (!prog_args_start && strcmp(argv[i], "--") == 0) {
@@ -106,7 +109,8 @@ int main(int argc, char **argv) {
             }
 #undef CHECK_COUNT
         } else if (filename == std::nullopt &&
-                   std::filesystem::exists(argv[i])) {
+                   std::filesystem::path(argv[i]).has_extension() &&
+                   std::filesystem::path(argv[i]).extension() == ".src") {
             std::string path(argv[i]);
             if (path[0] == '/') {
                 filename = path;
@@ -134,5 +138,17 @@ int main(int argc, char **argv) {
         return 0;
     }
 
-    return printHelp();
+    std::cout << LOGO << "\nSource Programming Language\nPress Ctrl+C to exit\n" << std::endl;
+    while (true) {
+        auto input = std::string(readline("> "));
+        while (!is_complete(input)) {
+            auto sub_input = std::string(readline("... "));
+            input += sub_input;
+        }
+        if (input == ".exit") break;
+        auto result = language.execute(input, "stdin");
+        std::cout << ":: " << SRCLANG_VALUE_GET_STRING(result) << std::endl;
+    }
+
+    return 0;
 }

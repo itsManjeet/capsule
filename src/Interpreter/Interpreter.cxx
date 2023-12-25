@@ -5,7 +5,6 @@
 #include <ranges>
 
 #include <ffi.h>
-#include <dlfcn.h>
 
 #include "../Language/Language.hxx"
 #include "../Compiler/SymbolTable/SymbolTable.hxx"
@@ -25,7 +24,7 @@ void Interpreter::error(std::string const &mesg) {
     err_stream << "  ERROR: " << mesg;
 }
 
-Interpreter::Interpreter(ByteCode &code, const std::shared_ptr <DebugInfo> &debugInfo, Language *language)
+Interpreter::Interpreter(ByteCode &code, const std::shared_ptr<DebugInfo> &debugInfo, Language *language)
         : stack(2048),
           frames(1024),
           language{language} {
@@ -501,14 +500,14 @@ bool Interpreter::call_native(Value callee, uint8_t count) {
             {CType::ptr, &ffi_type_pointer},
             {CType::val, &ffi_type_ulong},
     };
+#ifdef _WIN32
 
-    void *handler = nullptr;
-    if (handler == nullptr) {
-        handler = dlsym(nullptr, native->id.c_str());
-    }
+#else
+#endif
 
+    auto handler = language->get_function<void *>(native->id);
     if (handler == nullptr) {
-        error(dlerror());
+        error("undefined symbol '" + native->id + "'");
         return false;
     }
 
@@ -621,7 +620,7 @@ bool Interpreter::call_native(Value callee, uint8_t count) {
 bool Interpreter::call_builtin(Value callee, uint8_t count) {
     auto builtin =
             reinterpret_cast<Builtin>(SRCLANG_VALUE_AS_OBJECT(callee)->pointer);
-    std::vector <Value> args(sp - count, sp);
+    std::vector<Value> args(sp - count, sp);
     sp -= count + 1;
     Value result;
     try {
@@ -834,7 +833,7 @@ bool Interpreter::run() {
         }
         auto inst = static_cast<OpCode>(*fp->ip++);
         switch (inst) {
-            case OpCode::CONST:
+            case OpCode::CONST_:
                 *sp++ = language->constants[*fp->ip++];
                 break;
             case OpCode::CONST_INT:
@@ -1055,8 +1054,8 @@ bool Interpreter::run() {
                            ValueType::List &&
                            SRCLANG_VALUE_GET_TYPE(pos) ==
                            ValueType::Number) {
-                    std::vector <Value> list =
-                            *(std::vector < Value > *)SRCLANG_VALUE_AS_OBJECT(container)->pointer;
+                    std::vector<Value> list =
+                            *(std::vector<Value> *) SRCLANG_VALUE_AS_OBJECT(container)->pointer;
 
                     int index = SRCLANG_VALUE_AS_NUMBER(pos);
                     switch (count) {

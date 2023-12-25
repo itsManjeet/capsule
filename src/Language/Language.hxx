@@ -10,6 +10,15 @@
 #include "../Compiler/SymbolTable/SymbolTable.hxx"
 #include "../Value/Value.hxx"
 
+#ifdef _WIN32
+
+#include <windows.h>
+
+#else
+typedef void* HMODULE
+#include <dlfcn.h>
+#endif
+
 namespace srclang {
 
     struct Language {
@@ -19,6 +28,7 @@ namespace srclang {
 
         SrcLangList globals;
         SrcLangList constants;
+        std::vector<HMODULE> libraries;
 
         Language();
 
@@ -32,16 +42,32 @@ namespace srclang {
 
         Value resolve(std::string const &id);
 
-        std::tuple <Value, ByteCode, std::shared_ptr<DebugInfo>>
+        void load_library(const std::string &id);
+
+        template<typename T>
+        T get_function(const std::string &id) {
+            T symbol = nullptr;
+            for (auto c: libraries) {
+#ifdef _WIN32
+                symbol = (T) GetProcAddress(c, id.c_str());
+#else
+                symbol = (T) dlsym(c, id.c_str());
+#endif
+                if (symbol != nullptr) break;
+            }
+            return symbol;
+        }
+
+        std::tuple<Value, ByteCode, std::shared_ptr<DebugInfo>>
         compile(std::string const &input, std::string const &filename);
 
         Value execute(std::string const &input, std::string const &filename);
 
-        Value execute(ByteCode &code, const std::shared_ptr <DebugInfo> &debugInfo);
+        Value execute(ByteCode &code, const std::shared_ptr<DebugInfo> &debugInfo);
 
         Value execute(const std::filesystem::path &filename);
 
-        Value call(Value callee, std::vector <Value> const &args);
+        Value call(Value callee, std::vector<Value> const &args);
 
         void appendSearchPath(std::string const &path);
     };
