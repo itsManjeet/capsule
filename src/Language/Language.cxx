@@ -142,10 +142,10 @@ void Language::load_library(const std::string &id) {
     HMODULE handle = LoadLibrary(id.c_str());
     if (handle == nullptr) throw std::runtime_error("failed to load library '" + id + "'");
 #else
-    HMODULE handle = dlopen(id.c_str(), RTLD_LAZY | RTLD_LOCAL);
+    HMODULE handler = dlopen(id.c_str(), RTLD_LAZY | RTLD_LOCAL);
     if (handler == nullptr) throw std::runtime_error(dlerror());
 #endif
-    libraries.push_back(handle);
+    libraries.push_back(handler);
 }
 
 Value Language::call(Value callee, const std::vector<Value> &args) {

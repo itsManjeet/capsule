@@ -15,7 +15,7 @@
 #include <windows.h>
 
 #else
-typedef void* HMODULE
+typedef void* HMODULE;
 #include <dlfcn.h>
 #endif
 
