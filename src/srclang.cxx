@@ -31,22 +31,22 @@ int printHelp() {
     return 1;
 }
 
-static bool is_complete(const std::string &input) {
+static bool is_complete(const char* input) {
     std::vector<char> stack;
     std::map<char, char> pairs = {{'(', ')'},
                                   {'{', '}'},
                                   {'[', ']'}};
-    for (char c: input) {
-        switch (c) {
+    for (char *c = (char*) input; *c != '\0'; c++) {
+        switch (*c) {
             case '(':
             case '{':
             case '[':
-                stack.push_back(c);
+                stack.push_back(*c);
                 break;
             case '}':
             case ')':
             case ']':
-                if (stack.empty() || stack.back() != pairs[c]) return true;
+                if (stack.empty() || pairs[stack.back()] != *c) return true;
                 stack.pop_back();
                 break;
             default:
@@ -140,10 +140,14 @@ int main(int argc, char **argv) {
 
     std::cout << LOGO << "\nSource Programming Language\nPress Ctrl+C to exit\n" << std::endl;
     while (true) {
-        auto input = std::string(readline("> "));
+        auto input = readline("> ");
         while (!is_complete(input)) {
-            auto sub_input = std::string(readline("... "));
-            input += sub_input;
+            auto sub_input = readline("... ");
+            auto input_size = strlen(input), sub_input_size = strlen(sub_input);
+            input = (char*) realloc(input, input_size + sub_input_size + 1);
+            strcat(input + input_size, sub_input);
+            input[input_size + sub_input_size] = '\0';
+            free(sub_input);
         }
         if (input == ".exit") break;
         auto result = language.execute(input, "stdin");

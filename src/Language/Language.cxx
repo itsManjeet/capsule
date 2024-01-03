@@ -36,7 +36,10 @@ Language::Language()
 #ifdef _WIN32
     load_library("msvcrt");
 #else
-    load_library("c");
+    load_library(LIBC_SO);
+    auto HOME = getenv("HOME");
+    if (HOME) appendSearchPath(std::filesystem::path(HOME) / ".local" / "share" / "srclang");
+    appendSearchPath("/usr/lib/srclang/");
 #endif
 
 }
@@ -76,17 +79,17 @@ Language::compile(std::string const &input, std::string const &filename) {
     std::tuple<Value, ByteCode, std::shared_ptr<DebugInfo>> ret;
 
     auto compiler = Compiler(input.begin(), input.end(), filename, this);
-    if (!compiler.compile()) {
-        std::get<0>(ret) = register_object(SRCLANG_VALUE_ERROR(strdup(compiler.get_error().c_str())));
-        return ret;
-    }
+    try {
+        compiler.compile();
+        std::get<0>(ret) = SRCLANG_VALUE_TRUE;
+        std::get<1>(ret) = std::move(compiler.code());
+        std::get<2>(ret) = compiler.debugInfo();
 
-    std::get<0>(ret) = SRCLANG_VALUE_TRUE;
-    std::get<1>(ret) = std::move(compiler.code());
-    std::get<2>(ret) = compiler.debugInfo();
-
-    if (std::get<bool>(options["IR"])) {
-        std::cout << std::get<1>(ret) << std::endl;
+        if (std::get<bool>(options["IR"])) {
+            std::cout << std::get<1>(ret) << std::endl;
+        }
+    } catch (const std::exception& exception) {
+        std::get<0>(ret) = register_object(SRCLANG_VALUE_ERROR(strdup(exception.what())));
     }
 
     return ret;

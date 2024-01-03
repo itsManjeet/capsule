@@ -58,10 +58,7 @@ namespace srclang {
         Token cur, peek;
         Iterator iter, start, end;
         std::string filename;
-        std::string _cc_code;
-
-        std::stringstream error_stream;
-
+    
         std::vector <std::string> loaded_imports;
         std::vector <std::unique_ptr<Instructions>> instructions;
         DebugInfo *debug_info;
@@ -77,17 +74,19 @@ namespace srclang {
         void error(const Message &mesg, Iterator pos) {
             int line;
             Iterator line_start = get_error_pos(pos, line);
-            error_stream << filename << ":" << line << '\n';
+            std::stringstream err;
+            err << filename << ":" << line << '\n';
             if (pos != end) {
-                error_stream << "ERROR: " << mesg << '\n';
-                error_stream << " | " << get_error_line(line_start) << '\n'
+                err << "ERROR: " << mesg << '\n';
+                err << " | " << get_error_line(line_start) << '\n'
                              << "   ";
-                for (; line_start != pos; ++line_start) error_stream << ' ';
-                error_stream << '^';
+                for (; line_start != pos; ++line_start) err << ' ';
+                err << '^';
             } else {
-                error_stream << "Unexpected end of file. ";
-                error_stream << mesg << " line " << line;
+                err << "Unexpected end of file. ";
+                err << mesg << " line " << line;
             }
+            throw std::runtime_error(err.str());
         }
 
         Iterator get_error_pos(Iterator err_pos, int &line) const;
@@ -98,13 +97,13 @@ namespace srclang {
 
         bool consume(TokenType type);
 
-        bool check(TokenType type);
+        void check(TokenType type);
 
-        bool expect(const std::string &expected);
+        void expect(const std::string &expected);
 
-        bool expect(TokenType type);
+        void expect(TokenType type);
 
-        bool eat();
+        void eat();
 
         enum Precedence {
             P_None = 0,
@@ -135,33 +134,35 @@ namespace srclang {
         /// comment ::= '//' (.*) '\n'
 
         /// number ::= [0-9_.]+[bh]
-        bool number();
+        void number();
 
         /// identifier ::= [a-zA-Z_]([a-zA-Z0-9_]*)
-        bool identifier(bool can_assign);
+        void identifier(bool can_assign);
 
         /// string ::= '"' ... '"'
-        bool string_();
+        void string_();
 
         /// unary ::= ('+' | '-' | 'not') <expression>
-        bool unary(OpCode op);
+        void unary(OpCode op);
 
         /// block ::= '{' <stmt>* '}'
-        bool block();
+        void block();
 
-        bool value(Symbol *symbol);
+        void value(Symbol *symbol);
 
         /// fun '(' args ')' block
-        bool function(Symbol *symbol, bool skip_args = false);
+        void function(Symbol *symbol, bool skip_args = false);
+
+        void class_();
 
         /// native ::= 'native' <identifier> ( (<type> % ',') ) <type>
-        bool native(Symbol *symbol);
+        void native(Symbol *symbol);
 
         /// list ::= '[' (<expression> % ',') ']'
-        bool list();
+        void list();
 
         /// map ::= '{' ((<identifier> ':' <expression>) % ',') '}'
-        bool map_();
+        void map_();
 
         /// prefix ::= number
         ///        ::= string
@@ -172,52 +173,52 @@ namespace srclang {
         ///        ::= function
         ///        ::= use
         ///        ::= '(' expression ')'
-        bool prefix(bool can_assign);
+        void prefix(bool can_assign);
 
         /// binary ::= expr ('+' | '-' | '*' | '/' | '==' | '!=' | '<' | '>' | '>=' | '<=' | 'and' | 'or' | '|' | '&' | '>>' | '<<' | '%') expr
-        bool binary(OpCode op, int prec);
+        void binary(OpCode op, int prec);
 
         /// call ::= '(' (expr % ',' ) ')'
-        bool call();
+        void call();
 
         /// index ::= <expression> '[' <expession> (':' <expression>)? ']'
-        bool index(bool can_assign);
+        void index(bool can_assign);
 
         /// subscript ::= <expression> '.' <expression>
-        bool subscript(bool can_assign);
+        void subscript(bool can_assign);
 
         /// infix ::= call
         ///       ::= subscript
         ///       ::= index
         ///       ::= binary
-        bool infix(bool can_assign);
+        void infix(bool can_assign);
 
         /// expression ::= prefix infix*
-        bool expression(int prec = P_Assignment);
+        void expression(int prec = P_Assignment);
 
         /// compiler_options ::= #![<option>(<value>)]
-        bool compiler_options();
+        void compiler_options();
 
         /// let ::= 'let' 'global'? <identifier> '=' <expression>
-        bool let();
+        void let();
 
         /// return ::= 'return' <expression>
-        bool return_();
+        void return_();
 
         void patch_loop(int loop_start, OpCode to_patch, int pos);
 
         /// loop ::= 'for' <expression> <block>
         /// loop ::= 'for' <identifier> 'in' <expression> <block>
-        bool loop();
+        void loop();
 
         /// use ::= 'use' '('  <string> ')'
-        bool use();
+        void use();
 
         /// defer ::= 'defer' <function>
-        bool defer();
+        void defer();
 
         /// condition ::= 'if' <expression> <block> (else statement)?
-        bool condition();
+        void condition();
 
         /// type ::= 'identifier'
         ValueType type(std::string literal);
@@ -232,27 +233,20 @@ namespace srclang {
         ///           ::= defer
         ///           ::= compiler_options
         ///           ::= expression ';'
-        bool statement();
+        void statement();
 
         /// program ::= statement*
-        bool program();
+        void program();
 
     public:
         Compiler(Iterator start, Iterator end, const std::string &filename, Language *language);
 
-        bool compile();
+        void compile();
 
         ByteCode code();
 
         std::shared_ptr <DebugInfo> debugInfo() { return global_debug_info; }
-
-        std::string get_error() {
-            auto s = error_stream.str();
-            error_stream.clear();
-            return s;
-        }
-
-        const std::string &cc_code() const { return _cc_code; }
+        
     };
 
 }  // srclang

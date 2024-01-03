@@ -17,6 +17,7 @@
 #else
 typedef void* HMODULE;
 #include <dlfcn.h>
+#include <gnu/lib-names.h>
 #endif
 
 namespace srclang {
