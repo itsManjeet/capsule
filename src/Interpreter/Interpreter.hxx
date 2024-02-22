@@ -3,7 +3,7 @@
 
 #include <sstream>
 
-#include "Builtins/Builtin.hxx"
+#include "../Builtins/Builtin.hxx"
 #include "../ByteCode/ByteCode.hxx"
 #include "../Value/Function.hxx"
 #include "../Language/Options.hxx"

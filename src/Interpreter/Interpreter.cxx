@@ -46,7 +46,7 @@ Interpreter::~Interpreter() {
 
 void Interpreter::grace_full_exit() {
     do {
-        --sp;
+        if (sp != stack.begin()) --sp;
         for (auto i = fp->defers.rbegin(); i != fp->defers.rend(); i++)
             language->call(*i, {});
 

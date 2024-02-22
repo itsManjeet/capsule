@@ -1,7 +1,7 @@
 #include "Builtin.hxx"
 
-#include "../Interpreter.hxx"
-#include "../../Language/Language.hxx"
+#include "../Interpreter/Interpreter.hxx"
+#include "../Language/Language.hxx"
 
 using namespace srclang;
 
@@ -251,4 +251,89 @@ SRCLANG_BUILTIN(free) {
     object->cleanup(object->pointer);
     object->pointer = nullptr;
     return SRCLANG_VALUE_TRUE;
+}
+
+SRCLANG_BUILTIN(open) {
+    SRCLANG_CHECK_ARGS_RANGE(1, 2);
+    const char *mode = "a+";
+    if (args.size() == 2) {
+        SRCLANG_CHECK_ARGS_TYPE(1, ValueType::String);
+        mode = reinterpret_cast<const char *>(SRCLANG_VALUE_AS_OBJECT(args[1])->pointer);
+    }
+
+    FILE *fp = nullptr;
+    switch (SRCLANG_VALUE_GET_TYPE(args[0])) {
+        case ValueType::Number:
+            fp = fdopen(SRCLANG_VALUE_AS_NUMBER(args[0]), mode);
+            break;
+        case ValueType::String:
+            fp = fopen(reinterpret_cast<const char *>(SRCLANG_VALUE_AS_OBJECT(args[0])->pointer), mode);
+            break;
+        case ValueType::Pointer:
+            fp = reinterpret_cast<FILE *>(SRCLANG_VALUE_AS_OBJECT(args[0])->pointer);
+            break;
+        default:
+            SRCLANG_CHECK_ARGS_TYPE(0, ValueType::String);
+    }
+    if (fp == nullptr) {
+        return SRCLANG_VALUE_SET_REF(SRCLANG_VALUE_ERROR(strerror(errno)));
+    }
+
+    auto object = new SrcLangMap();
+    auto value = SRCLANG_VALUE_MAP(object);
+
+    object->insert({"__ptr__", SRCLANG_VALUE_SET_CLEANUP(
+            SRCLANG_VALUE_POINTER(reinterpret_cast<void *>(fp)),
+            +[](void *ptr) {
+                auto fp = reinterpret_cast<FILE *>(ptr);
+                fclose(fp);
+            })});
+
+    object->insert(
+            {"Write", SRCLANG_VALUE_BOUND(
+                    value,
+                    SRCLANG_VALUE_BUILTIN_NEW(+[](std::vector<Value> &args) -> Value {
+                        SRCLANG_CHECK_ARGS_EXACT(2);
+
+                        SRCLANG_CHECK_ARGS_TYPE(0, ValueType::Map);
+                        SRCLANG_CHECK_ARGS_TYPE(1, ValueType::String);
+
+
+                        auto self = reinterpret_cast<SrcLangMap *>(SRCLANG_VALUE_AS_OBJECT(args[0])->pointer);
+                        auto data = reinterpret_cast<const char *>(SRCLANG_VALUE_AS_OBJECT(args[1])->pointer);
+                        auto fp = reinterpret_cast<FILE *>(SRCLANG_VALUE_AS_OBJECT(self->at("__ptr__"))->pointer);
+
+                        int num = fwrite(data, sizeof(char), strlen(data), fp);
+                        if (num == -1) {
+                            return SRCLANG_VALUE_SET_REF(SRCLANG_VALUE_ERROR(strerror(errno)));
+                        }
+
+                        return SRCLANG_VALUE_NUMBER(num);
+                    }))});
+
+    object->insert(
+            {"Read", SRCLANG_VALUE_BOUND(
+                    value,
+                    SRCLANG_VALUE_BUILTIN_NEW(+[](std::vector<Value> &args) -> Value {
+                        SRCLANG_CHECK_ARGS_EXACT(2);
+
+                        SRCLANG_CHECK_ARGS_TYPE(0, ValueType::Map);
+                        SRCLANG_CHECK_ARGS_TYPE(1, ValueType::Number);
+
+                        auto self = reinterpret_cast<SrcLangMap *>(SRCLANG_VALUE_AS_OBJECT(args[0])->pointer);
+                        auto size = SRCLANG_VALUE_AS_NUMBER(args[1]);
+                        auto fp = reinterpret_cast<FILE *>(SRCLANG_VALUE_AS_OBJECT(self->at("__ptr__"))->pointer);
+
+                        auto buffer = new char[size + 1];
+
+                        int num = fread(buffer, sizeof(char), size, fp);
+                        if (num == -1) {
+                            delete[] buffer;
+                            return SRCLANG_VALUE_SET_REF(SRCLANG_VALUE_ERROR(strerror(errno)));
+                        }
+                        buffer[int(size)] = '\0';
+                        return SRCLANG_VALUE_STRING(buffer);
+                    }))});
+
+    return value;
 }

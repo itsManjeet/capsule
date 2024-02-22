@@ -1,8 +1,8 @@
 #ifndef SRCLANG_BUILTIN_HXX
 #define SRCLANG_BUILTIN_HXX
 
-#include "../MemoryManager/MemoryManager.hxx"
-#include "../../Value/Value.hxx"
+#include "../Interpreter/MemoryManager/MemoryManager.hxx"
+#include "../Value/Value.hxx"
 
 namespace srclang {
     struct Interpreter;
@@ -27,7 +27,8 @@ namespace srclang {
     X(alloc)                              \
     X(free)                               \
     X(bound)                              \
-    X(exit)
+    X(exit)                               \
+    X(open)
 
     struct Interpreter;
 #define X(id) SRCLANG_BUILTIN(id);
