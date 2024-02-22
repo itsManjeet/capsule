@@ -263,7 +263,7 @@ void Compiler::number() {
     bool is_float = false;
     int base = 10;
     std::string number_value;
-    if (cur.literal.starts_with("0") && cur.literal.length() > 1) {
+    if (cur.literal.length() > 1 && cur.literal[0] == '0') {
         base = 8;
         cur.literal = cur.literal.substr(1);
     }
@@ -670,13 +670,13 @@ void Compiler::compiler_options() {
 #undef CHECK_TYPE_ID
 
     if (option_id == "VERSION") {
-        if (SRCLANG_VERSION > get<float>(value)) {
+        if (SRCLANG_VERSION > std::get<float>(value)) {
             error("Code need srclang of version above or equal to "
                   "'" + std::to_string(SRCLANG_VERSION) + "'", pos);
         }
     } else if (option_id == "SEARCH_PATH") {
-        language->options[option_id] = std::filesystem::absolute(get<std::string>(value)).string() + ":" +
-                                       get<std::string>(language->options[option_id]);
+        language->options[option_id] = std::filesystem::absolute(std::get<std::string>(value)).string() + ":" +
+                                       std::get<std::string>(language->options[option_id]);
     } else {
         language->options[option_id] = value;
     }

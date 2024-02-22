@@ -31,8 +31,8 @@ Interpreter::Interpreter(ByteCode &code, const std::shared_ptr<DebugInfo> &debug
     debug_info.push_back(debugInfo);
     auto fun = new Function{FunctionType::Function, "<script>", std::move(code.instructions), 0, 0, false, debugInfo};
 
-    debug = get<bool>(language->options.at("DEBUG"));
-    break_ = get<bool>(language->options.at("BREAK"));
+    debug = std::get<bool>(language->options.at("DEBUG"));
+    break_ = std::get<bool>(language->options.at("BREAK"));
 
     fp->closure = new Closure{std::move(fun), {}};
     fp->ip = fp->closure->fun->instructions->begin();
@@ -47,9 +47,9 @@ Interpreter::~Interpreter() {
 void Interpreter::grace_full_exit() {
     do {
         --sp;
-        for (auto defer: std::ranges::reverse_view(fp->defers)) {
-            language->call(defer, {});
-        }
+        for (auto i = fp->defers.rbegin(); i != fp->defers.rend(); i++)
+            language->call(*i, {});
+
         if (fp == frames.begin()) {
             break;
         }
@@ -1013,9 +1013,9 @@ bool Interpreter::run() {
 
             case OpCode::RET: {
                 auto value = *--sp;
-                for (auto defer: std::ranges::reverse_view(fp->defers)) {
-                    language->call(defer, {});
-                }
+                for (auto i = fp->defers.rbegin(); i != fp->defers.rend(); i++)
+                    language->call(*i, {});
+
                 sp = fp->bp - 1;
                 fp--;
                 *sp++ = value;
@@ -1058,9 +1058,9 @@ bool Interpreter::run() {
                 break;
 
             case OpCode::HLT: {
-                for (auto defer: std::ranges::reverse_view(fp->defers)) {
-                    language->call(defer, {});
-                }
+                for (auto i = fp->defers.rbegin(); i != fp->defers.rend(); i++)
+                    language->call(*i, {});
+
                 return true;
             }
                 break;
