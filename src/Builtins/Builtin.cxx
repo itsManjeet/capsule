@@ -321,7 +321,7 @@ SRCLANG_BUILTIN(open) {
                         SRCLANG_CHECK_ARGS_TYPE(1, ValueType::Number);
 
                         auto self = reinterpret_cast<SrcLangMap *>(SRCLANG_VALUE_AS_OBJECT(args[0])->pointer);
-                        auto size = SRCLANG_VALUE_AS_NUMBER(args[1]);
+                        int size = SRCLANG_VALUE_AS_NUMBER(args[1]);
                         auto fp = reinterpret_cast<FILE *>(SRCLANG_VALUE_AS_OBJECT(self->at("__ptr__"))->pointer);
 
                         auto buffer = new char[size + 1];
@@ -331,7 +331,7 @@ SRCLANG_BUILTIN(open) {
                             delete[] buffer;
                             return SRCLANG_VALUE_SET_REF(SRCLANG_VALUE_ERROR(strerror(errno)));
                         }
-                        buffer[int(size)] = '\0';
+                        buffer[size] = '\0';
                         return SRCLANG_VALUE_STRING(buffer);
                     }))});
 
