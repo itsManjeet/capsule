@@ -32,26 +32,3 @@ jobs:
         working-directory: ${{github.workspace}}/build
         shell: bash
         run: ctest -C $BUILD_TYPE
-
-      - name: Create release
-        uses: actions/create-release@v1
-        id: create_release
-        if: github.ref == 'refs/heads/main'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: continuous
-          release_name: continuous
-          draft: false
-          prerelease: true
-
-      - name: Upload release artifacts
-        uses: actions/upload-release-asset@v1
-        if: github.ref == 'refs/heads/main'
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ${{github.workspace}}/build/src/srclang
-          asset_name: srclang
-          asset_content_type: application/octet-stream
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
