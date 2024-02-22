@@ -55,15 +55,11 @@ SRCLANG_BUILTIN(println) {
 
 SRCLANG_BUILTIN(len) {
     SRCLANG_CHECK_ARGS_EXACT(1);
-    switch (
-            SRCLANG_VALUE_GET_TYPE(args[0])) {
+    switch (SRCLANG_VALUE_GET_TYPE(args[0])) {
         case ValueType::String:
-            return SRCLANG_VALUE_NUMBER(
-                    strlen((char *) SRCLANG_VALUE_AS_OBJECT(args[0])->pointer));
+            return SRCLANG_VALUE_NUMBER(strlen((char *) SRCLANG_VALUE_AS_OBJECT(args[0])->pointer));
         case ValueType::List:
-            return SRCLANG_VALUE_NUMBER(
-                    ((std::vector<Value> *) SRCLANG_VALUE_AS_OBJECT(args[0])->pointer)
-                            ->size());
+            return SRCLANG_VALUE_NUMBER(((std::vector<Value> *) SRCLANG_VALUE_AS_OBJECT(args[0])->pointer)->size());
         case ValueType::Pointer:
             return SRCLANG_VALUE_NUMBER(SRCLANG_VALUE_AS_OBJECT(args[0])->size);
 
@@ -74,11 +70,9 @@ SRCLANG_BUILTIN(len) {
 
 SRCLANG_BUILTIN(append) {
     SRCLANG_CHECK_ARGS_EXACT(2);
-    switch (
-            SRCLANG_VALUE_GET_TYPE(args[0])) {
+    switch (SRCLANG_VALUE_GET_TYPE(args[0])) {
         case ValueType::List: {
-            auto list = reinterpret_cast<SrcLangList *>(
-                    SRCLANG_VALUE_AS_OBJECT(args[0])->pointer);
+            auto list = reinterpret_cast<SrcLangList *>(SRCLANG_VALUE_AS_OBJECT(args[0])->pointer);
             list->push_back(args[1]);
             return SRCLANG_VALUE_LIST(list);
         }
@@ -89,8 +83,7 @@ SRCLANG_BUILTIN(append) {
             switch (SRCLANG_VALUE_GET_TYPE(args[1])) {
                 break;
                 case ValueType::String: {
-                    auto str2 =
-                            (char *) (SRCLANG_VALUE_AS_OBJECT(args[1])->pointer);
+                    auto str2 = (char *) (SRCLANG_VALUE_AS_OBJECT(args[1])->pointer);
                     auto len2 = strlen(str2);
                     str = (char *) realloc(str, len + len2 + 1);
                     if (str == nullptr) {
@@ -107,11 +100,9 @@ SRCLANG_BUILTIN(append) {
         }
             break;
         default:
-            return SRCLANG_VALUE_ERROR(strdup(
-                    ("invalid append operation on '" +
-                     SRCLANG_VALUE_TYPE_ID[int(SRCLANG_VALUE_GET_TYPE(args[0]))] +
-                     "'")
-                            .c_str()));
+            return SRCLANG_VALUE_ERROR(strdup(("invalid append operation on '" +
+                                               SRCLANG_VALUE_TYPE_ID[int(SRCLANG_VALUE_GET_TYPE(args[0]))] +
+                                               "'").c_str()));
     }
 }
 
@@ -150,8 +141,7 @@ SRCLANG_BUILTIN(pop) {
     SRCLANG_CHECK_ARGS_EXACT(1);
     switch (SRCLANG_VALUE_GET_TYPE(args[0])) {
         case ValueType::List: {
-            auto list = reinterpret_cast<SrcLangList *>(
-                    SRCLANG_VALUE_AS_OBJECT(args[0])->pointer);
+            auto list = reinterpret_cast<SrcLangList *>(SRCLANG_VALUE_AS_OBJECT(args[0])->pointer);
             list->pop_back();
 
             return SRCLANG_VALUE_LIST(list);
@@ -165,11 +155,9 @@ SRCLANG_BUILTIN(pop) {
         }
             break;
         default:
-            return SRCLANG_VALUE_ERROR(strdup(
-                    ("invalid pop operation on '" +
-                     SRCLANG_VALUE_TYPE_ID[int(SRCLANG_VALUE_GET_TYPE(args[0]))] +
-                     "'")
-                            .c_str()));
+            return SRCLANG_VALUE_ERROR(
+                    strdup(("invalid pop operation on '" + SRCLANG_VALUE_TYPE_ID[int(SRCLANG_VALUE_GET_TYPE(args[0]))] +
+                            "'").c_str()));
     }
 }
 
@@ -179,14 +167,11 @@ SRCLANG_BUILTIN(clone) {
         switch (SRCLANG_VALUE_GET_TYPE(args[0])) {
             case ValueType::String:
             case ValueType::Error: {
-                return SRCLANG_VALUE_STRING(
-                        strdup((char *) SRCLANG_VALUE_AS_OBJECT(args[0])->pointer));
+                return SRCLANG_VALUE_STRING(strdup((char *) SRCLANG_VALUE_AS_OBJECT(args[0])->pointer));
             };
             case ValueType::List: {
-                auto list = reinterpret_cast<SrcLangList *>(
-                        SRCLANG_VALUE_AS_OBJECT(args[0])->pointer);
-                auto new_list =
-                        new SrcLangList(list->begin(), list->end());
+                auto list = reinterpret_cast<SrcLangList *>(SRCLANG_VALUE_AS_OBJECT(args[0])->pointer);
+                auto new_list = new SrcLangList(list->begin(), list->end());
                 return SRCLANG_VALUE_LIST(new_list);
             };
             case ValueType::Pointer: {
@@ -206,12 +191,9 @@ SRCLANG_BUILTIN(clone) {
                 break;
             default:
                 if (SRCLANG_VALUE_IS_OBJECT(args[0])) {
-                    return SRCLANG_VALUE_ERROR(
-                            strdup(("invalid clone operation on '" +
-                                    SRCLANG_VALUE_TYPE_ID[int(
-                                            SRCLANG_VALUE_GET_TYPE(args[0]))] +
-                                    "'")
-                                           .c_str()));
+                    return SRCLANG_VALUE_ERROR(strdup(("invalid clone operation on '" +
+                                                       SRCLANG_VALUE_TYPE_ID[int(SRCLANG_VALUE_GET_TYPE(args[0]))] +
+                                                       "'").c_str()));
                 }
         }
     }
@@ -268,17 +250,5 @@ SRCLANG_BUILTIN(free) {
     }
     object->cleanup(object->pointer);
     object->pointer = nullptr;
-    return SRCLANG_VALUE_TRUE;
-}
-
-SRCLANG_BUILTIN(loadlib) {
-    SRCLANG_CHECK_ARGS_EXACT(1);
-    SRCLANG_CHECK_ARGS_TYPE(0, ValueType::String);
-    auto library = (const char *) SRCLANG_VALUE_AS_OBJECT(args[0])->pointer;
-    try {
-        interpreter->language->load_library(library);
-    } catch (const std::exception &exception) {
-        return SRCLANG_VALUE_ERROR(strdup(exception.what()));
-    }
     return SRCLANG_VALUE_TRUE;
 }

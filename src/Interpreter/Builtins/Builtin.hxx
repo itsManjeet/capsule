@@ -27,8 +27,7 @@ namespace srclang {
     X(alloc)                              \
     X(free)                               \
     X(bound)                              \
-    X(exit)                               \
-    X(loadlib)
+    X(exit)
 
     struct Interpreter;
 #define X(id) SRCLANG_BUILTIN(id);

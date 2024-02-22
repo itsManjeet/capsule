@@ -4,8 +4,6 @@
 #include <iostream>
 #include <ranges>
 
-#include <ffi.h>
-
 #include "../Language/Language.hxx"
 #include "../Compiler/SymbolTable/SymbolTable.hxx"
 
@@ -18,29 +16,20 @@ void Interpreter::error(std::string const &mesg) {
     }
 
     err_stream << debug_info.back()->filename << ":"
-               << debug_info.back()->lines[distance(
-                       fp->closure->fun->instructions->begin(), fp->ip)]
-               << std::endl;
+               << debug_info.back()->lines[distance(fp->closure->fun->instructions->begin(), fp->ip)] << std::endl;
     err_stream << "  ERROR: " << mesg;
 }
 
-Interpreter::Interpreter(ByteCode &code, const std::shared_ptr<DebugInfo> &debugInfo, Language *language)
-        : stack(2048),
-          frames(1024),
-          language{language} {
-    GC_HEAP_GROW_FACTOR =
-            std::get<float>(language->options.at("GC_HEAP_GROW_FACTOR"));
-    next_gc =
-            std::get<int>(language->options.at("GC_INITIAL_TRIGGER"));
+Interpreter::Interpreter(ByteCode &code, const std::shared_ptr<DebugInfo> &debugInfo, Language *language) : stack(2048),
+                                                                                                            frames(1024),
+                                                                                                            language{
+                                                                                                                    language} {
+    GC_HEAP_GROW_FACTOR = std::get<float>(language->options.at("GC_HEAP_GROW_FACTOR"));
+    next_gc = std::get<int>(language->options.at("GC_INITIAL_TRIGGER"));
     sp = stack.begin();
     fp = frames.begin();
     debug_info.push_back(debugInfo);
-    auto fun = new Function{FunctionType::Function, "<script>",
-                            std::move(code.instructions),
-                            0,
-                            0,
-                            false,
-                            debugInfo};
+    auto fun = new Function{FunctionType::Function, "<script>", std::move(code.instructions), 0, 0, false, debugInfo};
 
     debug = get<bool>(language->options.at("DEBUG"));
     break_ = get<bool>(language->options.at("BREAK"));
@@ -149,28 +138,20 @@ bool Interpreter::unary(Value a, OpCode op) {
                 *sp++ = SRCLANG_VALUE_NUMBER(-SRCLANG_VALUE_AS_NUMBER(a));
                 break;
             default:
-                error(
-                        "unexpected unary operator '" +
-                        SRCLANG_OPCODE_ID[static_cast<int>(op)] + "' for '" +
-                        SRCLANG_VALUE_TYPE_ID[int(SRCLANG_VALUE_GET_TYPE(a))] +
-                        "'");
+                error("unexpected unary operator '" + SRCLANG_OPCODE_ID[static_cast<int>(op)] + "' for '" +
+                      SRCLANG_VALUE_TYPE_ID[int(SRCLANG_VALUE_GET_TYPE(a))] + "'");
                 return false;
         }
     } else if (SRCLANG_VALUE_GET_TYPE(a) == ValueType::String) {
         switch (op) {
             default:
-                error(
-                        "unexpected unary operator '" +
-                        SRCLANG_OPCODE_ID[static_cast<int>(op)] + "' for '" +
-                        SRCLANG_VALUE_TYPE_ID[int(SRCLANG_VALUE_GET_TYPE(a))] +
-                        "'");
+                error("unexpected unary operator '" + SRCLANG_OPCODE_ID[static_cast<int>(op)] + "' for '" +
+                      SRCLANG_VALUE_TYPE_ID[int(SRCLANG_VALUE_GET_TYPE(a))] + "'");
                 return false;
         }
     } else {
-        error("ERROR: unhandler unary operation for value of type " +
-              SRCLANG_VALUE_TYPE_ID[static_cast<int>(
-                      SRCLANG_VALUE_GET_TYPE(a))] +
-              "'");
+        error("ERROR: unhandler unary operation for value of type " + SRCLANG_VALUE_TYPE_ID[static_cast<int>(
+                SRCLANG_VALUE_GET_TYPE(a))] + "'");
         return false;
     }
 
@@ -178,8 +159,7 @@ bool Interpreter::unary(Value a, OpCode op) {
 }
 
 bool Interpreter::binary(Value lhs, Value rhs, OpCode op) {
-    if ((op == OpCode::NE || op == OpCode::EQ) &&
-        SRCLANG_VALUE_GET_TYPE(lhs) != SRCLANG_VALUE_GET_TYPE(rhs)) {
+    if ((op == OpCode::NE || op == OpCode::EQ) && SRCLANG_VALUE_GET_TYPE(lhs) != SRCLANG_VALUE_GET_TYPE(rhs)) {
         *sp++ = op == OpCode::NE ? SRCLANG_VALUE_TRUE : SRCLANG_VALUE_FALSE;
         return true;
     }
@@ -197,12 +177,9 @@ bool Interpreter::binary(Value lhs, Value rhs, OpCode op) {
     if (SRCLANG_VALUE_IS_TYPE(lhs)) {
         auto a = SRCLANG_VALUE_AS_TYPE(lhs);
         if (!SRCLANG_VALUE_IS_TYPE(rhs)) {
-            error("can't apply binary operation '" +
-                  SRCLANG_OPCODE_ID[static_cast<int>(op)] + "' for '" +
-                  SRCLANG_VALUE_TYPE_ID[int(SRCLANG_VALUE_GET_TYPE(lhs))] +
-                  "' and '" +
-                  SRCLANG_VALUE_TYPE_ID[int(SRCLANG_VALUE_GET_TYPE(rhs))] +
-                  "'");
+            error("can't apply binary operation '" + SRCLANG_OPCODE_ID[static_cast<int>(op)] + "' for '" +
+                  SRCLANG_VALUE_TYPE_ID[int(SRCLANG_VALUE_GET_TYPE(lhs))] + "' and '" +
+                  SRCLANG_VALUE_TYPE_ID[int(SRCLANG_VALUE_GET_TYPE(rhs))] + "'");
             return false;
         }
         auto b = SRCLANG_VALUE_AS_TYPE(rhs);
@@ -214,19 +191,15 @@ bool Interpreter::binary(Value lhs, Value rhs, OpCode op) {
                 *sp++ = SRCLANG_VALUE_BOOL(a != b);
                 break;
             default:
-                error("ERROR: unexpected binary operator '" +
-                      SRCLANG_OPCODE_ID[static_cast<int>(op)] + "'");
+                error("ERROR: unexpected binary operator '" + SRCLANG_OPCODE_ID[static_cast<int>(op)] + "'");
                 return false;
         }
     } else if (SRCLANG_VALUE_IS_NUMBER(lhs)) {
         auto a = SRCLANG_VALUE_AS_NUMBER(lhs);
         if (!SRCLANG_VALUE_IS_NUMBER(rhs)) {
-            error("can't apply binary operation '" +
-                  SRCLANG_OPCODE_ID[static_cast<int>(op)] + "' for '" +
-                  SRCLANG_VALUE_TYPE_ID[int(SRCLANG_VALUE_GET_TYPE(lhs))] +
-                  "' and '" +
-                  SRCLANG_VALUE_TYPE_ID[int(SRCLANG_VALUE_GET_TYPE(rhs))] +
-                  "'");
+            error("can't apply binary operation '" + SRCLANG_OPCODE_ID[static_cast<int>(op)] + "' for '" +
+                  SRCLANG_VALUE_TYPE_ID[int(SRCLANG_VALUE_GET_TYPE(lhs))] + "' and '" +
+                  SRCLANG_VALUE_TYPE_ID[int(SRCLANG_VALUE_GET_TYPE(rhs))] + "'");
             return false;
         }
         auto b = SRCLANG_VALUE_AS_NUMBER(rhs);
@@ -277,19 +250,15 @@ bool Interpreter::binary(Value lhs, Value rhs, OpCode op) {
                 *sp++ = SRCLANG_VALUE_NUMBER((long) a & (long) b);
                 break;
             default:
-                error("ERROR: unexpected binary operator '" +
-                      SRCLANG_OPCODE_ID[static_cast<int>(op)] + "'");
+                error("ERROR: unexpected binary operator '" + SRCLANG_OPCODE_ID[static_cast<int>(op)] + "'");
                 return false;
         }
     } else if (SRCLANG_VALUE_IS_BOOL(lhs)) {
         bool a = SRCLANG_VALUE_AS_BOOL(lhs);
         if (!SRCLANG_VALUE_IS_BOOL(rhs)) {
-            error("can't apply binary operation '" +
-                  SRCLANG_OPCODE_ID[static_cast<int>(op)] + "' for '" +
-                  SRCLANG_VALUE_TYPE_ID[int(SRCLANG_VALUE_GET_TYPE(lhs))] +
-                  "' and '" +
-                  SRCLANG_VALUE_TYPE_ID[int(SRCLANG_VALUE_GET_TYPE(rhs))] +
-                  "'");
+            error("can't apply binary operation '" + SRCLANG_OPCODE_ID[static_cast<int>(op)] + "' for '" +
+                  SRCLANG_VALUE_TYPE_ID[int(SRCLANG_VALUE_GET_TYPE(lhs))] + "' and '" +
+                  SRCLANG_VALUE_TYPE_ID[int(SRCLANG_VALUE_GET_TYPE(rhs))] + "'");
             return false;
         }
         bool b = SRCLANG_VALUE_AS_BOOL(rhs);
@@ -307,24 +276,18 @@ bool Interpreter::binary(Value lhs, Value rhs, OpCode op) {
                 *sp++ = SRCLANG_VALUE_BOOL(a || b);
                 break;
             default:
-                error("ERROR: unexpected binary operator '" +
-                      SRCLANG_OPCODE_ID[static_cast<int>(op)] + "'");
+                error("ERROR: unexpected binary operator '" + SRCLANG_OPCODE_ID[static_cast<int>(op)] + "'");
                 return false;
         }
     } else if (SRCLANG_VALUE_GET_TYPE(lhs) == ValueType::String) {
-        char *a =
-                reinterpret_cast<char *>(SRCLANG_VALUE_AS_OBJECT(lhs)->pointer);
+        char *a = reinterpret_cast<char *>(SRCLANG_VALUE_AS_OBJECT(lhs)->pointer);
         if (SRCLANG_VALUE_GET_TYPE(rhs) != ValueType::String) {
-            error("can't apply binary operation '" +
-                  SRCLANG_OPCODE_ID[static_cast<int>(op)] + "' for '" +
-                  SRCLANG_VALUE_TYPE_ID[int(SRCLANG_VALUE_GET_TYPE(lhs))] +
-                  "' and '" +
-                  SRCLANG_VALUE_TYPE_ID[int(SRCLANG_VALUE_GET_TYPE(rhs))] +
-                  "'");
+            error("can't apply binary operation '" + SRCLANG_OPCODE_ID[static_cast<int>(op)] + "' for '" +
+                  SRCLANG_VALUE_TYPE_ID[int(SRCLANG_VALUE_GET_TYPE(lhs))] + "' and '" +
+                  SRCLANG_VALUE_TYPE_ID[int(SRCLANG_VALUE_GET_TYPE(rhs))] + "'");
             return false;
         }
-        char *b =
-                reinterpret_cast<char *>(SRCLANG_VALUE_AS_OBJECT(rhs)->pointer);
+        char *b = reinterpret_cast<char *>(SRCLANG_VALUE_AS_OBJECT(rhs)->pointer);
 
         switch (op) {
             case OpCode::ADD: {
@@ -346,13 +309,11 @@ bool Interpreter::binary(Value lhs, Value rhs, OpCode op) {
             }
                 break;
             case OpCode::EQ: {
-                *sp++ = strcmp(a, b) == 0 ? SRCLANG_VALUE_TRUE
-                                          : SRCLANG_VALUE_FALSE;
+                *sp++ = strcmp(a, b) == 0 ? SRCLANG_VALUE_TRUE : SRCLANG_VALUE_FALSE;
             }
                 break;
             case OpCode::NE: {
-                *sp++ = strcmp(a, b) != 0 ? SRCLANG_VALUE_TRUE
-                                          : SRCLANG_VALUE_FALSE;
+                *sp++ = strcmp(a, b) != 0 ? SRCLANG_VALUE_TRUE : SRCLANG_VALUE_FALSE;
             }
                 break;
             case OpCode::GT:
@@ -362,28 +323,20 @@ bool Interpreter::binary(Value lhs, Value rhs, OpCode op) {
                 *sp++ = SRCLANG_VALUE_BOOL(strlen(a) < strlen(b));
                 break;
             default:
-                error("ERROR: unexpected binary operator '" +
-                      SRCLANG_OPCODE_ID[static_cast<int>(op)] + "' for '" +
-                      SRCLANG_VALUE_TYPE_ID[int(
-                              SRCLANG_VALUE_GET_TYPE(lhs))] +
-                      "'");
+                error("ERROR: unexpected binary operator '" + SRCLANG_OPCODE_ID[static_cast<int>(op)] + "' for '" +
+                      SRCLANG_VALUE_TYPE_ID[int(SRCLANG_VALUE_GET_TYPE(lhs))] + "'");
                 return false;
         }
     } else if (SRCLANG_VALUE_GET_TYPE(lhs) == ValueType::List) {
-        auto a = reinterpret_cast<SrcLangList *>(
-                SRCLANG_VALUE_AS_OBJECT(lhs)->pointer);
+        auto a = reinterpret_cast<SrcLangList *>(SRCLANG_VALUE_AS_OBJECT(lhs)->pointer);
         if (SRCLANG_VALUE_GET_TYPE(rhs) != ValueType::List) {
-            error("can't apply binary operation '" +
-                  SRCLANG_OPCODE_ID[static_cast<int>(op)] + "' for '" +
-                  SRCLANG_VALUE_TYPE_ID[int(SRCLANG_VALUE_GET_TYPE(lhs))] +
-                  "' and '" +
-                  SRCLANG_VALUE_TYPE_ID[int(SRCLANG_VALUE_GET_TYPE(rhs))] +
-                  "'");
+            error("can't apply binary operation '" + SRCLANG_OPCODE_ID[static_cast<int>(op)] + "' for '" +
+                  SRCLANG_VALUE_TYPE_ID[int(SRCLANG_VALUE_GET_TYPE(lhs))] + "' and '" +
+                  SRCLANG_VALUE_TYPE_ID[int(SRCLANG_VALUE_GET_TYPE(rhs))] + "'");
             return false;
         }
 
-        auto b = reinterpret_cast<SrcLangList *>(
-                SRCLANG_VALUE_AS_OBJECT(rhs)->pointer);
+        auto b = reinterpret_cast<SrcLangList *>(SRCLANG_VALUE_AS_OBJECT(rhs)->pointer);
         switch (op) {
             case OpCode::ADD: {
                 auto c = new SrcLangList(a->begin(), a->end());
@@ -399,19 +352,14 @@ bool Interpreter::binary(Value lhs, Value rhs, OpCode op) {
                 *sp++ = SRCLANG_VALUE_BOOL(a->size() < b->size());
                 break;
             default:
-                error("ERROR: unexpected binary operator '" +
-                      SRCLANG_OPCODE_ID[static_cast<int>(op)] + "' for '" +
-                      SRCLANG_VALUE_TYPE_ID[int(
-                              SRCLANG_VALUE_GET_TYPE(lhs))] +
-                      "'");
+                error("ERROR: unexpected binary operator '" + SRCLANG_OPCODE_ID[static_cast<int>(op)] + "' for '" +
+                      SRCLANG_VALUE_TYPE_ID[int(SRCLANG_VALUE_GET_TYPE(lhs))] + "'");
                 return false;
         }
     } else {
-        error("ERROR: unsupported binary operator '" +
-              SRCLANG_OPCODE_ID[int(op)] + "' for type '" +
+        error("ERROR: unsupported binary operator '" + SRCLANG_OPCODE_ID[int(op)] + "' for type '" +
               SRCLANG_VALUE_TYPE_ID[static_cast<int>(
-                      SRCLANG_VALUE_GET_TYPE(lhs))] +
-              "'");
+                      SRCLANG_VALUE_GET_TYPE(lhs))] + "'");
         return false;
     }
 
@@ -419,11 +367,8 @@ bool Interpreter::binary(Value lhs, Value rhs, OpCode op) {
 }
 
 bool Interpreter::is_falsy(Value val) {
-    return SRCLANG_VALUE_IS_NULL(val) ||
-           (SRCLANG_VALUE_IS_BOOL(val) &&
-            SRCLANG_VALUE_AS_BOOL(val) == false) ||
-           (SRCLANG_VALUE_IS_NUMBER(val) &&
-            SRCLANG_VALUE_AS_NUMBER(val) == 0) ||
+    return SRCLANG_VALUE_IS_NULL(val) || (SRCLANG_VALUE_IS_BOOL(val) && SRCLANG_VALUE_AS_BOOL(val) == false) ||
+           (SRCLANG_VALUE_IS_NUMBER(val) && SRCLANG_VALUE_AS_NUMBER(val) == 0) ||
            (SRCLANG_VALUE_IS_OBJECT(val) && SRCLANG_VALUE_AS_OBJECT(val)->type == ValueType::Error);
 }
 
@@ -438,8 +383,7 @@ void Interpreter::print_stack() {
 }
 
 bool Interpreter::call_closure(Value callee, uint8_t count) {
-    auto closure = reinterpret_cast<Closure *>(
-            SRCLANG_VALUE_AS_OBJECT(callee)->pointer);
+    auto closure = reinterpret_cast<Closure *>(SRCLANG_VALUE_AS_OBJECT(callee)->pointer);
     if (closure->fun->is_variadic) {
         if (count < closure->fun->nparams - 1) {
             error("expected atleast '" + std::to_string(closure->fun->nparams - 1) + "' but '" + std::to_string(count) +
@@ -478,148 +422,12 @@ bool Interpreter::call_closure(Value callee, uint8_t count) {
 }
 
 bool Interpreter::call_native(Value callee, uint8_t count) {
-    auto native = reinterpret_cast<NativeFunction *>(
-            SRCLANG_VALUE_AS_OBJECT(callee)->pointer);
-    if (native->param.size() != count) {
-        error("Expected '" + std::to_string(native->param.size()) + "' but '" +
-              std::to_string(count) + "' provided");
-        return false;
-    }
-
-    static std::map<CType, ffi_type *> ctypes = {
-            {CType::i8,  &ffi_type_sint8},
-            {CType::i16, &ffi_type_sint16},
-            {CType::i32, &ffi_type_sint32},
-            {CType::i64, &ffi_type_sint64},
-            {CType::u8,  &ffi_type_uint8},
-            {CType::u16, &ffi_type_uint16},
-            {CType::u32, &ffi_type_uint32},
-            {CType::u64, &ffi_type_uint64},
-            {CType::f32, &ffi_type_float},
-            {CType::f64, &ffi_type_double},
-            {CType::ptr, &ffi_type_pointer},
-            {CType::val, &ffi_type_ulong},
-    };
-#ifdef _WIN32
-
-#else
-#endif
-
-    auto handler = language->get_function<void *>(native->id);
-    if (handler == nullptr) {
-        error("undefined symbol '" + native->id + "'");
-        return false;
-    }
-
-    ffi_cif cif;
-    void *values[count];
-    ffi_type *types[count];
-    int j = 0;
-    std::vector<unsigned long> unsigned_value_holder(count);
-    std::vector<long> signed_value_holder(count);
-    std::vector<double> float_value_holder(count);
-    for (auto i = sp - count; i != sp; i++, j++) {
-        auto type = SRCLANG_VALUE_GET_TYPE(*i);
-        if (!is_same(native->param[j], type)) {
-            error("ERROR: invalid " + std::to_string(j) + "th parameter, expected '" +
-                  CTYPE_ID[int(native->param[j])] + "' but got '" +
-                  SRCLANG_VALUE_TYPE_ID[int(type)] +
-                  "'");
-            return false;
-        }
-        if (native->param[j] == CType::val) {
-            values[j] = &(*i);
-            types[j] = &ffi_type_ulong;
-        } else {
-            switch (type) {
-                case ValueType::Null:
-                    values[j] = nullptr;
-                    types[j] = &ffi_type_pointer;
-                    break;
-                case ValueType::Number: {
-                    if (native->param[j] >= CType::i8 && native->param[j] <= CType::i64) {
-                        auto value = SRCLANG_VALUE_AS_NUMBER(*i);
-                        signed_value_holder[j] = static_cast<long>(value);
-                        values[j] = &signed_value_holder[j];
-                    } else if (native->param[j] >= CType::u8 && native->param[j] <= CType::u64) {
-                        auto value = SRCLANG_VALUE_AS_NUMBER(*i);
-                        unsigned_value_holder[j] = static_cast<unsigned long>(value);
-                        values[j] = &unsigned_value_holder[j];
-                    } else if (native->param[j] == CType::f32 && native->param[j] == CType::f64) {
-                        auto value = SRCLANG_VALUE_AS_NUMBER(*i);
-                        float_value_holder[j] = value;
-                        values[j] = &float_value_holder[j];
-                    } else {
-                        error("invalid value type " + SRCLANG_VALUE_DEBUG(*i));
-                        return false;
-                    }
-                    types[j] = ctypes[native->param[j]];
-
-                }
-                    break;
-                case ValueType::Pointer: {
-                    values[j] = &SRCLANG_VALUE_AS_OBJECT(*i)->pointer;
-                    types[j] = &ffi_type_pointer;
-                }
-                    break;
-
-                case ValueType::Boolean:
-                    values[j] = &(*i);
-                    types[j] = &ffi_type_sint;
-                    break;
-                default:
-                    values[j] = &SRCLANG_VALUE_AS_OBJECT(*i)->pointer;
-                    types[j] = &ffi_type_pointer;
-                    break;
-            }
-        }
-    }
-    ffi_type *ret_type = ctypes[native->ret];
-
-    if (ffi_prep_cif(&cif, FFI_DEFAULT_ABI, count, ret_type,
-                     types) != FFI_OK) {
-        error("ffi_prep_cif() failed");
-        return false;
-    }
-    ffi_arg result;
-    ffi_call(&cif, FFI_FN(handler), &result, values);
-    switch (native->ret) {
-        case CType::i8:
-        case CType::i16:
-        case CType::i32:
-        case CType::i64:
-            result = SRCLANG_VALUE_NUMBER(static_cast<double>((long) result));
-            break;
-        case CType::u8:
-        case CType::u16:
-        case CType::u32:
-        case CType::u64:
-            result = SRCLANG_VALUE_NUMBER(static_cast<double>((unsigned long) result));
-            break;
-        case CType::ptr:
-            if ((void *) result == nullptr) {
-                result = SRCLANG_VALUE_NULL;
-            } else {
-                result = SRCLANG_VALUE_POINTER((void *) result);
-            }
-            break;
-        case CType::val:
-            // std::cout << "NATIVE: " << result << std::endl;
-            break;
-        default:
-            error("ERROR: unsupported return type '" +
-                  SRCLANG_VALUE_TYPE_ID[int(native->ret)] + "'");
-            return false;
-    }
-
-    sp -= count + 1;
-    *sp++ = result;
-    return true;
+    error("not handled");
+    return false;
 }
 
 bool Interpreter::call_builtin(Value callee, uint8_t count) {
-    auto builtin =
-            reinterpret_cast<Builtin>(SRCLANG_VALUE_AS_OBJECT(callee)->pointer);
+    auto builtin = reinterpret_cast<Builtin>(SRCLANG_VALUE_AS_OBJECT(callee)->pointer);
     std::vector<Value> args(sp - count, sp);
     sp -= count + 1;
     Value result;
@@ -642,11 +450,9 @@ bool Interpreter::call_typecast_num(uint8_t count) {
     }
     Value val = *(sp - count);
     sp -= count + 1;
-    if (SRCLANG_VALUE_IS_OBJECT(val) &&
-        SRCLANG_VALUE_AS_OBJECT(val)->type == ValueType::String) {
+    if (SRCLANG_VALUE_IS_OBJECT(val) && SRCLANG_VALUE_AS_OBJECT(val)->type == ValueType::String) {
         try {
-            *sp++ = SRCLANG_VALUE_NUMBER(
-                    std::stod((char *) (SRCLANG_VALUE_AS_OBJECT(val)->pointer)));
+            *sp++ = SRCLANG_VALUE_NUMBER(std::stod((char *) (SRCLANG_VALUE_AS_OBJECT(val)->pointer)));
         } catch (...) {
             error("invalid typecast str -> num");
             return false;
@@ -787,8 +593,6 @@ bool Interpreter::call(uint8_t count) {
         switch (SRCLANG_VALUE_AS_OBJECT(callee)->type) {
             case ValueType::Closure:
                 return call_closure(callee, count);
-            case ValueType::Native:
-                return call_native(callee, count);
             case ValueType::Builtin:
                 return call_builtin(callee, count);
             case ValueType::Bounded:
@@ -796,15 +600,11 @@ bool Interpreter::call(uint8_t count) {
             case ValueType::Map:
                 return call_map(callee, count);
             default:
-                error("ERROR: can't call object '" +
-                      SRCLANG_VALUE_DEBUG(callee) +
-                      "'");
+                error("ERROR: can't call object '" + SRCLANG_VALUE_DEBUG(callee) + "'");
                 return false;
         }
     }
-    error("ERROR: can't call value of type '" +
-          SRCLANG_VALUE_DEBUG(callee) +
-          "'");
+    error("ERROR: can't call value of type '" + SRCLANG_VALUE_DEBUG(callee) + "'");
     return false;
 }
 
@@ -813,8 +613,7 @@ bool Interpreter::run() {
         if (debug) {
             if (!debug_info.empty() && debug_info.back() != nullptr) {
                 std::cout << debug_info.back()->filename << ":"
-                          << debug_info.back()->lines[distance(
-                                  fp->closure->fun->instructions->begin(), fp->ip)]
+                          << debug_info.back()->lines[distance(fp->closure->fun->instructions->begin(), fp->ip)]
                           << std::endl;
             }
 
@@ -824,9 +623,8 @@ bool Interpreter::run() {
             }
             std::cout << std::endl;
             std::cout << ">> ";
-            ByteCode::debug(
-                    *fp->closure->fun->instructions.get(), language->constants,
-                    distance(fp->closure->fun->instructions->begin(), fp->ip), std::cout);
+            ByteCode::debug(*fp->closure->fun->instructions.get(), language->constants,
+                            distance(fp->closure->fun->instructions->begin(), fp->ip), std::cout);
             std::cout << std::endl;
 
             if (break_) std::cin.get();
@@ -898,8 +696,7 @@ bool Interpreter::run() {
                         language->globals[pos] = *(sp - 1);
                         break;
                     default:
-                        error("Invalid STORE operation on '" +
-                              SRCLANG_SYMBOL_ID[int(scope)] + "'");
+                        error("Invalid STORE operation on '" + SRCLANG_SYMBOL_ID[int(scope)] + "'");
                         return false;
                 }
             }
@@ -925,8 +722,7 @@ bool Interpreter::run() {
                         *sp++ = fp->closure->free[pos];
                         break;
                     default:
-                        error("ERROR: can't load value of scope '" +
-                              SRCLANG_SYMBOL_ID[int(scope)] + "'");
+                        error("ERROR: can't load value of scope '" + SRCLANG_SYMBOL_ID[int(scope)] + "'");
                         return false;
                 }
 
@@ -979,9 +775,7 @@ bool Interpreter::run() {
                 auto size = *fp->ip++;
                 auto map = new SrcLangMap();
                 for (auto i = sp - (size * 2); i != sp; i += 2) {
-                    map->insert(
-                            {(char *) SRCLANG_VALUE_AS_OBJECT(*(i))->pointer,
-                             *(i + 1)});
+                    map->insert({(char *) SRCLANG_VALUE_AS_OBJECT(*(i))->pointer, *(i + 1)});
                 }
                 sp -= (size * 2);
                 *sp++ = SRCLANG_VALUE_MAP(map);
@@ -999,8 +793,7 @@ bool Interpreter::run() {
                     case 2:
                         end_idx = *--sp;
                         pos = *--sp;
-                        if (!(SRCLANG_VALUE_IS_NUMBER(pos) &&
-                              SRCLANG_VALUE_IS_NUMBER(end_idx))) {
+                        if (!(SRCLANG_VALUE_IS_NUMBER(pos) && SRCLANG_VALUE_IS_NUMBER(end_idx))) {
                             error("invalid INDEX for range");
                             return false;
                         }
@@ -1010,11 +803,9 @@ bool Interpreter::run() {
                         return false;
                 }
                 auto container = *--sp;
-                if (SRCLANG_VALUE_GET_TYPE(container) ==
-                    ValueType::String &&
+                if (SRCLANG_VALUE_GET_TYPE(container) == ValueType::String &&
                     SRCLANG_VALUE_GET_TYPE(pos) == ValueType::Number) {
-                    char *buffer =
-                            (char *) SRCLANG_VALUE_AS_OBJECT(container)->pointer;
+                    char *buffer = (char *) SRCLANG_VALUE_AS_OBJECT(container)->pointer;
                     int index = SRCLANG_VALUE_AS_NUMBER(pos);
                     int len = strlen(buffer);
                     switch (count) {
@@ -1045,17 +836,13 @@ bool Interpreter::run() {
                         }
                             break;
                         default:
-                            error(
-                                    "Invalid INDEX range operation for string");
+                            error("Invalid INDEX range operation for string");
                             return false;
                     }
 
-                } else if (SRCLANG_VALUE_GET_TYPE(container) ==
-                           ValueType::List &&
-                           SRCLANG_VALUE_GET_TYPE(pos) ==
-                           ValueType::Number) {
-                    std::vector<Value> list =
-                            *(std::vector<Value> *) SRCLANG_VALUE_AS_OBJECT(container)->pointer;
+                } else if (SRCLANG_VALUE_GET_TYPE(container) == ValueType::List &&
+                           SRCLANG_VALUE_GET_TYPE(pos) == ValueType::Number) {
+                    std::vector<Value> list = *(std::vector<Value> *) SRCLANG_VALUE_AS_OBJECT(container)->pointer;
 
                     int index = SRCLANG_VALUE_AS_NUMBER(pos);
                     switch (count) {
@@ -1077,8 +864,7 @@ bool Interpreter::run() {
                             }
                             auto values = new SrcLangList(end - index);
                             for (int i = index; i < end; i++) {
-                                values->at(i) =
-                                        builtin_clone({list[i]}, this);
+                                values->at(i) = builtin_clone({list[i]}, this);
                             }
                             *sp++ = SRCLANG_VALUE_LIST(values);
                             add_object(*(sp - 1));
@@ -1090,14 +876,10 @@ bool Interpreter::run() {
                             return false;
                     }
 
-                } else if (SRCLANG_VALUE_GET_TYPE(container) ==
-                           ValueType::Map &&
-                           SRCLANG_VALUE_GET_TYPE(pos) ==
-                           ValueType::String) {
-                    auto map = *reinterpret_cast<SrcLangMap *>(
-                            SRCLANG_VALUE_AS_OBJECT(container)->pointer);
-                    auto buf = reinterpret_cast<char *>(
-                            SRCLANG_VALUE_AS_OBJECT(pos)->pointer);
+                } else if (SRCLANG_VALUE_GET_TYPE(container) == ValueType::Map &&
+                           SRCLANG_VALUE_GET_TYPE(pos) == ValueType::String) {
+                    auto map = *reinterpret_cast<SrcLangMap *>(SRCLANG_VALUE_AS_OBJECT(container)->pointer);
+                    auto buf = reinterpret_cast<char *>(SRCLANG_VALUE_AS_OBJECT(pos)->pointer);
                     auto get_index_callback = map.find("__index__");
                     if (get_index_callback == map.end()) {
                         auto idx = map.find(buf);
@@ -1139,12 +921,10 @@ bool Interpreter::run() {
                 auto val = *--sp;
                 auto pos = *--sp;
                 auto container = *--sp;
-                if (SRCLANG_VALUE_GET_TYPE(container) ==
-                    ValueType::String &&
+                if (SRCLANG_VALUE_GET_TYPE(container) == ValueType::String &&
                     SRCLANG_VALUE_GET_TYPE(pos) == ValueType::Number) {
                     auto idx = SRCLANG_VALUE_AS_NUMBER(pos);
-                    char *buf =
-                            (char *) SRCLANG_VALUE_AS_OBJECT(container)->pointer;
+                    char *buf = (char *) SRCLANG_VALUE_AS_OBJECT(container)->pointer;
                     int size = strlen(buf);
                     if (idx < 0 || size <= idx) {
                         error("out of bound");
@@ -1157,35 +937,23 @@ bool Interpreter::run() {
                             return false;
                         }
                         buf[long(idx)] = (char) SRCLANG_VALUE_AS_NUMBER(val);
-                    } else if (SRCLANG_VALUE_GET_TYPE(val) ==
-                               ValueType::String) {
-                        char *b =
-                                (char *) SRCLANG_VALUE_AS_OBJECT(val)->pointer;
+                    } else if (SRCLANG_VALUE_GET_TYPE(val) == ValueType::String) {
+                        char *b = (char *) SRCLANG_VALUE_AS_OBJECT(val)->pointer;
                         size_t b_size = strlen(b);
                         buf = (char *) realloc(buf, size + b_size);
                         strcat(buf, b);
                     } else {
-                        error("can't SET '" +
-                              SRCLANG_VALUE_TYPE_ID[int(
-                                      SRCLANG_VALUE_GET_TYPE(val))] +
-                              "' to string");
+                        error("can't SET '" + SRCLANG_VALUE_TYPE_ID[int(SRCLANG_VALUE_GET_TYPE(val))] + "' to string");
                         return true;
                     }
-                } else if (SRCLANG_VALUE_GET_TYPE(container) ==
-                           ValueType::List &&
-                           SRCLANG_VALUE_GET_TYPE(pos) ==
-                           ValueType::Number) {
-                    auto list = reinterpret_cast<SrcLangList *>(
-                            SRCLANG_VALUE_AS_OBJECT(container)->pointer);
+                } else if (SRCLANG_VALUE_GET_TYPE(container) == ValueType::List &&
+                           SRCLANG_VALUE_GET_TYPE(pos) == ValueType::Number) {
+                    auto list = reinterpret_cast<SrcLangList *>(SRCLANG_VALUE_AS_OBJECT(container)->pointer);
                     list->at(SRCLANG_VALUE_AS_NUMBER(pos)) = val;
-                } else if (SRCLANG_VALUE_GET_TYPE(container) ==
-                           ValueType::Map &&
-                           SRCLANG_VALUE_GET_TYPE(pos) ==
-                           ValueType::String) {
-                    auto map = reinterpret_cast<SrcLangMap *>(
-                            SRCLANG_VALUE_AS_OBJECT(container)->pointer);
-                    auto buf = reinterpret_cast<char *>(
-                            SRCLANG_VALUE_AS_OBJECT(pos)->pointer);
+                } else if (SRCLANG_VALUE_GET_TYPE(container) == ValueType::Map &&
+                           SRCLANG_VALUE_GET_TYPE(pos) == ValueType::String) {
+                    auto map = reinterpret_cast<SrcLangMap *>(SRCLANG_VALUE_AS_OBJECT(container)->pointer);
+                    auto buf = reinterpret_cast<char *>(SRCLANG_VALUE_AS_OBJECT(pos)->pointer);
                     auto set_index_callback = map->find("__set_index__");
                     if (set_index_callback == map->end()) {
                         if (map->find(buf) == map->end()) {
@@ -1206,8 +974,7 @@ bool Interpreter::run() {
                         }
                     }
 
-                } else if (SRCLANG_VALUE_GET_TYPE(container) ==
-                           ValueType::Pointer &&
+                } else if (SRCLANG_VALUE_GET_TYPE(container) == ValueType::Pointer &&
                            SRCLANG_VALUE_GET_TYPE(pos) == ValueType::Number) {
                     auto idx = SRCLANG_VALUE_AS_NUMBER(pos);
                     char *buf = (char *) SRCLANG_VALUE_AS_OBJECT(container)->pointer;
@@ -1215,12 +982,8 @@ bool Interpreter::run() {
                     buf[long(idx)] = value;
                 } else {
                     error("invalid SET operation for '" +
-                          SRCLANG_VALUE_TYPE_ID[int(
-                                  SRCLANG_VALUE_GET_TYPE(container))] +
-                          "' and '" +
-                          SRCLANG_VALUE_TYPE_ID[int(
-                                  SRCLANG_VALUE_GET_TYPE(pos))] +
-                          "'");
+                          SRCLANG_VALUE_TYPE_ID[int(SRCLANG_VALUE_GET_TYPE(container))] + "' and '" +
+                          SRCLANG_VALUE_TYPE_ID[int(SRCLANG_VALUE_GET_TYPE(pos))] + "'");
                     return false;
                 }
                 *sp++ = container;
@@ -1303,8 +1066,7 @@ bool Interpreter::run() {
                 break;
 
             default:
-                error("unknown opcode '" +
-                      SRCLANG_OPCODE_ID[static_cast<int>(inst)] + "'");
+                error("unknown opcode '" + SRCLANG_OPCODE_ID[static_cast<int>(inst)] + "'");
                 return false;
         }
     }

@@ -1,23 +1,21 @@
 cmake_minimum_required(VERSION 3.10)
 project(srclang
-    VERSION 0.0.1
-    DESCRIPTION "Source Programming Language")
+        VERSION 0.0.1
+        DESCRIPTION "Source Programming Language")
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(POSITION_INDEPENDENT_CODE ON)
 
-find_library(FFI ffi REQUIRED)
-find_library(READLINE readline REQUIRED)
-
 if (WIN32)
 
-else()
+else ()
+    find_library(READLINE readline REQUIRED)
     find_library(DL dl REQUIRED)
-endif()
+endif ()
 add_subdirectory(src)
 
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-enable_testing()
-add_subdirectory(tests)
+    enable_testing()
+    add_subdirectory(tests)
 endif ()

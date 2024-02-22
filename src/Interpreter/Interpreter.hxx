@@ -18,30 +18,30 @@ namespace srclang {
             typename std::vector<Byte>::iterator ip;
             Closure *closure;
             std::vector<Value>::iterator bp;
-            std::vector <Value> defers;
+            std::vector<Value> defers;
         };
 
         int next_gc = 50;
         float GC_HEAP_GROW_FACTOR = 1.0;
         int LIMIT_NEXT_GC = 200;
 
-        std::vector <Value> stack;
+        std::vector<Value> stack;
         std::vector<Value>::iterator sp;
-        std::vector <Frame> frames;
+        std::vector<Frame> frames;
 
         Language *language;
 
         std::stringstream err_stream;
 
         typename std::vector<Frame>::iterator fp;
-        std::vector <std::shared_ptr<DebugInfo>> debug_info;
+        std::vector<std::shared_ptr<DebugInfo>> debug_info;
         bool debug, break_;
 
         void error(std::string const &mesg);
 
         void grace_full_exit();
 
-        Interpreter(ByteCode &code, const std::shared_ptr <DebugInfo> &debugInfo, Language *language);
+        Interpreter(ByteCode &code, const std::shared_ptr<DebugInfo> &debugInfo, Language *language);
 
         ~Interpreter();
 

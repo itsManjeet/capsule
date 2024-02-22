@@ -43,10 +43,6 @@ void srclang::SRCLANG_VALUE_FREE(Value value) {
                 object->cleanup(object->pointer);
                 break;
 
-            case ValueType::Native:
-                delete reinterpret_cast<NativeFunction *>(object->pointer);
-                break;
-
             case ValueType::Builtin:
                 break;
 
@@ -86,9 +82,7 @@ std::string srclang::SRCLANG_VALUE_GET_STRING(Value val) {
         }
 
         case ValueType::Type:
-            return "<type(" +
-                   SRCLANG_VALUE_TYPE_ID[int(SRCLANG_VALUE_AS_TYPE(val))] +
-                   ")>";
+            return "<type(" + SRCLANG_VALUE_TYPE_ID[int(SRCLANG_VALUE_AS_TYPE(val))] + ")>";
         default:
             if (SRCLANG_VALUE_IS_OBJECT(val)) {
                 auto object = SRCLANG_VALUE_AS_OBJECT(val);

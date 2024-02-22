@@ -5,18 +5,14 @@
 
 using namespace srclang;
 
-Language::Language()
-        : globals(65536),
-          options({
-                          {"VERSION", SRCLANG_VERSION},
-                          {"GC_HEAP_GROW_FACTOR",   1.3f},
-                          {"GC_INITIAL_TRIGGER",    10},
-                          {"SEARCH_PATH",           ""},
-                          {"IR",                    false},
-                          {"EXPERIMENTAL_FEATURES", false},
-                          {"DEBUG",                 false},
-                          {"BREAK",                 false},
-                  }) {
+Language::Language() : globals(65536), options({{"VERSION", SRCLANG_VERSION},
+                                                {"GC_HEAP_GROW_FACTOR",   1.3f},
+                                                {"GC_INITIAL_TRIGGER",    10},
+                                                {"SEARCH_PATH",           ""},
+                                                {"IR",                    false},
+                                                {"EXPERIMENTAL_FEATURES", false},
+                                                {"DEBUG",                 false},
+                                                {"BREAK",                 false},}) {
     for (auto b: builtins) {
         memoryManager.heap.push_back(b);
     }
@@ -33,27 +29,9 @@ Language::Language()
     define("false", SRCLANG_VALUE_FALSE);
     define("null", SRCLANG_VALUE_NULL);
 
-#ifdef _WIN32
-    load_library("msvcrt");
-#else
-    load_library(LIBC_SO);
-    auto HOME = getenv("HOME");
-    if (HOME) appendSearchPath(std::filesystem::path(HOME) / ".local" / "share" / "srclang");
-    appendSearchPath("/usr/lib/srclang/");
-#endif
-
 }
 
-Language::~Language() {
-    for (auto c: libraries) {
-#ifdef _WIN32
-        FreeLibrary(c);
-#else
-        dlclose(c);
-#endif
-    }
-
-}
+Language::~Language() = default;
 
 void Language::define(const std::string &id, Value value) {
     auto symbol = symbolTable.resolve(id);
@@ -88,7 +66,7 @@ Language::compile(std::string const &input, std::string const &filename) {
         if (std::get<bool>(options["IR"])) {
             std::cout << std::get<1>(ret) << std::endl;
         }
-    } catch (const std::exception& exception) {
+    } catch (const std::exception &exception) {
         std::get<0>(ret) = register_object(SRCLANG_VALUE_ERROR(strdup(exception.what())));
     }
 
@@ -117,9 +95,7 @@ Value Language::execute(const std::filesystem::path &filename) {
     }
     std::ifstream reader(filename);
 
-    std::string input(
-            (std::istreambuf_iterator<char>(reader)),
-            (std::istreambuf_iterator<char>()));
+    std::string input((std::istreambuf_iterator<char>(reader)), (std::istreambuf_iterator<char>()));
     return execute(input, filename.string());
 }
 
@@ -140,16 +116,6 @@ Value Language::resolve(const std::string &id) {
     }
 }
 
-void Language::load_library(const std::string &id) {
-#ifdef _WIN32
-    HMODULE handle = LoadLibrary(id.c_str());
-    if (handle == nullptr) throw std::runtime_error("failed to load library '" + id + "'");
-#else
-    HMODULE handler = dlopen(id.c_str(), RTLD_LAZY | RTLD_LOCAL);
-    if (handler == nullptr) throw std::runtime_error(dlerror());
-#endif
-    libraries.push_back(handler);
-}
 
 Value Language::call(Value callee, const std::vector<Value> &args) {
     ByteCode code;

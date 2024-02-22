@@ -1,6 +1,5 @@
 #include <fstream>
-#include <readline/readline.h>
-#include <readline/history.h>
+#include <iostream>
 
 #include "Language/Language.hxx"
 
@@ -31,12 +30,12 @@ int printHelp() {
     return 1;
 }
 
-static bool is_complete(const char* input) {
+static bool is_complete(const char *input) {
     std::vector<char> stack;
     std::map<char, char> pairs = {{'(', ')'},
                                   {'{', '}'},
                                   {'[', ']'}};
-    for (char *c = (char*) input; *c != '\0'; c++) {
+    for (char *c = (char *) input; *c != '\0'; c++) {
         switch (*c) {
             case '(':
             case '{':
@@ -139,19 +138,22 @@ int main(int argc, char **argv) {
     }
 
     std::cout << LOGO << "\nSource Programming Language\nPress Ctrl+C to exit\n" << std::endl;
+    std::string input;
+    std::string prompt = ">> ";
     while (true) {
-        auto input = readline("> ");
-        while (!is_complete(input)) {
-            auto sub_input = readline("... ");
-            auto input_size = strlen(input), sub_input_size = strlen(sub_input);
-            input = (char*) realloc(input, input_size + sub_input_size + 1);
-            strcat(input + input_size, sub_input);
-            input[input_size + sub_input_size] = '\0';
-            free(sub_input);
-        }
+        do {
+            std::cout << prompt;
+            std::string line;
+            std::getline(std::cin, line);
+            input += line;
+            prompt = "... ";
+        } while (!is_complete(input.c_str()));
+
         if (input == ".exit") break;
         auto result = language.execute(input, "stdin");
         std::cout << ":: " << SRCLANG_VALUE_GET_STRING(result) << std::endl;
+        prompt = ">> ";
+        input.clear();
     }
 
     return 0;

@@ -11,7 +11,8 @@ add_library(${PROJECT_NAME}_LIB
         Compiler/Compiler.cxx Compiler/Compiler.hxx
         Interpreter/Interpreter.cxx Interpreter/Interpreter.hxx
         Language/Language.cxx Language/Language.hxx)
-target_link_libraries(${PROJECT_NAME}_LIB ${DL} ${FFI} ${READLINE})
+
+target_link_libraries(${PROJECT_NAME}_LIB ${DL} ${READLINE})
 add_executable(${PROJECT_NAME} srclang.cxx)
 
 target_link_libraries(${PROJECT_NAME} ${PROJECT_NAME}_LIB)

@@ -32,7 +32,7 @@ namespace srclang {
 #undef X
     };
 
-    static const std::vector <std::string> SRCLANG_TOKEN_ID = {
+    static const std::vector<std::string> SRCLANG_TOKEN_ID = {
 #define X(id) #id,
             SRCLANG_TOKEN_TYPE_LIST
 #undef X
@@ -58,17 +58,17 @@ namespace srclang {
         Token cur, peek;
         Iterator iter, start, end;
         std::string filename;
-    
-        std::vector <std::string> loaded_imports;
-        std::vector <std::unique_ptr<Instructions>> instructions;
+
+        std::vector<std::string> loaded_imports;
+        std::vector<std::unique_ptr<Instructions>> instructions;
         DebugInfo *debug_info;
-        std::shared_ptr <DebugInfo> global_debug_info;
+        std::shared_ptr<DebugInfo> global_debug_info;
 
         Instructions *inst();
 
         void push_scope();
 
-        std::unique_ptr <Instructions> pop_scope();
+        std::unique_ptr<Instructions> pop_scope();
 
         template<typename Message>
         void error(const Message &mesg, Iterator pos) {
@@ -79,7 +79,7 @@ namespace srclang {
             if (pos != end) {
                 err << "ERROR: " << mesg << '\n';
                 err << " | " << get_error_line(line_start) << '\n'
-                             << "   ";
+                    << "   ";
                 for (; line_start != pos; ++line_start) err << ' ';
                 err << '^';
             } else {
@@ -154,9 +154,6 @@ namespace srclang {
         void function(Symbol *symbol, bool skip_args = false);
 
         void class_();
-
-        /// native ::= 'native' <identifier> ( (<type> % ',') ) <type>
-        void native(Symbol *symbol);
 
         /// list ::= '[' (<expression> % ',') ']'
         void list();
@@ -239,14 +236,14 @@ namespace srclang {
         void program();
 
     public:
-        Compiler(Iterator start, Iterator end, const std::string &filename, Language *language);
+        Compiler(const Iterator &start, Iterator end, const std::string &filename, Language *language);
 
         void compile();
 
         ByteCode code();
 
-        std::shared_ptr <DebugInfo> debugInfo() { return global_debug_info; }
-        
+        std::shared_ptr<DebugInfo> debugInfo() { return global_debug_info; }
+
     };
 
 }  // srclang
