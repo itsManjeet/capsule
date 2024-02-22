@@ -202,13 +202,13 @@ void Compiler::eat() {
         do {
             iter++;
         } while (isalnum(*iter) || *iter == '_');
-        peek.literal = std::string_view(peek.pos, iter);
+        peek.literal = std::string(peek.pos, iter);
         peek.type = TokenType::Identifier;
         return;
     }
 
     if (ispunct(*iter)) {
-        peek.literal = std::string_view(peek.pos, ++iter);
+        peek.literal = std::string(peek.pos, ++iter);
         peek.type = TokenType::Reserved;
         return;
     }
@@ -220,7 +220,7 @@ void Compiler::eat() {
         if (*iter == 'b' || *iter == 'h') {  // include 'b' for binary and 'h' for hexadecimal
             iter++;
         }
-        peek.literal = std::string_view(peek.pos, iter);
+        peek.literal = std::string(peek.pos, iter);
         peek.type = TokenType::Number;
         return;
     }
