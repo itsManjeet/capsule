@@ -1,4 +1,4 @@
-#include "Compiler.hxx"
+#include "Compiler.h"
 
 #include <algorithm>
 #include <filesystem>
@@ -6,7 +6,7 @@
 #include <ranges>
 #include <utility>
 
-#include "../Language/Language.hxx"
+#include "../Language/Language.h"
 
 using namespace srclang;
 

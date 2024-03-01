@@ -1,7 +1,7 @@
 #include <fstream>
 #include <iostream>
 
-#include "Language/Language.hxx"
+#include "../src/Language/Language.h"
 
 using namespace srclang;
 

@@ -1,7 +1,7 @@
-#ifndef SRCLANG_MEMORYMANAGER_HXX
-#define SRCLANG_MEMORYMANAGER_HXX
+#ifndef SRCLANG_MEMORYMANAGER_H
+#define SRCLANG_MEMORYMANAGER_H
 
-#include "../../Value/Value.hxx"
+#include "../../Value/Value.h"
 
 namespace srclang {
 
@@ -61,4 +61,4 @@ namespace srclang {
 
 }  // srclang
 
-#endif  // SRCLANG_MEMORYMANAGER_HXX
+#endif  // SRCLANG_MEMORYMANAGER_H

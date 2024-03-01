@@ -16,7 +16,7 @@
  */
 
 #include <fstream>
-#include "../src/Language/Language.hxx"
+#include "../src/Language/Language.h"
 
 using namespace srclang;
 

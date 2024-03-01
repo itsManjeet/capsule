@@ -1,5 +1,5 @@
-#ifndef SRCLANG_OPTIONS_HXX
-#define SRCLANG_OPTIONS_HXX
+#ifndef SRCLANG_OPTIONS_H
+#define SRCLANG_OPTIONS_H
 
 #include <map>
 #include <string>
@@ -16,4 +16,4 @@ namespace srclang {
 
 }  // srclang
 
-#endif  // SRCLANG_OPTIONS_HXX
+#endif  // SRCLANG_OPTIONS_H

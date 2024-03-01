@@ -1,8 +1,8 @@
-#ifndef SRCLANG_BUILTIN_HXX
-#define SRCLANG_BUILTIN_HXX
+#ifndef SRCLANG_BUILTIN_H
+#define SRCLANG_BUILTIN_H
 
-#include "../Interpreter/MemoryManager/MemoryManager.hxx"
-#include "../Value/Value.hxx"
+#include "../Interpreter/MemoryManager/MemoryManager.h"
+#include "../Value/Value.h"
 
 namespace srclang {
     struct Interpreter;
@@ -45,4 +45,4 @@ namespace srclang {
     extern std::vector<Value> builtins;
 }  // namespace srclang
 
-#endif  // SRCLANG_BUILTIN_HXX
+#endif  // SRCLANG_BUILTIN_H

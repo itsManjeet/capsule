@@ -1,5 +1,5 @@
-#ifndef SRCLANG_DEBUGINFO_HXX
-#define SRCLANG_DEBUGINFO_HXX
+#ifndef SRCLANG_DEBUGINFO_H
+#define SRCLANG_DEBUGINFO_H
 
 #include <iostream>
 #include <string>
@@ -15,4 +15,4 @@ namespace srclang {
 
 }  // srclang
 
-#endif  // SRCLANG_DEBUGINFO_HXX
+#endif  // SRCLANG_DEBUGINFO_H

@@ -1,6 +1,6 @@
-#include "MemoryManager.hxx"
+#include "MemoryManager.h"
 
-#include "../../Value/Function.hxx"
+#include "../../Value/Function.h"
 
 using namespace srclang;
 

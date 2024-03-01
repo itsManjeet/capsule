@@ -1,4 +1,4 @@
-#include "Function.hxx"
+#include "Function.h"
 
 namespace srclang {
 }  // srclang

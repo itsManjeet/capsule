@@ -1,11 +1,11 @@
-#include "Interpreter.hxx"
+#include "Interpreter.h"
 
 #include <array>
 #include <iostream>
 #include <ranges>
 
-#include "../Language/Language.hxx"
-#include "../Compiler/SymbolTable/SymbolTable.hxx"
+#include "../Language/Language.h"
+#include "../Compiler/SymbolTable/SymbolTable.h"
 
 using namespace srclang;
 

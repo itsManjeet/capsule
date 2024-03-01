@@ -1,7 +1,7 @@
-#include "Builtin.hxx"
+#include "Builtin.h"
 
-#include "../Interpreter/Interpreter.hxx"
-#include "../Language/Language.hxx"
+#include "../Interpreter/Interpreter.h"
+#include "../Language/Language.h"
 
 using namespace srclang;
 

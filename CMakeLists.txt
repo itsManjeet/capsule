@@ -7,13 +7,8 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(POSITION_INDEPENDENT_CODE ON)
 
-if (WIN32)
-
-else ()
-    find_library(READLINE readline REQUIRED)
-    find_library(DL dl REQUIRED)
-endif ()
 add_subdirectory(src)
+add_subdirectory(bin)
 
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     enable_testing()

@@ -1,6 +1,6 @@
-#include "ByteCode.hxx"
+#include "ByteCode.h"
 
-#include "../Compiler/SymbolTable/SymbolTable.hxx"
+#include "../Compiler/SymbolTable/SymbolTable.h"
 
 using namespace srclang;
 

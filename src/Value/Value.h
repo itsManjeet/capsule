@@ -1,5 +1,5 @@
-#ifndef SRCLANG_VALUE_HXX
-#define SRCLANG_VALUE_HXX
+#ifndef SRCLANG_VALUE_H
+#define SRCLANG_VALUE_H
 
 #include <cstdint>
 #include <cstring>

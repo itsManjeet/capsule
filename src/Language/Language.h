@@ -1,14 +1,14 @@
-#ifndef SRCLANG_LANGUAGE_HXX
-#define SRCLANG_LANGUAGE_HXX
+#ifndef SRCLANG_LANGUAGE_H
+#define SRCLANG_LANGUAGE_H
 
 #include <filesystem>
 #include <tuple>
 
-#include "../Compiler/Compiler.hxx"
-#include "../Interpreter/Interpreter.hxx"
-#include "Options.hxx"
-#include "../Compiler/SymbolTable/SymbolTable.hxx"
-#include "../Value/Value.hxx"
+#include "../Compiler/Compiler.h"
+#include "../Interpreter/Interpreter.h"
+#include "Options.h"
+#include "../Compiler/SymbolTable/SymbolTable.h"
+#include "../Value/Value.h"
 
 namespace srclang {
 

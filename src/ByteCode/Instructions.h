@@ -1,11 +1,11 @@
-#ifndef SRCLANG_INSTRUCTIONS_HXX
-#define SRCLANG_INSTRUCTIONS_HXX
+#ifndef SRCLANG_INSTRUCTIONS_H
+#define SRCLANG_INSTRUCTIONS_H
 
 #include <cstdint>
 #include <string>
 #include <vector>
 
-#include "DebugInfo.hxx"
+#include "DebugInfo.h"
 
 namespace srclang {
     using Byte = uint32_t;
@@ -94,4 +94,4 @@ namespace srclang {
     };
 }
 
-#endif  // SRCLANG_INSTRUCTIONS_HXX
+#endif  // SRCLANG_INSTRUCTIONS_H

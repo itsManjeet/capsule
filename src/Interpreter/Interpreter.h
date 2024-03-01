@@ -1,13 +1,13 @@
-#ifndef SRCLANG_INTERPRETER_HXX
-#define SRCLANG_INTERPRETER_HXX
+#ifndef SRCLANG_INTERPRETER_H
+#define SRCLANG_INTERPRETER_H
 
 #include <sstream>
 
-#include "../Builtins/Builtin.hxx"
-#include "../ByteCode/ByteCode.hxx"
-#include "../Value/Function.hxx"
-#include "../Language/Options.hxx"
-#include "../Value/Value.hxx"
+#include "../Builtins/Builtin.h"
+#include "../ByteCode/ByteCode.h"
+#include "../Value/Function.h"
+#include "../Language/Options.h"
+#include "../Value/Value.h"
 
 namespace srclang {
 
@@ -94,4 +94,4 @@ namespace srclang {
 
 }  // srclang
 
-#endif  // SRCLANG_INTERPRETER_HXX
+#endif  // SRCLANG_INTERPRETER_H

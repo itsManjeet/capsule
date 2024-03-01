@@ -1,18 +1,18 @@
-#ifndef SRCLANG_COMPILER_HXX
-#define SRCLANG_COMPILER_HXX
+#ifndef SRCLANG_COMPILER_H
+#define SRCLANG_COMPILER_H
 
 #include <iostream>
 #include <sstream>
 #include <string>
 #include <vector>
 
-#include "../ByteCode/ByteCode.hxx"
-#include "../Value/Function.hxx"
-#include "../ByteCode/Instructions.hxx"
-#include "../Interpreter/MemoryManager/MemoryManager.hxx"
-#include "../Language/Options.hxx"
-#include "SymbolTable/SymbolTable.hxx"
-#include "../Value/Value.hxx"
+#include "../ByteCode/ByteCode.h"
+#include "../Value/Function.h"
+#include "../ByteCode/Instructions.h"
+#include "../Interpreter/MemoryManager/MemoryManager.h"
+#include "../Language/Options.h"
+#include "SymbolTable/SymbolTable.h"
+#include "../Value/Value.h"
 
 namespace srclang {
     using Iterator = std::string::const_iterator;
@@ -248,4 +248,4 @@ namespace srclang {
 
 }  // srclang
 
-#endif  // SRCLANG_COMPILER_HXX
+#endif  // SRCLANG_COMPILER_H

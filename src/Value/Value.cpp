@@ -1,7 +1,7 @@
-#include "Value.hxx"
+#include "Value.h"
 
-#include "Function.hxx"
-#include "../Interpreter/MemoryManager/MemoryManager.hxx"
+#include "Function.h"
+#include "../Interpreter/MemoryManager/MemoryManager.h"
 #include <sstream>
 
 using namespace srclang;

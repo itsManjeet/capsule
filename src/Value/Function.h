@@ -1,11 +1,11 @@
-#ifndef SRCLANG_FUNCTION_HXX
-#define SRCLANG_FUNCTION_HXX
+#ifndef SRCLANG_FUNCTION_H
+#define SRCLANG_FUNCTION_H
 
 #include <memory>
 
-#include "../ByteCode/DebugInfo.hxx"
-#include "../ByteCode/Instructions.hxx"
-#include "Value.hxx"
+#include "../ByteCode/DebugInfo.h"
+#include "../ByteCode/Instructions.h"
+#include "Value.h"
 
 namespace srclang {
 

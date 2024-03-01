@@ -1,11 +1,11 @@
-#ifndef SRCLANG_BYTECODE_HXX
-#define SRCLANG_BYTECODE_HXX
+#ifndef SRCLANG_BYTECODE_H
+#define SRCLANG_BYTECODE_H
 
 #include <iomanip>
 #include <memory>
 
-#include "Instructions.hxx"
-#include "../Value/Value.hxx"
+#include "Instructions.h"
+#include "../Value/Value.h"
 
 namespace srclang {
 
@@ -37,4 +37,4 @@ namespace srclang {
 
 }  // srclang
 
-#endif  // SRCLANG_BYTECODE_HXX
+#endif  // SRCLANG_BYTECODE_H

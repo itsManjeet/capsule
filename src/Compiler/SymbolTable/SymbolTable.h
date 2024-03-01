@@ -1,9 +1,9 @@
-#ifndef SRCLANG_SYMBOLTABLE_HXX
-#define SRCLANG_SYMBOLTABLE_HXX
+#ifndef SRCLANG_SYMBOLTABLE_H
+#define SRCLANG_SYMBOLTABLE_H
 
 #include <optional>
 
-#include "../../Value/Value.hxx"
+#include "../../Value/Value.h"
 
 namespace srclang {
 
@@ -50,4 +50,4 @@ namespace srclang {
     };
 }
 
-#endif  // SRCLANG_SYMBOLTABLE_HXX
+#endif  // SRCLANG_SYMBOLTABLE_H

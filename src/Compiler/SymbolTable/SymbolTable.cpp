@@ -1,4 +1,4 @@
-#include "SymbolTable.hxx"
+#include "SymbolTable.h"
 
 using namespace srclang;
 
