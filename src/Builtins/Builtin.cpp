@@ -369,7 +369,8 @@ SRCLANG_BUILTIN(exec) {
     while (fgets(buffer, sizeof(buffer), fd) != nullptr) {
         interpreter->language->call(args[1], {SRCLANG_VALUE_SET_REF(SRCLANG_VALUE_STRING(buffer))});
     }
-    return SRCLANG_VALUE_NUMBER(WEXITSTATUS(pclose(fd)));
+    int status = WEXITSTATUS(pclose(fd));
+    return SRCLANG_VALUE_NUMBER(status);
 }
 
 static sockaddr *get_sock_addr(std::string address, int domain) {
