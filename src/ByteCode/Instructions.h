@@ -64,25 +64,25 @@ namespace srclang {
 
     static const std::vector<std::string> SRCLANG_OPCODE_ID = {
 #define X(id, size) #id,
-        SRCLANG_OPCODE_LIST
+            SRCLANG_OPCODE_LIST
 #undef X
     };
 
     static const std::vector<int> SRCLANG_OPCODE_SIZE = {
 #define X(id, size) size,
-        SRCLANG_OPCODE_LIST
+            SRCLANG_OPCODE_LIST
 #undef X
     };
 
     class Instructions : public std::vector<Byte> {
-       public:
+    public:
         OpCode last_instruction{};
 
         Instructions() = default;
 
         size_t emit(DebugInfo *debug_info, int line) { return 0; }
 
-        template <typename T, typename... Types>
+        template<typename T, typename... Types>
         size_t emit(DebugInfo *debug_info, int line, T byte, Types... operand) {
             size_t pos = this->size();
             this->push_back(static_cast<Byte>(byte));

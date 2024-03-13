@@ -5,14 +5,18 @@
 
 using namespace srclang;
 
-Language::Language() : globals(65536), options({{"VERSION", SRCLANG_VERSION},
-                                                {"GC_HEAP_GROW_FACTOR",   1.3f},
-                                                {"GC_INITIAL_TRIGGER",    10},
-                                                {"SEARCH_PATH",           ""},
-                                                {"IR",                    false},
-                                                {"EXPERIMENTAL_FEATURES", false},
-                                                {"DEBUG",                 false},
-                                                {"BREAK",                 false},}) {
+Language::Language()
+        : globals(65536), options(
+        {
+                {"VERSION", SRCLANG_VERSION},
+                {"GC_HEAP_GROW_FACTOR",   1.3f},
+                {"GC_INITIAL_TRIGGER",    10},
+                {"SEARCH_PATH",           ""},
+                {"IR",                    false},
+                {"EXPERIMENTAL_FEATURES", false},
+                {"DEBUG",                 false},
+                {"BREAK",                 false},
+        }) {
     for (auto b: builtins) {
         memoryManager.heap.push_back(b);
     }

@@ -23,7 +23,7 @@ namespace srclang {
             os << "== CODE ==" << std::endl;
             for (int offset = 0; offset < bytecode.instructions->size();) {
                 offset = ByteCode::debug(
-                    *bytecode.instructions, bytecode.constants, offset, os);
+                        *bytecode.instructions, bytecode.constants, offset, os);
                 os << std::endl;
             }
             os << "\n== CONSTANTS ==" << std::endl;

@@ -5,7 +5,7 @@
 using namespace srclang;
 
 int ByteCode::debug(Instructions const &instructions,
-                    std::vector <Value> const &constants, int offset,
+                    std::vector<Value> const &constants, int offset,
                     std::ostream &os) {
     os << std::setfill('0') << std::setw(4) << offset << " ";
     auto op = static_cast<OpCode>(instructions[offset]);

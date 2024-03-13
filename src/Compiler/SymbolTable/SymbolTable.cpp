@@ -4,8 +4,8 @@ using namespace srclang;
 
 Symbol SymbolTable::define(const std::string &name) {
     store[name] =
-        Symbol{name, (parent == nullptr ? Symbol::GLOBAL : Symbol::LOCAL),
-               definitions++};
+            Symbol{name, (parent == nullptr ? Symbol::GLOBAL : Symbol::LOCAL),
+                   definitions++};
     return store[name];
 }
 
@@ -16,7 +16,7 @@ Symbol SymbolTable::define(const std::string &name, int index) {
 
 Symbol SymbolTable::define(const Symbol &other) {
     free.push_back(other);
-    auto sym = Symbol{other.name, Symbol::FREE, (int)free.size() - 1};
+    auto sym = Symbol{other.name, Symbol::FREE, (int) free.size() - 1};
     store[other.name] = sym;
     return sym;
 }

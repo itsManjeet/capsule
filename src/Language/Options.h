@@ -10,7 +10,7 @@ namespace srclang {
     using OptionType = std::variant<std::string, int, float, bool>;
 
     class Options : public std::map<std::string, OptionType> {
-       public:
+    public:
         explicit Options(std::map<std::string, OptionType> const &);
     };
 

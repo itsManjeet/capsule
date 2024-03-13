@@ -42,8 +42,8 @@ namespace srclang {
     }
 
     class MemoryManager {
-       private:
-       public:
+    private:
+    public:
         using Heap = std::vector<Value>;
 
         Heap heap;
