@@ -6,8 +6,13 @@
 using namespace srclang;
 
 #ifdef _WIN32
+#include <WinSock2.h>
+#include <io.h>
+
 #define popen _popen
 #define pclose _pclose
+#define close _close
+#define WEXITSTATUS(c) (((c) >> 8) & 0377)
 #else
 
 #include <netinet/in.h>
@@ -398,12 +403,14 @@ static sockaddr *get_sock_addr(std::string address, int domain) {
             return (sockaddr *) (a);
         }
             break;
+#ifndef _WIN32
         case AF_INET6: {
             auto a = new sockaddr_in6{};
             a->sin6_family = AF_INET6;
             a->sin6_port = htons(port);
             return (sockaddr *) (a);
         }
+#endif
             break;
         default: {
             throw std::runtime_error("can't set socket for domain");
@@ -448,7 +455,7 @@ SRCLANG_BUILTIN(socket) {
 
     const int enable = 1;
     if (domain == AF_INET || domain == AF_INET6) {
-        if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(enable)) < 0) {
+        if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, reinterpret_cast<const char *>(&enable), sizeof(enable)) < 0) {
             return SRCLANG_VALUE_SET_REF(SRCLANG_VALUE_ERROR(strerror(errno)));
         }
     }
