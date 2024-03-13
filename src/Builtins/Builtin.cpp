@@ -369,7 +369,8 @@ SRCLANG_BUILTIN(exec) {
     while (fgets(buffer, sizeof(buffer), fd) != nullptr) {
         interpreter->language->call(args[1], {SRCLANG_VALUE_SET_REF(SRCLANG_VALUE_STRING(buffer))});
     }
-    int status = WEXITSTATUS(pclose(fd));
+    int status = pclose(fd);
+    status = WEXITSTATUS(status);
     return SRCLANG_VALUE_NUMBER(status);
 }
 
