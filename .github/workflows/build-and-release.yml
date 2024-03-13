@@ -19,7 +19,7 @@ jobs:
             asset_name: srclang-macos-amd64
           - os: windows-latest
             artifact_name: srclang.exe
-            asset_name: srclang-windows-amd64.exe
+            asset_name: Release/srclang-windows-amd64.exe
 
     steps:
       - uses: actions/checkout@v2
