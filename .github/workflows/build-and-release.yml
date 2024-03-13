@@ -10,7 +10,16 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ ubuntu-latest, macos-latest, windows-latest ]
+        include:
+          - os: ubuntu-latest
+            artifact_name: srclang
+            asset_name: srclang-linux-amd64
+          - os: macos-latest
+            artifact_name: srclang
+            asset_name: srclang-macos-amd64
+          - os: windows-latest
+            artifact_name: srclang.exe
+            asset_name: srclang-windows-amd64.exe
 
     steps:
       - uses: actions/checkout@v2
@@ -32,3 +41,12 @@ jobs:
         working-directory: ${{github.workspace}}/build
         shell: bash
         run: ctest -C $BUILD_TYPE
+
+      - name: Upload binaries to release
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: ${{github.workspace}}/build/bin/${{matrix.artifact_name}}
+          asset_name: ${{matrix.asset_name}}
+          tag: continuous
+          overwrite: true

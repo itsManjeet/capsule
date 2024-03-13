@@ -28,7 +28,9 @@ namespace srclang {
     X(free)                               \
     X(bound)                              \
     X(exit)                               \
-    X(open)
+    X(open)                               \
+    X(exec)                               \
+    X(socket)
 
     struct Interpreter;
 #define X(id) SRCLANG_BUILTIN(id);

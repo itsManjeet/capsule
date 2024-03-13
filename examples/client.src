@@ -1,0 +1,23 @@
+if sock := socket("tcp4"); not sock {
+    println("Error:", sock);
+    exit (1);
+}
+defer { sock.Close(); };
+
+println ("Binding...");
+if ok := sock.Bind("127.0.0.1:32535"); not ok {
+    println ("Error: failed to bind to socket ", ok);
+    exit (1);
+}
+
+println ("Connecting...");
+if ok := sock.Connect("127.0.0.1:8000"); not sock {
+    println ("Error: failed to connect to socket ", ok);
+    exit (1);
+}
+
+println ("Writing data...");
+if ok := sock.File.Write("Hello World"); not ok {
+    println ("Error: failed to write to socket ", ok);
+    exit (1);
+}

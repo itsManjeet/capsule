@@ -5,6 +5,18 @@
 
 using namespace srclang;
 
+#ifdef _WIN32
+#define popen _popen
+#define pclose _pclose
+#else
+
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+#include <netdb.h>
+
+#endif
 
 std::vector<Value> srclang::builtins = {
 #define X(id) SRCLANG_VALUE_BUILTIN(id),
@@ -334,6 +346,212 @@ SRCLANG_BUILTIN(open) {
                         buffer[size] = '\0';
                         return SRCLANG_VALUE_STRING(buffer);
                     }))});
+
+    return value;
+}
+
+/**
+ * Platform Independent Wrapper for exec syscall to execute system commands and binary files
+ */
+SRCLANG_BUILTIN(exec) {
+    SRCLANG_CHECK_ARGS_EXACT(2);
+
+    SRCLANG_CHECK_ARGS_TYPE(0, ValueType::String);
+    auto cmd = reinterpret_cast<const char *>(SRCLANG_VALUE_AS_OBJECT(args[0])->pointer);
+
+    SRCLANG_CHECK_ARGS_TYPE(1, ValueType::Closure);
+
+    char buffer[128] = {};
+    FILE *fd = popen(cmd, "r");
+    if (fd == nullptr) {
+        return SRCLANG_VALUE_SET_REF(SRCLANG_VALUE_ERROR(strerror(errno)));
+    }
+    while (fgets(buffer, sizeof(buffer), fd) != nullptr) {
+        interpreter->language->call(args[1], {SRCLANG_VALUE_SET_REF(SRCLANG_VALUE_STRING(buffer))});
+    }
+    return SRCLANG_VALUE_NUMBER(WEXITSTATUS(pclose(fd)));
+}
+
+static sockaddr *get_sock_addr(std::string address, int domain) {
+    int port = 80;
+    if (auto idx = address.find(':'); idx != std::string::npos) {
+        port = std::stoi(address.substr(idx + 1));
+        address = address.substr(0, idx);
+    }
+
+    std::cout << "Address: " << address << '\n'
+              << "Port: " << port << std::endl;
+    auto hp = gethostbyname(address.c_str());
+    if (hp == nullptr) {
+        throw std::runtime_error(std::string("failed to get host by name ") + strerror(errno));
+    }
+
+    switch (domain) {
+        case AF_INET: {
+            auto a = new sockaddr_in{};
+            a->sin_family = AF_INET;
+            a->sin_port = htons(port);
+            a->sin_addr.s_addr = inet_addr(address.c_str());
+//            bcopy((const char *) hp->h_addr_list[0], reinterpret_cast<void *>(a->sin_addr.s_addr), hp->h_length);
+            return (sockaddr *) (a);
+        }
+            break;
+        case AF_INET6: {
+            auto a = new sockaddr_in6{};
+            a->sin6_family = AF_INET6;
+            a->sin6_port = htons(port);
+            return (sockaddr *) (a);
+        }
+            break;
+        default: {
+            throw std::runtime_error("can't set socket for domain");
+        }
+    }
+}
+
+SRCLANG_BUILTIN(socket) {
+    SRCLANG_CHECK_ARGS_EXACT(1);
+    SRCLANG_CHECK_ARGS_TYPE(0, ValueType::String);
+
+    std::string socketType = reinterpret_cast<const char *>(SRCLANG_VALUE_AS_OBJECT(args[0])->pointer);
+    int domain, type, protocol;
+    if (socketType == "unix") {
+        domain = AF_UNIX;
+        type = SOCK_STREAM;
+        protocol = 0;
+    } else if (socketType == "tcp4") {
+        domain = AF_INET;
+        type = SOCK_STREAM;
+        protocol = IPPROTO_TCP;
+    } else if (socketType == "tcp6") {
+        domain = AF_INET6;
+        type = SOCK_STREAM;
+        protocol = IPPROTO_TCP;
+    } else if (socketType == "udp4") {
+        domain = AF_INET;
+        type = SOCK_DGRAM;
+        protocol = IPPROTO_UDP;
+    } else if (socketType == "udp6") {
+        domain = AF_INET6;
+        type = SOCK_DGRAM;
+        protocol = IPPROTO_UDP;
+    } else {
+        return SRCLANG_VALUE_SET_REF(SRCLANG_VALUE_ERROR("invalid socket type"));
+    }
+
+    int fd = socket(domain, type, protocol);
+    if (fd == -1) {
+        return SRCLANG_VALUE_SET_REF(SRCLANG_VALUE_ERROR(strerror(errno)));
+    }
+
+    const int enable = 1;
+    if (domain == AF_INET || domain == AF_INET6) {
+        if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(enable)) < 0) {
+            return SRCLANG_VALUE_SET_REF(SRCLANG_VALUE_ERROR(strerror(errno)));
+        }
+    }
+
+    auto object = new SrcLangMap();
+    auto value = SRCLANG_VALUE_MAP(object);
+
+    object->insert({"__socket__", SRCLANG_VALUE_NUMBER(fd)});
+    object->insert({"__domain__", SRCLANG_VALUE_NUMBER(domain)});
+    object->insert({"__socket_type__", SRCLANG_VALUE_NUMBER(type)});
+    object->insert({"__protocol__", SRCLANG_VALUE_NUMBER(protocol)});
+    object->insert({"File", builtin_open({SRCLANG_VALUE_NUMBER(fd)}, interpreter)});
+
+    object->insert({"Close", SRCLANG_VALUE_BOUND(value, SRCLANG_VALUE_BUILTIN_NEW(
+            +[](std::vector<Value> &args, Interpreter *interpreter) -> Value {
+                SRCLANG_CHECK_ARGS_EXACT(1);
+                SRCLANG_CHECK_ARGS_TYPE(0, ValueType::Map);
+
+                auto object = reinterpret_cast<SrcLangMap *>(SRCLANG_VALUE_AS_OBJECT(args[0])->pointer);
+                int fd = SRCLANG_VALUE_AS_NUMBER(object->at("__socket__"));
+                if (fd != -1) {
+                    close(fd);
+                    object->at("__socket__") = SRCLANG_VALUE_NUMBER(-1);
+                }
+                return SRCLANG_VALUE_TRUE;
+            }))});
+
+    object->insert({"Listen", SRCLANG_VALUE_BOUND(value, SRCLANG_VALUE_BUILTIN_NEW(
+            +[](std::vector<Value> &args, Interpreter *interpreter) -> Value {
+                SRCLANG_CHECK_ARGS_EXACT(2);
+                SRCLANG_CHECK_ARGS_TYPE(0, ValueType::Map);
+
+                SRCLANG_CHECK_ARGS_TYPE(1, ValueType::Number);
+
+                auto object = reinterpret_cast<SrcLangMap *>(SRCLANG_VALUE_AS_OBJECT(args[0])->pointer);
+                int fd = SRCLANG_VALUE_AS_NUMBER(object->at("__socket__"));
+                if (fd == -1) {
+                    return SRCLANG_VALUE_SET_REF(SRCLANG_VALUE_ERROR("socket is already closed"));
+                }
+                if (listen(fd, SRCLANG_VALUE_AS_NUMBER(args[1])) < 0) {
+                    return SRCLANG_VALUE_SET_REF(SRCLANG_VALUE_ERROR(strerror(errno)));
+                }
+                return SRCLANG_VALUE_TRUE;
+            }))});
+
+    object->insert({"Connect", SRCLANG_VALUE_BOUND(value, SRCLANG_VALUE_BUILTIN_NEW(
+            +[](std::vector<Value> &args, Interpreter *interpreter) -> Value {
+                SRCLANG_CHECK_ARGS_EXACT(2);
+                SRCLANG_CHECK_ARGS_TYPE(0, ValueType::Map);
+                SRCLANG_CHECK_ARGS_TYPE(1, ValueType::String);
+
+                auto object = reinterpret_cast<SrcLangMap *>(SRCLANG_VALUE_AS_OBJECT(args[0])->pointer);
+                int fd = SRCLANG_VALUE_AS_NUMBER(object->at("__socket__"));
+                if (fd == -1) {
+                    return SRCLANG_VALUE_SET_REF(SRCLANG_VALUE_ERROR("socket is already closed"));
+                }
+
+                int domain = SRCLANG_VALUE_AS_NUMBER(object->at("__domain__"));
+
+                auto addr = get_sock_addr((const char *) SRCLANG_VALUE_AS_OBJECT(args[1])->pointer, domain);
+                if (bind(fd, reinterpret_cast<const sockaddr *>(addr), sizeof(sockaddr)) < 0) {
+                    return SRCLANG_VALUE_SET_REF(SRCLANG_VALUE_ERROR(strerror(errno)));
+                }
+//                delete addr;
+                return SRCLANG_VALUE_TRUE;
+            }))});
+
+    object->insert({"Bind", SRCLANG_VALUE_BOUND(value, SRCLANG_VALUE_BUILTIN_NEW(
+            +[](std::vector<Value> &args, Interpreter *interpreter) -> Value {
+                SRCLANG_CHECK_ARGS_EXACT(2);
+                SRCLANG_CHECK_ARGS_TYPE(0, ValueType::Map);
+                SRCLANG_CHECK_ARGS_TYPE(1, ValueType::String);
+
+                auto object = reinterpret_cast<SrcLangMap *>(SRCLANG_VALUE_AS_OBJECT(args[0])->pointer);
+                int fd = SRCLANG_VALUE_AS_NUMBER(object->at("__socket__"));
+                if (fd == -1) {
+                    return SRCLANG_VALUE_SET_REF(SRCLANG_VALUE_ERROR("socket is already closed"));
+                }
+                int domain = SRCLANG_VALUE_AS_NUMBER(object->at("__domain__"));
+
+                auto addr = get_sock_addr((const char *) SRCLANG_VALUE_AS_OBJECT(args[1])->pointer, domain);
+                if (bind(fd, reinterpret_cast<const sockaddr *>(addr), sizeof(sockaddr)) < 0) {
+                    return SRCLANG_VALUE_SET_REF(SRCLANG_VALUE_ERROR(strerror(errno)));
+                }
+//                delete addr;
+                return SRCLANG_VALUE_TRUE;
+            }))});
+
+    object->insert({"Accept", SRCLANG_VALUE_BOUND(value, SRCLANG_VALUE_BUILTIN_NEW(
+            +[](std::vector<Value> &args, Interpreter *interpreter) -> Value {
+                SRCLANG_CHECK_ARGS_EXACT(1);
+                SRCLANG_CHECK_ARGS_TYPE(0, ValueType::Map);
+
+                auto object = reinterpret_cast<SrcLangMap *>(SRCLANG_VALUE_AS_OBJECT(args[0])->pointer);
+                int fd = SRCLANG_VALUE_AS_NUMBER(object->at("__socket__"));
+                if (fd == -1) {
+                    return SRCLANG_VALUE_SET_REF(SRCLANG_VALUE_ERROR("socket is already closed"));
+                }
+
+                int client_fd = accept(fd, nullptr, nullptr);
+                if (client_fd < 0) {
+                    return SRCLANG_VALUE_SET_REF(SRCLANG_VALUE_ERROR(strerror(errno)));
+                }
+                return builtin_open({SRCLANG_VALUE_NUMBER(client_fd)}, interpreter);
+            }))});
 
     return value;
 }
