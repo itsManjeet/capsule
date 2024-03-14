@@ -2,39 +2,44 @@
 
 #include <array>
 #include <iostream>
-#include <ranges>
 
 #include "../Language/Language.h"
 #include "../Compiler/SymbolTable/SymbolTable.h"
 
 using namespace srclang;
 
-void Interpreter::error(std::string const &mesg) {
-    if (debug_info.empty() || debug_info.back() == nullptr) {
-        err_stream << "ERROR: " << mesg << std::endl;
+void Interpreter::error(std::string const &msg) {
+    if (debugInfo.empty() || debugInfo.back() == nullptr) {
+        errStream << "ERROR: " << msg << std::endl;
         return;
     }
 
-    err_stream << debug_info.back()->filename << ":"
-               << debug_info.back()->lines[distance(fp->closure->fun->instructions->begin(), fp->ip)] << std::endl;
-    err_stream << "  ERROR: " << mesg;
+    errStream << debugInfo.back()->filename << ":"
+              << debugInfo.back()->lines[distance(fp->closure->fun->instructions->begin(), fp->ip)] << std::endl;
+    errStream << "  ERROR: " << msg;
 }
 
-Interpreter::Interpreter(ByteCode &code, const std::shared_ptr<DebugInfo> &debugInfo, Language *language) : stack(2048),
-                                                                                                            frames(1024),
-                                                                                                            language{
-                                                                                                                    language} {
-    GC_HEAP_GROW_FACTOR = std::get<float>(language->options.at("GC_HEAP_GROW_FACTOR"));
-    next_gc = std::get<int>(language->options.at("GC_INITIAL_TRIGGER"));
+Interpreter::Interpreter(ByteCode &code, const std::shared_ptr<DebugInfo> &debugInfo, Language *language)
+        : stack(2048),
+          frames(1024),
+          language{language} {
+    gcHeapGrowFactor = std::get<float>(language->options.at("GC_HEAP_GROW_FACTOR"));
+    nextGc = std::get<int>(language->options.at("GC_INITIAL_TRIGGER"));
     sp = stack.begin();
     fp = frames.begin();
-    debug_info.push_back(debugInfo);
-    auto fun = new Function{FunctionType::Function, "<script>", std::move(code.instructions), 0, 0, false, debugInfo};
+    this->debugInfo.push_back(debugInfo);
+    auto fun = new Function{FunctionType::Function,
+                            "<script>",
+                            std::move(code.instructions),
+                            0,
+                            0,
+                            false,
+                            debugInfo};
 
     debug = std::get<bool>(language->options.at("DEBUG"));
     break_ = std::get<bool>(language->options.at("BREAK"));
 
-    fp->closure = new Closure{std::move(fun), {}};
+    fp->closure = new Closure{fun, {}};
     fp->ip = fp->closure->fun->instructions->begin();
     fp->bp = sp;
 }
@@ -44,7 +49,7 @@ Interpreter::~Interpreter() {
     delete (frames.begin())->closure;
 }
 
-void Interpreter::grace_full_exit() {
+void Interpreter::graceFullExit() {
     do {
         if (sp != stack.begin()) --sp;
         for (auto i = fp->defers.rbegin(); i != fp->defers.rend(); i++)
@@ -55,37 +60,37 @@ void Interpreter::grace_full_exit() {
         }
         sp = fp->bp - 1;
         *sp++ = SRCLANG_VALUE_NULL;
-        debug_info.pop_back();
+        debugInfo.pop_back();
         fp--;
     } while (true);
 }
 
-void Interpreter::add_object(Value val) {
+void Interpreter::addObject(Value val) {
 #ifdef SRCLANG_GC_DEBUG
     gc();
 #else
-    if (language->memoryManager.heap.size() > next_gc && next_gc < LIMIT_NEXT_GC) {
+    if (language->memoryManager->heap.size() > nextGc && nextGc < limitNextGc) {
         gc();
-        language->memoryManager.heap.shrink_to_fit();
-        next_gc = language->memoryManager.heap.size() * GC_HEAP_GROW_FACTOR;
+        language->memoryManager->heap.shrink_to_fit();
+        nextGc = static_cast<int>(static_cast<float>(language->memoryManager->heap.size()) * gcHeapGrowFactor);
     }
 #endif
-    language->memoryManager.heap.push_back(val);
+    language->memoryManager->heap.push_back(val);
 }
 
 void Interpreter::gc() {
 #ifdef SRCLANG_GC_DEBUG
-    std::cout << "Total allocations: " << language->memoryManager.heap.size() << std::endl;
+    std::cout << "Total allocations: " << language->memoryManager->heap.size() << std::endl;
     std::cout << "gc begin:" << std::endl;
 #endif
-    language->memoryManager.mark(stack.begin(), sp);
-    language->memoryManager.mark(language->globals.begin(), language->globals.end());
-    language->memoryManager.mark(language->constants.begin(), language->constants.end());
-    language->memoryManager.mark(builtins.begin(), builtins.end());
-    language->memoryManager.sweep();
+    language->memoryManager->mark(stack.begin(), sp);
+    language->memoryManager->mark(language->globals.begin(), language->globals.end());
+    language->memoryManager->mark(language->constants.begin(), language->constants.end());
+    language->memoryManager->mark(builtins.begin(), builtins.end());
+    language->memoryManager->sweep();
 #ifdef SRCLANG_GC_DEBUG
     std::cout << "gc end:" << std::endl;
-    std::cout << "Total allocations: " << language->memoryManager.heap.size() << std::endl;
+    std::cout << "Total allocations: " << language->memoryManager->heap.size() << std::endl;
 #endif
 }
 
@@ -104,7 +109,7 @@ bool Interpreter::isEqual(Value a, Value b) {
 
         case ValueType::List: {
             auto *aList = (SrcLangList *) SRCLANG_VALUE_AS_OBJECT(a)->pointer;
-            SrcLangList *bList = (SrcLangList *) SRCLANG_VALUE_AS_OBJECT(b)->pointer;
+            auto *bList = (SrcLangList *) SRCLANG_VALUE_AS_OBJECT(b)->pointer;
             if (aList->size() != bList->size()) return false;
             for (int i = 0; i < aList->size(); i++) {
                 if (!isEqual(aList->at(i), bList->at(i))) return false;
@@ -113,8 +118,8 @@ bool Interpreter::isEqual(Value a, Value b) {
         }
 
         case ValueType::Map: {
-            SrcLangMap *aMap = (SrcLangMap *) SRCLANG_VALUE_AS_OBJECT(a)->pointer;
-            SrcLangMap *bMap = (SrcLangMap *) SRCLANG_VALUE_AS_OBJECT(b)->pointer;
+            auto *aMap = (SrcLangMap *) SRCLANG_VALUE_AS_OBJECT(a)->pointer;
+            auto *bMap = (SrcLangMap *) SRCLANG_VALUE_AS_OBJECT(b)->pointer;
             if (aMap->size() != bMap->size()) return false;
             for (auto const &i: *aMap) {
                 auto iter = bMap->find(i.first);
@@ -123,13 +128,15 @@ bool Interpreter::isEqual(Value a, Value b) {
             }
             return true;
         }
+        default:
+            return false;
     }
     return false;
 }
 
 bool Interpreter::unary(Value a, OpCode op) {
     if (OpCode::NOT == op) {
-        *sp++ = SRCLANG_VALUE_BOOL(is_falsy(a));
+        *sp++ = SRCLANG_VALUE_BOOL(isFalsy(a));
         return true;
     }
     if (SRCLANG_VALUE_IS_NUMBER(a)) {
@@ -150,7 +157,7 @@ bool Interpreter::unary(Value a, OpCode op) {
                 return false;
         }
     } else {
-        error("ERROR: unhandler unary operation for value of type " + SRCLANG_VALUE_TYPE_ID[static_cast<int>(
+        error("ERROR: unhandled unary operation for value of type " + SRCLANG_VALUE_TYPE_ID[static_cast<int>(
                 SRCLANG_VALUE_GET_TYPE(a))] + "'");
         return false;
     }
@@ -165,7 +172,7 @@ bool Interpreter::binary(Value lhs, Value rhs, OpCode op) {
     }
 
     if (op == OpCode::OR) {
-        *sp++ = (is_falsy(lhs) ? rhs : lhs);
+        *sp++ = (isFalsy(lhs) ? rhs : lhs);
         return true;
     }
 
@@ -293,7 +300,7 @@ bool Interpreter::binary(Value lhs, Value rhs, OpCode op) {
             case OpCode::ADD: {
                 auto a_size = strlen(a);
                 auto b_size = strlen(b);
-                int size = a_size + b_size + 1;
+                auto size = a_size + b_size + 1;
 
                 char *buf = (char *) malloc(size);
                 if (buf == nullptr) {
@@ -304,7 +311,7 @@ bool Interpreter::binary(Value lhs, Value rhs, OpCode op) {
 
                 buf[size] = '\0';
                 auto val = SRCLANG_VALUE_STRING(buf);
-                add_object(val);
+                addObject(val);
                 *sp++ = val;
             }
                 break;
@@ -342,7 +349,7 @@ bool Interpreter::binary(Value lhs, Value rhs, OpCode op) {
                 auto c = new SrcLangList(a->begin(), a->end());
                 c->insert(c->end(), b->begin(), b->end());
                 *sp++ = SRCLANG_VALUE_LIST(c);
-                add_object(*(sp - 1));
+                addObject(*(sp - 1));
             }
                 break;
             case OpCode::GT:
@@ -366,13 +373,13 @@ bool Interpreter::binary(Value lhs, Value rhs, OpCode op) {
     return true;
 }
 
-bool Interpreter::is_falsy(Value val) {
+bool Interpreter::isFalsy(Value val) {
     return SRCLANG_VALUE_IS_NULL(val) || (SRCLANG_VALUE_IS_BOOL(val) && SRCLANG_VALUE_AS_BOOL(val) == false) ||
            (SRCLANG_VALUE_IS_NUMBER(val) && SRCLANG_VALUE_AS_NUMBER(val) == 0) ||
            (SRCLANG_VALUE_IS_OBJECT(val) && SRCLANG_VALUE_AS_OBJECT(val)->type == ValueType::Error);
 }
 
-void Interpreter::print_stack() {
+void Interpreter::printStack() {
     if (debug) {
         std::cout << "  ";
         for (auto i = stack.begin(); i != sp; i++) {
@@ -382,7 +389,7 @@ void Interpreter::print_stack() {
     }
 }
 
-bool Interpreter::call_closure(Value callee, uint8_t count) {
+bool Interpreter::callClosure(Value callee, uint8_t count) {
     auto closure = reinterpret_cast<Closure *>(SRCLANG_VALUE_AS_OBJECT(callee)->pointer);
     if (closure->fun->is_variadic) {
         if (count < closure->fun->nparams - 1) {
@@ -400,7 +407,7 @@ bool Interpreter::call_closure(Value callee, uint8_t count) {
             var_args = new SrcLangList(v_arg_begin, v_arg_end);
         }
         auto var_val = SRCLANG_VALUE_LIST(var_args);
-        add_object(var_val);
+        addObject(var_val);
         *(sp - (count - (closure->fun->nparams - 1))) = var_val;
         sp = (sp - (count - closure->fun->nparams));
         count = closure->fun->nparams;
@@ -416,17 +423,12 @@ bool Interpreter::call_closure(Value callee, uint8_t count) {
     fp->ip = fp->closure->fun->instructions->begin();
     fp->bp = (sp - count);
     sp = fp->bp + fp->closure->fun->nlocals;
-    debug_info.push_back(fp->closure->fun->debug_info);
+    debugInfo.push_back(fp->closure->fun->debug_info);
 
     return true;
 }
 
-bool Interpreter::call_native(Value callee, uint8_t count) {
-    error("not handled");
-    return false;
-}
-
-bool Interpreter::call_builtin(Value callee, uint8_t count) {
+bool Interpreter::callBuiltin(Value callee, uint8_t count) {
     auto builtin = reinterpret_cast<Builtin>(SRCLANG_VALUE_AS_OBJECT(callee)->pointer);
     std::vector<Value> args(sp - count, sp);
     sp -= count + 1;
@@ -438,12 +440,12 @@ bool Interpreter::call_builtin(Value callee, uint8_t count) {
         return false;
     }
 
-    if (SRCLANG_VALUE_IS_OBJECT(result)) add_object(result);
+    if (SRCLANG_VALUE_IS_OBJECT(result)) addObject(result);
     *sp++ = result;
     return true;
 }
 
-bool Interpreter::call_typecast_num(uint8_t count) {
+bool Interpreter::callTypecastNum(uint8_t count) {
     if (count != 1) {
         error("invalid typecast");
         return false;
@@ -464,7 +466,7 @@ bool Interpreter::call_typecast_num(uint8_t count) {
     return true;
 }
 
-bool Interpreter::call_typecast_string(uint8_t count) {
+bool Interpreter::callTypecastString(uint8_t count) {
     Value result;
     if (count == 1) {
         Value val = *(sp - count);
@@ -503,7 +505,7 @@ bool Interpreter::call_typecast_string(uint8_t count) {
     return true;
 }
 
-bool Interpreter::call_typecast_error(uint8_t count) {
+bool Interpreter::callTypecastError(uint8_t count) {
     std::string buf;
     for (auto i = sp - count; i != sp; i++) {
         buf += SRCLANG_VALUE_GET_STRING(*i);
@@ -513,18 +515,18 @@ bool Interpreter::call_typecast_error(uint8_t count) {
     return true;
 }
 
-bool Interpreter::call_typecast_bool(uint8_t count) {
+bool Interpreter::callTypecastBool(uint8_t count) {
     if (count != 1) {
         error("invalid typecast");
         return false;
     }
     Value val = *(sp - count);
     sp -= count + 1;
-    *sp++ = SRCLANG_VALUE_BOOL(!is_falsy(val));
+    *sp++ = SRCLANG_VALUE_BOOL(!isFalsy(val));
     return true;
 }
 
-bool Interpreter::call_typecast_type(uint8_t count) {
+bool Interpreter::callTypecastType(uint8_t count) {
     if (count != 1) {
         error("invalid typecast");
         return false;
@@ -535,19 +537,19 @@ bool Interpreter::call_typecast_type(uint8_t count) {
     return true;
 }
 
-bool Interpreter::call_typecast(Value callee, uint8_t count) {
+bool Interpreter::callTypecast(Value callee, uint8_t count) {
     auto type = SRCLANG_VALUE_AS_TYPE(callee);
     switch (type) {
         case ValueType::Number:
-            return call_typecast_num(count);
+            return callTypecastNum(count);
         case ValueType::Type:
-            return call_typecast_type(count);
+            return callTypecastType(count);
         case ValueType::Boolean:
-            return call_typecast_bool(count);
+            return callTypecastBool(count);
         case ValueType::String:
-            return call_typecast_string(count);
+            return callTypecastString(count);
         case ValueType::Error:
-            return call_typecast_error(count);
+            return callTypecastError(count);
             // case ValueType::Function:
             //     return call_typecast_function(count);
         default:
@@ -556,7 +558,7 @@ bool Interpreter::call_typecast(Value callee, uint8_t count) {
     }
 }
 
-bool Interpreter::call_map(Value callee, uint8_t count) {
+bool Interpreter::callMap(Value callee, uint8_t count) {
     auto container = (SrcLangMap *) SRCLANG_VALUE_AS_OBJECT(callee)->pointer;
     auto callback = container->find("__call__");
     if (callback == container->end()) {
@@ -564,12 +566,12 @@ bool Interpreter::call_map(Value callee, uint8_t count) {
         return false;
     }
     auto bounded_value = SRCLANG_VALUE_BOUNDED((new BoundedValue{callee, callback->second}));
-    add_object(bounded_value);
+    addObject(bounded_value);
     *(sp - count - 1) = bounded_value;
-    return call_bounded(bounded_value, count);
+    return callBounded(bounded_value, count);
 }
 
-bool Interpreter::call_bounded(Value callee, uint8_t count) {
+bool Interpreter::callBounded(Value callee, uint8_t count) {
     auto bounded = (BoundedValue *) SRCLANG_VALUE_AS_OBJECT(callee)->pointer;
     *(sp - count - 1) = bounded->value;
     for (auto i = sp; i != sp - count; i--) {
@@ -579,7 +581,7 @@ bool Interpreter::call_bounded(Value callee, uint8_t count) {
     sp++;
     if (debug) {
         std::cout << "BOUNDED STACK" << std::endl;
-        print_stack();
+        printStack();
     }
 
     return call(count + 1);
@@ -588,17 +590,17 @@ bool Interpreter::call_bounded(Value callee, uint8_t count) {
 bool Interpreter::call(uint8_t count) {
     auto callee = *(sp - 1 - count);
     if (SRCLANG_VALUE_IS_TYPE(callee)) {
-        return call_typecast(callee, count);
+        return callTypecast(callee, count);
     } else if (SRCLANG_VALUE_IS_OBJECT(callee)) {
         switch (SRCLANG_VALUE_AS_OBJECT(callee)->type) {
             case ValueType::Closure:
-                return call_closure(callee, count);
+                return callClosure(callee, count);
             case ValueType::Builtin:
-                return call_builtin(callee, count);
+                return callBuiltin(callee, count);
             case ValueType::Bounded:
-                return call_bounded(callee, count);
+                return callBounded(callee, count);
             case ValueType::Map:
-                return call_map(callee, count);
+                return callMap(callee, count);
             default:
                 error("ERROR: can't call object '" + SRCLANG_VALUE_DEBUG(callee) + "'");
                 return false;
@@ -611,9 +613,9 @@ bool Interpreter::call(uint8_t count) {
 bool Interpreter::run() {
     while (true) {
         if (debug) {
-            if (!debug_info.empty() && debug_info.back() != nullptr) {
-                std::cout << debug_info.back()->filename << ":"
-                          << debug_info.back()->lines[distance(fp->closure->fun->instructions->begin(), fp->ip)]
+            if (!debugInfo.empty() && debugInfo.back() != nullptr) {
+                std::cout << debugInfo.back()->filename << ":"
+                          << debugInfo.back()->lines[distance(fp->closure->fun->instructions->begin(), fp->ip)]
                           << std::endl;
             }
 
@@ -623,8 +625,8 @@ bool Interpreter::run() {
             }
             std::cout << std::endl;
             std::cout << ">> ";
-            ByteCode::debug(*fp->closure->fun->instructions.get(), language->constants,
-                            distance(fp->closure->fun->instructions->begin(), fp->ip), std::cout);
+            ByteCode::debug(*fp->closure->fun->instructions, language->constants,
+                            std::distance(fp->closure->fun->instructions->begin(), fp->ip), std::cout);
             std::cout << std::endl;
 
             if (break_) std::cin.get();
@@ -740,7 +742,7 @@ bool Interpreter::run() {
                 auto closure = new Closure{fun, frees};
                 auto closure_value = SRCLANG_VALUE_CLOSURE(closure);
                 *sp++ = closure_value;
-                add_object(closure_value);
+                addObject(closure_value);
             }
                 break;
 
@@ -766,7 +768,7 @@ bool Interpreter::run() {
                 auto list = new std::vector<Value>(sp - size, sp);
                 sp -= size;
                 auto list_value = SRCLANG_VALUE_LIST(list);
-                add_object(list_value);
+                addObject(list_value);
                 *sp++ = list_value;
             }
                 break;
@@ -779,7 +781,7 @@ bool Interpreter::run() {
                 }
                 sp -= (size * 2);
                 *sp++ = SRCLANG_VALUE_MAP(map);
-                add_object(*(sp - 1));
+                addObject(*(sp - 1));
             }
                 break;
 
@@ -831,7 +833,7 @@ bool Interpreter::run() {
                                 buf[end - index] = '\0';
                                 *sp++ = SRCLANG_VALUE_STRING(buf);
 
-                                add_object(*(sp - 1));
+                                addObject(*(sp - 1));
                             }
                         }
                             break;
@@ -867,7 +869,7 @@ bool Interpreter::run() {
                                 values->at(i) = builtin_clone({list[i]}, this);
                             }
                             *sp++ = SRCLANG_VALUE_LIST(values);
-                            add_object(*(sp - 1));
+                            addObject(*(sp - 1));
 
                         }
                             break;
@@ -891,11 +893,11 @@ bool Interpreter::run() {
                     } else {
                         auto bounded_value = SRCLANG_VALUE_BOUNDED(
                                 (new BoundedValue{container, get_index_callback->second}));
-                        add_object(bounded_value);
+                        addObject(bounded_value);
 
                         *sp++ = bounded_value;
                         *sp++ = pos;
-                        if (!call_bounded(bounded_value, 1)) {
+                        if (!callBounded(bounded_value, 1)) {
                             return false;
                         }
                     }
@@ -912,7 +914,7 @@ bool Interpreter::run() {
                 auto freeIndex = *fp->ip++;
 
                 auto currentClosure = fp->closure;
-                currentClosure->free[freeIndex] = language->register_object(SRCLANG_VALUE_CLOSURE(currentClosure));
+                currentClosure->free[freeIndex] = language->registerObject(SRCLANG_VALUE_CLOSURE(currentClosure));
                 SRCLANG_VALUE_SET_REF(currentClosure->free[freeIndex]);
             }
                 break;
@@ -964,12 +966,12 @@ bool Interpreter::run() {
                     } else {
                         auto bounded_value = SRCLANG_VALUE_BOUNDED(
                                 (new BoundedValue{container, set_index_callback->second}));
-                        add_object(bounded_value);
+                        addObject(bounded_value);
 
                         *sp++ = bounded_value;
                         *sp++ = pos;
                         *sp++ = val;
-                        if (!call_bounded(bounded_value, 2)) {
+                        if (!callBounded(bounded_value, 2)) {
                             return false;
                         }
                     }
@@ -1019,7 +1021,7 @@ bool Interpreter::run() {
                 sp = fp->bp - 1;
                 fp--;
                 *sp++ = value;
-                debug_info.pop_back();
+                debugInfo.pop_back();
             }
                 break;
 

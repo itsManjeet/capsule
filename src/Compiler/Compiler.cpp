@@ -181,7 +181,7 @@ void Compiler::eat() {
         return;
     }
 
-    for (std::string k: {"let", "fun", "return", "class", "if", "else", "for", "break", "continue", "use", "global",
+    for (std::string k: {"let", "fun", "return", "class", "if", "else", "for", "break", "continue", "include", "global",
                          "as", "in", "defer",
 
             // special operators
@@ -330,7 +330,7 @@ void Compiler::identifier(bool can_assign) {
 
 void Compiler::string_() {
     auto string_value = SRCLANG_VALUE_STRING(strdup(cur.literal.c_str()));
-    language->memoryManager.heap.push_back(string_value);
+    language->memoryManager->heap.push_back(string_value);
     language->constants.push_back(string_value);
     emit(OpCode::CONST_, language->constants.size() - 1);
     return expect(TokenType::String);
@@ -417,7 +417,7 @@ void Compiler::function(Symbol *symbol, bool skip_args) {
     auto fun = new Function{FunctionType::Function, id, std::move(fun_instructions), nlocals, nparam, is_variadic,
                             fun_debug_info};
     auto fun_value = SRCLANG_VALUE_FUNCTION(fun);
-    language->memoryManager.heap.push_back(fun_value);
+    language->memoryManager->heap.push_back(fun_value);
     language->constants.push_back(fun_value);
 
     emit(OpCode::CLOSURE, language->constants.size() - 1, free_symbols.size());
@@ -477,8 +477,8 @@ void Compiler::prefix(bool can_assign) {
         return map_();
     } else if (consume("fun")) {
         return function(nullptr);
-    } else if (consume("use")) {
-        return use();
+    } else if (consume("include")) {
+        return include();
     } else if (consume("(")) {
         expression();
         return expect(")");
@@ -495,6 +495,8 @@ void Compiler::binary(OpCode op, int prec) {
             break;
         case OpCode::AND:
             pos = emit(OpCode::CHK, 0, 0);
+            break;
+        default:
             break;
     }
     expression(prec + 1);
@@ -551,7 +553,7 @@ void Compiler::subscript(bool can_assign) {
     check(TokenType::Identifier);
 
     auto string_value = SRCLANG_VALUE_STRING(strdup(cur.literal.c_str()));
-    language->memoryManager.heap.push_back(string_value);
+    language->memoryManager->heap.push_back(string_value);
     language->constants.push_back(string_value);
     emit(OpCode::CONST_, language->constants.size() - 1);
     eat();
@@ -670,7 +672,7 @@ void Compiler::compiler_options() {
 #undef CHECK_TYPE_ID
 
     if (option_id == "VERSION") {
-        if (SRCLANG_VERSION > std::get<float>(value)) {
+        if (SRCLANG_VERSION > std::get<int>(value)) {
             error("Code need srclang of version above or equal to "
                   "'" + std::to_string(SRCLANG_VERSION) + "'", pos);
         }
@@ -691,7 +693,7 @@ void Compiler::let() {
     check(TokenType::Identifier);
 
     std::string id = cur.literal;
-    auto s = is_global ? &language->symbolTable : symbol_table;
+    auto s = is_global ? language->symbolTable : symbol_table;
     auto symbol = s->resolve(id);
     if (symbol.has_value()) {
         error("Variable already defined '" + id + "'", cur.pos);
@@ -800,11 +802,9 @@ void Compiler::loop() {
     patch_loop(loop_start, OpCode::BREAK, after_condition);
 }
 
-void Compiler::use() {
-    expect("(");
+void Compiler::include() {
     auto path = cur;
     expect(TokenType::String);
-    expect(")");
 
     std::stringstream ss(std::get<std::string>(language->options["SEARCH_PATH"]));
     std::string search_path;
@@ -844,7 +844,7 @@ void Compiler::use() {
 
     int total = 0;
     // export symbols
-    for (auto i: symbol_table->store) {
+    for (const auto& i: symbol_table->store) {
         if (i.second.scope == Symbol::Scope::LOCAL && isupper(i.first[0])) {
             language->constants.push_back(SRCLANG_VALUE_STRING(strdup(i.first.c_str())));
             instructions->emit(compiler.global_debug_info.get(), 0, OpCode::CONST_, language->constants.size() - 1);
@@ -866,7 +866,7 @@ void Compiler::use() {
     auto fun = new Function{FunctionType::Function, "", std::move(instructions), nlocals, 0, false,
                             compiler.global_debug_info};
     auto val = SRCLANG_VALUE_FUNCTION(fun);
-    language->memoryManager.heap.push_back(val);
+    language->memoryManager->heap.push_back(val);
     language->constants.push_back(val);
 
     emit(OpCode::CLOSURE, language->constants.size() - 1, nfree.size());
@@ -955,7 +955,7 @@ Compiler::Compiler(const Iterator &start, Iterator end,
     global_debug_info->filename = filename;
     global_debug_info->position = 0;
     debug_info = global_debug_info.get();
-    symbol_table = &language->symbolTable;
+    symbol_table = language->symbolTable;
     instructions.push_back(std::make_unique<Instructions>());
     eat();
     eat();

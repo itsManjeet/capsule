@@ -2,6 +2,9 @@
 
 #include <fstream>
 #include <utility>
+#include "../Compiler/SymbolTable/SymbolTable.h"
+#include "../Compiler/Compiler.h"
+#include "../Interpreter/Interpreter.h"
 
 using namespace srclang;
 
@@ -17,17 +20,20 @@ Language::Language()
                 {"DEBUG",                 false},
                 {"BREAK",                 false},
         }) {
+    memoryManager = new MemoryManager();
+    symbolTable = new SymbolTable();
+
     for (auto b: builtins) {
-        memoryManager.heap.push_back(b);
+        memoryManager->heap.push_back(b);
     }
     {
         int i = 0;
-#define X(id) symbolTable.define(#id, i++);
+#define X(id) symbolTable->define(#id, i++);
         SRCLANG_BUILTIN_LIST
 #undef X
     }
 
-    symbolTable.define("__FILE__");
+    symbolTable->define("__FILE__");
 
     define("true", SRCLANG_VALUE_TRUE);
     define("false", SRCLANG_VALUE_FALSE);
@@ -35,25 +41,23 @@ Language::Language()
 
 }
 
-Language::~Language() = default;
+Language::~Language() {
+    delete memoryManager;
+    delete symbolTable;
+}
 
 void Language::define(const std::string &id, Value value) {
-    auto symbol = symbolTable.resolve(id);
+    auto symbol = symbolTable->resolve(id);
     if (symbol == std::nullopt) {
-        symbol = symbolTable.define(id);
+        symbol = symbolTable->define(id);
     }
     globals[symbol->index] = value;
-    register_object(value);
+    registerObject(value);
 }
 
-Value Language::register_object(Value value) {
-    memoryManager.heap.push_back(value);
+Value Language::registerObject(Value value) const {
+    memoryManager->heap.push_back(value);
     return value;
-}
-
-size_t Language::add_constant(Value value) {
-    constants.push_back(register_object(value));
-    return constants.size() - 1;
 }
 
 std::tuple<Value, ByteCode, std::shared_ptr<DebugInfo>>
@@ -71,7 +75,7 @@ Language::compile(std::string const &input, std::string const &filename) {
             std::cout << std::get<1>(ret) << std::endl;
         }
     } catch (const std::exception &exception) {
-        std::get<0>(ret) = register_object(SRCLANG_VALUE_ERROR(strdup(exception.what())));
+        std::get<0>(ret) = registerObject(SRCLANG_VALUE_ERROR(strdup(exception.what())));
     }
 
     return ret;
@@ -88,7 +92,7 @@ Value Language::execute(const std::string &input, const std::string &filename) {
 Value Language::execute(ByteCode &code, const std::shared_ptr<DebugInfo> &debugInfo) {
     auto interpreter = Interpreter(code, debugInfo, this);
     if (!interpreter.run()) {
-        return register_object(SRCLANG_VALUE_ERROR(strdup(interpreter.get_error().c_str())));
+        return registerObject(SRCLANG_VALUE_ERROR(strdup(interpreter.getError().c_str())));
     }
     return *interpreter.sp;
 }
@@ -108,7 +112,7 @@ void Language::appendSearchPath(const std::string &path) {
 }
 
 Value Language::resolve(const std::string &id) {
-    auto symbol = symbolTable.resolve(id);
+    auto symbol = symbolTable->resolve(id);
     if (symbol == std::nullopt) {
         return SRCLANG_VALUE_NULL;
     }
