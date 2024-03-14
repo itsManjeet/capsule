@@ -11,6 +11,9 @@ using namespace srclang;
 
 #define popen _popen
 #define pclose _pclose
+#define LIBRARY_SUFFIX ".dll"
+#elif defined(__APPLE__)
+#define LIBRARY_SUFFIX ".dyn"
 #define close _close
 #define WEXITSTATUS(c) (((c) >> 8) & 0377)
 #else
@@ -20,7 +23,9 @@ using namespace srclang;
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <netdb.h>
+#include <dlfcn.h>
 
+#define LIBRARY_SUFFIX ".so"
 #endif
 
 std::vector<Value> srclang::builtins = {
@@ -254,7 +259,7 @@ SRCLANG_BUILTIN(exit) {
     SRCLANG_CHECK_ARGS_TYPE(0, ValueType::Number);
 
     auto status = (int) SRCLANG_VALUE_AS_NUMBER(args[0]);
-    interpreter->grace_full_exit();
+    interpreter->graceFullExit();
     exit(status);
 }
 
@@ -563,4 +568,22 @@ SRCLANG_BUILTIN(socket) {
             }))});
 
     return value;
+}
+
+SRCLANG_BUILTIN(use) {
+    SRCLANG_CHECK_ARGS_EXACT(0);
+    SRCLANG_CHECK_ARGS_TYPE(0, ValueType::String);
+
+    std::string mod = reinterpret_cast<const char *>(SRCLANG_VALUE_AS_OBJECT(args[0])->pointer);
+    auto searchPath = std::get<std::string>(interpreter->language->options["SEARCH_PATH"]);
+    std::stringstream ss(searchPath);
+    for (std::string s; std::getline(ss, s, ';');) {
+        auto modulePath = std::filesystem::path(s) / mod;
+        if (std::filesystem::exists(modulePath.string() + ".src")) {
+            return interpreter->language->execute(modulePath.string() + ".src");
+        } else if (std::filesystem::exists(modulePath.string() + LIBRARY_SUFFIX)) {
+
+        }
+    }
+    return SRCLANG_VALUE_SET_REF(SRCLANG_VALUE_STRING("Module missing"));
 }

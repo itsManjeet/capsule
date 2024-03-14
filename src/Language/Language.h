@@ -4,18 +4,19 @@
 #include <filesystem>
 #include <tuple>
 
-#include "../Compiler/Compiler.h"
-#include "../Interpreter/Interpreter.h"
 #include "Options.h"
-#include "../Compiler/SymbolTable/SymbolTable.h"
 #include "../Value/Value.h"
+#include "../ByteCode/ByteCode.h"
 
 namespace srclang {
 
+    struct SymbolTable;
+    struct MemoryManager;
+
     struct Language {
-        MemoryManager memoryManager;
+        MemoryManager *memoryManager;
         Options options;
-        SymbolTable symbolTable;
+        SymbolTable *symbolTable;
 
         SrcLangList globals;
         SrcLangList constants;
@@ -26,9 +27,7 @@ namespace srclang {
 
         void define(std::string const &id, Value value);
 
-        size_t add_constant(Value value);
-
-        Value register_object(Value value);
+        [[nodiscard]] Value registerObject(Value value) const;
 
         Value resolve(std::string const &id);
 

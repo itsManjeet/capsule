@@ -30,7 +30,8 @@ namespace srclang {
     X(exit)                               \
     X(open)                               \
     X(exec)                               \
-    X(socket)
+    X(socket)                             \
+    X(use)
 
     struct Interpreter;
 #define X(id) SRCLANG_BUILTIN(id);

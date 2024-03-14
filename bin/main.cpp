@@ -1,6 +1,7 @@
 #include <fstream>
 #include <iostream>
-
+#include <optional>
+#include "../src/Interpreter/MemoryManager/MemoryManager.h"
 #include "../src/Language/Language.h"
 
 using namespace srclang;

@@ -168,7 +168,6 @@ namespace srclang {
         ///        ::= list
         ///        ::= map
         ///        ::= function
-        ///        ::= use
         ///        ::= '(' expression ')'
         void prefix(bool can_assign);
 
@@ -208,8 +207,8 @@ namespace srclang {
         /// loop ::= 'for' <identifier> 'in' <expression> <block>
         void loop();
 
-        /// use ::= 'use' '('  <string> ')'
-        void use();
+        /// include ::= 'include' <string>
+        void include();
 
         /// defer ::= 'defer' <function>
         void defer();
