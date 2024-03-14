@@ -18,7 +18,7 @@ jobs:
             artifact_name: srclang
             asset_name: srclang-macos-amd64
           - os: windows-latest
-            artifact_name: srclang.exe
+            artifact_name: Release/srclang.exe
             asset_name: srclang-windows-amd64.exe
 
     steps:
@@ -44,6 +44,7 @@ jobs:
 
       - name: Upload binaries to release
         uses: svenstaro/upload-release-action@v2
+        if: github.ref == 'refs/heads/main'
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: ${{github.workspace}}/build/bin/${{matrix.artifact_name}}
