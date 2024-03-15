@@ -12,10 +12,10 @@ using namespace srclang;
 #define popen _popen
 #define pclose _pclose
 #define LIBRARY_SUFFIX ".dll"
-#elif defined(__APPLE__)
-#define LIBRARY_SUFFIX ".dyn"
 #define close _close
 #define WEXITSTATUS(c) (((c) >> 8) & 0377)
+#elif defined(__APPLE__)
+#define LIBRARY_SUFFIX ".dyn"
 #else
 
 #include <netinet/in.h>
