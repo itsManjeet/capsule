@@ -44,7 +44,7 @@ jobs:
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: ${{github.workspace}}/${{matrix.os}}.zip
+          file: ${{github.workspace}}/build/${{matrix.os}}.zip
           asset_name: srclang-${{matrix.os}}.zip
           tag: continuous
           overwrite: true
