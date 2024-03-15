@@ -8,3 +8,7 @@ set_target_properties(${PROJECT_NAME}Library
 install(TARGETS ${PROJECT_NAME}Library
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
         PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+
+if (WIN32)
+    target_link_libraries(${PROJECT_NAME}Library PUBLIC wsock32 ws2_32)
+endif ()
