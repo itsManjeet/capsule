@@ -10,16 +10,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        include:
-          - os: ubuntu-latest
-            artifact_name: srclang
-            asset_name: srclang-linux-amd64
-          - os: macos-latest
-            artifact_name: srclang
-            asset_name: srclang-macos-amd64
-          - os: windows-latest
-            artifact_name: Release/srclang.exe
-            asset_name: srclang-windows-amd64.exe
+        os: [ubuntu-latest, windows-latest]
 
     steps:
       - uses: actions/checkout@v2
@@ -42,12 +33,25 @@ jobs:
         shell: bash
         run: ctest -C $BUILD_TYPE
 
+      - name: Create Artifact
+        shell: bash
+        working-directory: ${{github.workspace}}/build
+        run: |-
+          DESTDIR=$PWD/dest cmake --install . --prefix /usr
+
+      - name: Pack Artifact
+        uses: thedoctor0/zip-release@0.7.5
+        with:
+          type: 'zip'
+          filename: ${{github.workspace}}/build/${{matrix.os}}.zip
+          directory: ${{github.workspace}}/build/dest
+
       - name: Upload binaries to release
         uses: svenstaro/upload-release-action@v2
-        if: github.ref == 'refs/heads/main'
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: ${{github.workspace}}/build/bin/${{matrix.artifact_name}}
-          asset_name: ${{matrix.asset_name}}
+          file: ${{github.workspace}}/build/${{matrix.os}}.zip
+          asset_name: srclang-${{matrix.os}}.zip
           tag: continuous
           overwrite: true
+          prerelease: true
