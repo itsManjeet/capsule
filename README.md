@@ -1,279 +1,303 @@
-# Srclang: An Easy to learn Programming language (Work in Progress)
-
-Welcome to the early development stage of Srclang! Srclang is an emerging, open-source programming language that's a work in progress. We're in the process of crafting a versatile and feature-rich language to empower developers, but please keep in mind that this README reflects our ongoing efforts.
-
-## Table of Contents
-
-- [Srclang: An Easy to learn Programming language (Work in Progress)](#srclang-an-easy-to-learn-programming-language-work-in-progress)
-  - [Table of Contents](#table-of-contents)
-  - [Introduction](#introduction)
-  - [Features](#features)
-    - [Dynamic Typing](#dynamic-typing)
-    - [Garbage Collection](#garbage-collection)
-    - [Simplified Data Types](#simplified-data-types)
-    - [Error Handling](#error-handling)
-    - [First-Class Functions](#first-class-functions)
-    - [Control Structures](#control-structures)
-    - [Built-In Functions](#built-in-functions)
-    - [`println`](#println)
-    - [`print`](#print)
-    - [`gc`](#gc)
-    - [`len`](#len)
-    - [`append`](#append)
-    - [`range`](#range)
-    - [`clone`](#clone)
-    - [`eval`](#eval)
-    - [`pop`](#pop)
-    - [`call`](#call)
-    - [`alloc` and `free`](#alloc-and-free)
-    - [`lower` and `upper`](#lower-and-upper)
-    - [`search`](#search)
-    - [`system`](#system)
-  - [Examples](#examples)
-  - [Getting Started](#getting-started)
-  - [License](#license)
-
-## Introduction
-
-Srclang, also known as Source Language, is a programming language in the early stages of development. Our goal is to create a modern and accessible language that will eventually offer a rich set of features to facilitate efficient and expressive coding. This README provides an overview of our current progress.
-
-## Features
-
-### Dynamic Typing
-
-Srclang is being designed as a dynamically-typed programming language, offering flexibility in variable declarations and assignments. The concept of generic variables that can store values of any type, as well as variables that can change their type during program execution, is part of our vision:
-
-```srclang
-let x = 10;
-println("VALUE:", x, "TYPE:", type(x));
-
-x = "String";
-println("VALUE:", x, "TYPE:", type(x));
-
-x = [10, x];
-println("VALUE:", x, "TYPE:", type(x));
-```
-
-### Garbage Collection
-
-We are actively working on implementing self-managed garbage collection, which will eliminate the need for manual memory management and reduce the risk of memory leaks. This feature aims to enhance code reliability and simplify resource management:
-
-```srclang
-for i in range(100000) {
-    x := "Hello " + "World";
-}
-```
-
-### Simplified Data Types
-
-Our aspiration is to provide a concise set of data types, making the language easy to learn and use. Currently, we're focusing on the following data types:
-
-- **Boolean**: A primitive data type for logical operations:
-
-```srclang
-println(true);
-println(not false);
-```
-
-- **Numbers**: We are working on supporting double-precision floating-point values that can also represent a wide range of integral values. Underscores will be used for better visualization:
-
-```srclang
-let bigNumber = 1_234_567_890;
-let floatingPoint = 123_456_789.99;
-```
-
-### Error Handling
-
-We plan to include error handling to simplify runtime error management:
-
-```srclang
-let e = error("Runtime Error");
-println(type(e), e);
-```
-
-### First-Class Functions
-
-Our design philosophy involves treating functions as first-class citizens, allowing for the creation of higher-order functions. Here's a glimpse of our intended approach:
-
-```srclang
-Complex := fun (real, img) {
-    self := {};
-
-    self.real = real;
-    self.img = img;
-
-    self.__str__ = fun () {
-        return str(real) + " i" + str(img);
-    };
-
-    return self;
-};
-```
-
-### Control Structures
-
-We're actively developing a variety of control structures, including conditions and loops, to facilitate program flow control:
-
-```srclang
-if x := 10; x > 10 {
-    println("Greater than 10");
-} else if x < 10 {
-    println("Smaller");
-} else {
-    println("Equal");
-}
-
-count := 0;
-for true {
-    count = count + 1;
-    if count >= 20 {
-        break;
-    }
-    if count % 5 {
-        println("skipping");
-        continue;
-    }
-    println("i am running");
-}
-```
-
-### Built-In Functions
-
-Srclang offers a variety of built-in functions to simplify common tasks and enhance your coding experience. Here's a brief overview of some of the essential built-in functions:
-
-### `println`
-
-The `println` function is used to print argument values, followed by a newline character. It is a handy tool for displaying output in your programs:
-
-```srclang
-println ("Hello", 10, 20.03, Complex(10, 20), e);
-```
-
-### `print`
-
-Similar to `println`, the `print` function is used to print argument values without adding a newline character. This allows you to display output on the same line:
-
-```srclang
-print ("Hello", 10, 20.03, Complex(10, 20), e);
-```
-
-### `gc`
-
-The `gc` function manually triggers garbage collection, helping you manage memory efficiently and prevent memory leaks:
-
-```srclang
-gc();
-```
-
-### `len`
-
-The `len` function calculates and prints the size of a value. It is especially useful for determining the length of strings or lists:
-
-```srclang
-len("Hello World");
-len([10, 20, 30]);
-```
-
-### `append`
-
-The `append` function adds a value to a string or list. It allows you to build and modify strings or lists dynamically:
-
-```srclang
-l := [];
-append(l, 10);
-append(l, 20);
-append(l, 30);
-println(l);
-```
-
-### `range`
-
-The `range` function generates a range of values based on the specified parameters. It is often used in loops and iteration:
-
-```srclang
-println(range(4));           // [0, 1, 2, 3]
-println(range(4, 10));       // [4, 5, 6, 7, 8, 9]
-println(range(5, 20, 2));    // [5, 7, 9, 11, 13, 15, 17, 19]
-```
-
-### `clone`
-
-The `clone` function performs a deep copy of a value and allocates space for the new value. This helps maintain data integrity:
-
-```srclang
-println(clone([10, 20, "hello"]));
-```
-
-### `eval`
-
-`eval` allows you to evaluate Srclang code from a string. It can be a powerful tool for dynamic code execution:
-
-```srclang
-let v = 10;
-println(eval("println(v);"));
-```
-
-### `pop`
-
-The `pop` function removes and returns a value from a list. It's a useful function for managing lists:
-
-```srclang
-println(pop([10, 20, 30]));
-```
-
-### `call`
-
-The `call` function enables the invocation of Srclang methods with arguments. It ensures safe evaluation and returns any runtime errors as an error:
-
-```srclang
-println(Complex, 10, 20);
-```
-
-### `alloc` and `free`
-
-These functions allow you to allocate and manually free memory buffers. They are helpful for managing memory resources:
-
-```srclang
-let buffer = alloc(10);
-free(buffer);
-```
-
-### `lower` and `upper`
-
-The `lower` and `upper` functions convert string values to lowercase and uppercase, respectively:
-
-```srclang
-println(lower("HELLO"));
-println(upper("hello"));
-```
-
-### `search`
-
-The `search` function looks for a value within a string, list, or map and returns its index:
-
-```srclang
-println(search([10, 20, 40, "ley"], "ley")); // 3
-```
-
-### `system`
-
-The `system` function provides a platform-independent way to execute system commands. It even allows you to specify a callback function for handling the command's output:
-
-```srclang
-exit_code := system("ls", fun (output) {
-    print(output);
-});
-
-Our development journey continues, and we welcome your contributions and feedback as we work towards a more complete and robust Srclang.
-
-## Examples
-
-Stay tuned for more code examples and in-depth usage of Srclang features as we progress with our development efforts.
+<!-- PROJECT LOGO -->
+<br />
+<div align="center">
+  <a href="https://github.com/itsmanjeet/srclang">
+    <h1>SrcLang</h1>
+  </a>
+
+<h3 align="center">Source Programming Language</h3>
+
+  <p align="center">
+    A Platform independent, Easy to Learn, Bytecode Programming Language.
+    <br />
+    <a href="https://github.com/itsmanjeet/srclang"><strong>Explore the docs »</strong></a>
+    <br />
+    <br />
+    <a href="https://github.com/itsManjeet/srclang/releases/tag/continuous">View Demo</a>
+    ·
+    <a href="https://github.com/itsmanjeet/srclang/issues">Report Bug</a>
+    ·
+    <a href="https://github.com/itsmanjeet/srclang/issues">Request Feature</a>
+  </p>
+</div>
+
+
+[![CMake](https://github.com/itsManjeet/srclang/actions/workflows/build-and-release.yml/badge.svg)](https://github.com/itsManjeet/srclang/actions/workflows/build-and-release.yml)
+
+<!-- TABLE OF CONTENTS -->
+<details>
+  <summary>Table of Contents</summary>
+  <ol>
+    <li>
+      <a href="#about-the-project">About The Project</a>
+      <ul>
+        <li><a href="#built-with">Built With</a></li>
+      </ul>
+    </li>
+    <li>
+      <a href="#getting-started">Getting Started</a>
+      <ul>
+        <li><a href="#prerequisites">Prerequisites</a></li>
+        <li><a href="#installation">Installation</a></li>
+      </ul>
+    </li>
+    <li><a href="#usage">Usage</a></li>
+    <li><a href="#roadmap">Roadmap</a></li>
+    <li><a href="#contributing">Contributing</a></li>
+    <li><a href="#license">License</a></li>
+    <li><a href="#contact">Contact</a></li>
+    <li><a href="#acknowledgments">Acknowledgments</a></li>
+  </ol>
+</details>
+
+
+
+<!-- ABOUT THE PROJECT -->
+
+## About The Project
+
+[![Screen Shot](assets/screenshot.png)](https://github.com/itsmanjeet/srclang)
+
+SrcLang or Source Programming Language is an easy to learn, dynamically typed bytecode Programming Language for platform
+Independent Application Development.
+
+Here's why:
+
+* Write once run everywhere
+* Faster, efficient and lightweight
+* Easy to learn, you can get use to it within a weekend.
+
+<!-- GETTING STARTED -->
 
 ## Getting Started
 
-We're actively working on providing detailed instructions for getting started with Srclang. Keep an eye on this space for updates.
+SrcLang uses only system provided libraries and hence no special setup is required other than CMake and C++ Compiler to
+build and run SrcLang.
+
+<!-- USAGE EXAMPLES -->
+
+## Usage
+
+You can either compile the code from source or use the `continuous` release build
+from [GitHub Release](https://github.com/itsManjeet/srclang/releases/tag/continuous)
+
+## Basics
+
+```
+# Supported DataType
+
+# Boolean
+true false
+
+# Number
+10 10.02 10_00_000.0_10
+
+# String
+"Supported Multiline
+String by Default"
+
+# List
+[10, true, "Hey", fun () { return 0; }, {a: 10, b: 20}];
+
+# Map
+{
+  a: 10,
+  b: "20",
+  c: [20, 40]
+}
+
+# Closures
+let adder = fun (p) {
+  return fun (a, b) {
+    return a + b + p;
+  };
+};
+let p_adder = adder(2);
+
+println (p_adder(20, 30));
+
+
+# Error
+error("This is a error");
+
+# Type
+let str_type = type("string");
+
+# Nil
+nil
+
+
+# Variable declaration
+
+let x = 10;
+
+x := 10; # Declare variable of not already defined else reassign new value
+
+# Condition
+
+# Condition support multiple statements
+if result := false; not result {
+  println ("Not Result");
+} else {
+  println ("Result");
+}
+
+# Loops
+
+for true {
+  println ("infinite");
+}
+
+for a in [10, 20, 30, 40] {
+  println (a);
+}
+
+for a in range(0, 10, 2) {
+  println (a);
+}
+
+# Function
+
+# Functions in srclang are First class Citizens
+# and can be assigned as normal values
+
+let adder = fun (pre) {
+  return fun (a, b) {
+    return a + b + pre;
+  };
+};
+
+let th_adder = adder(10);
+println (th_adder(20, 30));
+
+# Error handling
+if ok := someFun(10); not ok {
+  println ("Error");
+};
+
+# Object Oriented
+
+let Complex = fun (real, img) {
+  self := { real: real, img: img};
+  
+  self.__type__ = fun () {
+    return "<complex>;
+  };
+  
+  self.__str__ = fun () {
+    return str(self.real) + " i" + str(self.img);
+  };
+  
+  self.Add = fun (other) {
+    return Complex(self.real + other.real, self.img + other.img);
+  };
+};
+
+let complex = Complex(10, 20);
+
+println (complex);
+
+# Resource Management via defer
+
+if let file = open("hello.txt"); not file {
+  ...
+}
+defer { file.Close(); };
+
+
+# Builtins
+
+# To get length of elements
+len("Hello World");
+
+# Append and Pop value in list
+let arr = [10, 20];
+arr = append(arr, 30);
+
+arr = pop(arr);
+
+# Range to generate a list of values
+# range(end);
+# range(start, end);
+# range(start, end, inc);
+
+let arr = range(10);
+arr = range(2, 10);
+arr = range(5, 10, 2);
+
+# Lazy evaluate SrcLang code
+let result = eval("range(10);");
+
+
+# Safely call srclang function in sandbox
+let result = call(adder, 10, 20);
+
+# Open() to create and edit file
+
+let file = open("hello.txt");
+defer { file.Close() };
+file.Write("Hello World");
+
+# Exec() to execute system calls
+let status = exec("dir", fun (out) {
+  print(out);
+});
+
+# Socket to create socket
+
+let sock = socket("tcp4");
+
+sock.Bind("0.0.0.0:8000");
+
+sock.File.Write("Hello World");
+
+
+```
+
+<!-- ROADMAP -->
+
+## Roadmap
+
+- [x] Basic Infrastructure and Working
+- [x] Platform Independent Codebase
+- [x] Nan Boxing
+- [ ] Stabilize Codebase
+- [ ] Support Bytecode dumping
+- [ ] Platform Independent FFI support
+
+See the [open issues](https://github.com/itsmanjeet/srclang/issues) for a full list of proposed features (
+and known issues).
+
+
+
+<!-- CONTRIBUTING -->
+
+## Contributing
+
+Contributions are what make the open source community such an amazing place to learn, inspire, and create. Any
+contributions you make are **greatly appreciated**.
+
+If you have a suggestion that would make this better, please fork the repo and create a pull request. You can also
+simply open an issue with the tag "enhancement".
+Don't forget to give the project a star! Thanks again!
+
+1. Fork the Project
+2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the Branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+<!-- LICENSE -->
 
 ## License
 
-Srclang will be released under an open-source license. We encourage open collaboration and usage of Srclang for both personal and commercial projects. Thank you for your interest in our work-in-progress programming language!
+Distributed under the GPLv3 License. See `LICENSE` for more information.
+
+
+<!-- CONTACT -->
+
+## Contact
+
+Manjeet Singh - itsmanjeet1998@gmail.com
+
+Project Link: [https://github.com/itsmanjeet/srclang](https://github.com/itsmanjeet/srclang)
