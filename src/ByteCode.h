@@ -5,9 +5,9 @@
 #include <memory>
 
 #include "Instructions.h"
-#include "../Value/Value.h"
+#include "Value.h"
 
-namespace srclang {
+namespace SrcLang {
 
     struct ByteCode {
         std::unique_ptr<Instructions> instructions;
@@ -35,6 +35,6 @@ namespace srclang {
         }
     };
 
-}  // srclang
+}  // SrcLang
 
 #endif  // SRCLANG_BYTECODE_H

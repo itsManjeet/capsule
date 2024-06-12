@@ -1,6 +1,6 @@
 #include "SymbolTable.h"
 
-using namespace srclang;
+using namespace SrcLang;
 
 Symbol SymbolTable::define(const std::string &name) {
     store[name] =

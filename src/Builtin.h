@@ -1,12 +1,11 @@
 #ifndef SRCLANG_BUILTIN_H
 #define SRCLANG_BUILTIN_H
 
-#include "../Interpreter/MemoryManager/MemoryManager.h"
-#include "../Value/Value.h"
+#include "MemoryManager.h"
+#include "Value.h"
 
-namespace srclang {
-    struct Interpreter;
-    struct Language;
+namespace SrcLang {
+    class Interpreter;
 
     typedef Value (*Builtin)(std::vector<Value> &, Interpreter *);
 
@@ -23,15 +22,12 @@ namespace srclang {
     X(clone)                              \
     X(eval)                               \
     X(pop)                                \
-    X(call)                               \
     X(alloc)                              \
     X(free)                               \
     X(bound)                              \
     X(exit)                               \
     X(open)                               \
-    X(exec)                               \
-    X(socket)                             \
-    X(use)
+    X(exec)
 
     struct Interpreter;
 #define X(id) SRCLANG_BUILTIN(id);
@@ -46,6 +42,6 @@ namespace srclang {
 #undef X
     };
     extern std::vector<Value> builtins;
-}  // namespace srclang
+}  // namespace SrcLang
 
 #endif  // SRCLANG_BUILTIN_H

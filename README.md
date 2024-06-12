@@ -1,7 +1,7 @@
 <!-- PROJECT LOGO -->
 <br />
 <div align="center">
-  <a href="https://github.com/itsmanjeet/srclang">
+  <a href="https://github.com/itsmanjeet/SrcLang">
     <h1>SrcLang</h1>
   </a>
 
@@ -10,26 +10,26 @@
   <p align="center">
     A Platform independent, Easy to Learn, Bytecode Programming Language.
     <br />
-    <a href="https://github.com/itsmanjeet/srclang"><strong>Explore the docs »</strong></a>
+    <a href="https://github.com/itsmanjeet/SrcLang"><strong>Explore the docs »</strong></a>
     <br />
     <br />
-    <a href="https://github.com/itsManjeet/srclang/releases/tag/continuous">View Demo</a>
+    <a href="https://github.com/itsManjeet/SrcLang/releases/tag/continuous">View Demo</a>
     ·
-    <a href="https://github.com/itsmanjeet/srclang/issues">Report Bug</a>
+    <a href="https://github.com/itsmanjeet/SrcLang/issues">Report Bug</a>
     ·
-    <a href="https://github.com/itsmanjeet/srclang/issues">Request Feature</a>
+    <a href="https://github.com/itsmanjeet/SrcLang/issues">Request Feature</a>
   </p>
 </div>
 
 
-[![CMake](https://github.com/itsManjeet/srclang/actions/workflows/build-and-release.yml/badge.svg)](https://github.com/itsManjeet/srclang/actions/workflows/build-and-release.yml)
+[![CMake](https://github.com/itsManjeet/SrcLang/actions/workflows/build-and-release.yml/badge.svg)](https://github.com/itsManjeet/SrcLang/actions/workflows/build-and-release.yml)
 
 
 <!-- ABOUT THE PROJECT -->
 
 ## About The Project
 
-[![Screen Shot](assets/screenshot.png)](https://github.com/itsmanjeet/srclang)
+[![Screen Shot](assets/screenshot.png)](https://github.com/itsmanjeet/SrcLang)
 
 SrcLang or Source Programming Language is an easy to learn, dynamically typed bytecode Programming Language for platform
 Independent Application Development.
@@ -52,7 +52,7 @@ build and run SrcLang.
 ## Usage
 
 You can either compile the code from source or use the `continuous` release build
-from [GitHub Release](https://github.com/itsManjeet/srclang/releases/tag/continuous)
+from [GitHub Release](https://github.com/itsManjeet/SrcLang/releases/tag/continuous)
 
 ## Basics
 
@@ -131,7 +131,7 @@ for a in range(0, 10, 2) {
 
 # Function
 
-# Functions in srclang are First class Citizens
+# Functions in SrcLang are First class Citizens
 # and can be assigned as normal values
 
 let adder = fun (pre) {
@@ -202,7 +202,7 @@ arr = range(5, 10, 2);
 let result = eval("range(10);");
 
 
-# Safely call srclang function in sandbox
+# Safely call SrcLang function in sandbox
 let result = call(adder, 10, 20);
 
 # Open() to create and edit file
@@ -238,7 +238,7 @@ sock.File.Write("Hello World");
 - [ ] Support Bytecode dumping
 - [ ] Platform Independent FFI support
 
-See the [open issues](https://github.com/itsmanjeet/srclang/issues) for a full list of proposed features (
+See the [open issues](https://github.com/itsmanjeet/SrcLang/issues) for a full list of proposed features (
 and known issues).
 
 
@@ -273,4 +273,4 @@ Distributed under the GPLv3 License. See `LICENSE` for more information.
 
 Manjeet Singh - itsmanjeet1998@gmail.com
 
-Project Link: [https://github.com/itsmanjeet/srclang](https://github.com/itsmanjeet/srclang)
+Project Link: [https://github.com/itsmanjeet/SrcLang](https://github.com/itsmanjeet/SrcLang)

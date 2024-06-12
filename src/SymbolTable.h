@@ -3,9 +3,9 @@
 
 #include <optional>
 
-#include "../../Value/Value.h"
+#include "Value.h"
 
-namespace srclang {
+namespace SrcLang {
 
 #define SRCLANG_SYMBOL_SCOPE_LIST \
     X(BUILTIN)                    \

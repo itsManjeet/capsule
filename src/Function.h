@@ -3,11 +3,11 @@
 
 #include <memory>
 
-#include "../ByteCode/DebugInfo.h"
-#include "../ByteCode/Instructions.h"
+#include "DebugInfo.h"
+#include "Instructions.h"
 #include "Value.h"
 
-namespace srclang {
+namespace SrcLang {
 
     enum class FunctionType {
         Function,
@@ -31,6 +31,6 @@ namespace srclang {
         std::vector<Value> free{0};
     };
 
-}  // srclang
+}  // SrcLang
 
 #endif

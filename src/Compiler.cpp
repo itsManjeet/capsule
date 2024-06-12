@@ -6,9 +6,7 @@
 #include <ranges>
 #include <utility>
 
-#include "../Language/Language.h"
-
-using namespace srclang;
+using namespace SrcLang;
 
 template<class V>
 std::type_info const &variant_typeid(V const &v) {
@@ -16,7 +14,7 @@ std::type_info const &variant_typeid(V const &v) {
 }
 
 ByteCode Compiler::code() {
-    return ByteCode{std::move(instructions.back()), language->constants};
+    return ByteCode{std::move(instructions.back()), constants};
 }
 
 Instructions *Compiler::inst() { return instructions.back().get(); }
@@ -181,8 +179,8 @@ void Compiler::eat() {
         return;
     }
 
-    for (std::string k: {"let", "fun", "return", "class", "if", "else", "for", "break", "continue", "include", "global",
-                         "as", "in", "defer",
+    for (std::string k: {"let", "fun", "return", "class", "if", "else", "for", "break", "continue", "use",
+                         "global", "as", "in", "defer",
 
             // special operators
                          "#!", "not", "...", ":=",
@@ -293,8 +291,8 @@ void Compiler::number() {
         error("Invalid numerical value " + std::string(e.what()), cur.pos);
     }
 
-    language->constants.push_back(val);
-    emit(OpCode::CONST_, language->constants.size() - 1);
+    constants.push_back(val);
+    emit(OpCode::CONST_, constants.size() - 1);
     return expect(TokenType::Number);
 }
 
@@ -330,9 +328,9 @@ void Compiler::identifier(bool can_assign) {
 
 void Compiler::string_() {
     auto string_value = SRCLANG_VALUE_STRING(strdup(cur.literal.c_str()));
-    language->memoryManager->heap.push_back(string_value);
-    language->constants.push_back(string_value);
-    emit(OpCode::CONST_, language->constants.size() - 1);
+    memoryManager->heap.push_back(string_value);
+    constants.push_back(string_value);
+    emit(OpCode::CONST_, constants.size() - 1);
     return expect(TokenType::String);
 }
 
@@ -417,10 +415,10 @@ void Compiler::function(Symbol *symbol, bool skip_args) {
     auto fun = new Function{FunctionType::Function, id, std::move(fun_instructions), nlocals, nparam, is_variadic,
                             fun_debug_info};
     auto fun_value = SRCLANG_VALUE_FUNCTION(fun);
-    language->memoryManager->heap.push_back(fun_value);
-    language->constants.push_back(fun_value);
+    memoryManager->heap.push_back(fun_value);
+    constants.push_back(fun_value);
 
-    emit(OpCode::CLOSURE, language->constants.size() - 1, free_symbols.size());
+    emit(OpCode::CLOSURE, constants.size() - 1, free_symbols.size());
 }
 
 void Compiler::class_() {
@@ -446,8 +444,8 @@ void Compiler::map_() {
     int size = 0;
     while (!consume("}")) {
         check(TokenType::Identifier);
-        language->constants.push_back(SRCLANG_VALUE_STRING(strdup(cur.literal.c_str())));
-        emit(OpCode::CONST_, language->constants.size() - 1);
+        constants.push_back(SRCLANG_VALUE_STRING(strdup(cur.literal.c_str())));
+        emit(OpCode::CONST_, constants.size() - 1);
         eat();
 
         expect(":");
@@ -477,8 +475,8 @@ void Compiler::prefix(bool can_assign) {
         return map_();
     } else if (consume("fun")) {
         return function(nullptr);
-    } else if (consume("include")) {
-        return include();
+    } else if (consume("use")) {
+        return use();
     } else if (consume("(")) {
         expression();
         return expect(")");
@@ -553,9 +551,9 @@ void Compiler::subscript(bool can_assign) {
     check(TokenType::Identifier);
 
     auto string_value = SRCLANG_VALUE_STRING(strdup(cur.literal.c_str()));
-    language->memoryManager->heap.push_back(string_value);
-    language->constants.push_back(string_value);
-    emit(OpCode::CONST_, language->constants.size() - 1);
+    memoryManager->heap.push_back(string_value);
+    constants.push_back(string_value);
+    emit(OpCode::CONST_, constants.size() - 1);
     eat();
 
     if (can_assign && consume("=")) {
@@ -618,70 +616,70 @@ void Compiler::compiler_options() {
     auto pos = cur.pos;
     eat();
 
-    auto id = language->options.find(option_id);
-    if (id == language->options.end()) {
-        error("unknown compiler option '" + option_id + "'", pos);
-    }
-#define CHECK_TYPE_ID(ty)                                          \
-    if (variant_typeid(id->second) != typeid(ty)) {                \
-        error("invalid value of type '" +                          \
-                  std::string(variant_typeid(id->second).name()) + \
-                  "' for option '" + option_id + "', required '" + \
-                  std::string(typeid(ty).name()) + "'",            \
-              pos);                                                \
-    }
-    OptionType value;
-    if (consume("(")) {
-        switch (cur.type) {
-            case TokenType::Identifier:
-                if (cur.literal == "true" || cur.literal == "false") {
-                    CHECK_TYPE_ID(bool);
-                    value = cur.literal == "true";
-                } else {
-                    CHECK_TYPE_ID(std::string);
-                    value = cur.literal;
-                }
-                break;
-            case TokenType::String:
-                CHECK_TYPE_ID(std::string);
-                value = cur.literal;
-                break;
-            case TokenType::Number: {
-                bool is_float = false;
-                for (int i = 0; i < cur.literal.size(); i++)
-                    if (cur.literal[i] == '.') is_float = true;
-
-                if (is_float) {
-                    CHECK_TYPE_ID(float);
-                    value = stof(cur.literal);
-                } else {
-                    CHECK_TYPE_ID(int);
-                    value = stoi(cur.literal);
-                }
-            }
-                break;
-            default:
-                CHECK_TYPE_ID(void);
-        }
-        eat();
-        expect(")");
-    } else {
-        CHECK_TYPE_ID(bool);
-        value = true;
-    }
-#undef CHECK_TYPE_ID
-
-    if (option_id == "VERSION") {
-        if (SRCLANG_VERSION > std::get<int>(value)) {
-            error("Code need srclang of version above or equal to "
-                  "'" + std::to_string(SRCLANG_VERSION) + "'", pos);
-        }
-    } else if (option_id == "SEARCH_PATH") {
-        language->options[option_id] = std::filesystem::absolute(std::get<std::string>(value)).string() + ":" +
-                                       std::get<std::string>(language->options[option_id]);
-    } else {
-        language->options[option_id] = value;
-    }
+//    auto id = options.find(option_id);
+//    if (id == options.end()) {
+//        error("unknown compiler option '" + option_id + "'", pos);
+//    }
+//#define CHECK_TYPE_ID(ty)                                          \
+//    if (variant_typeid(id->second) != typeid(ty)) {                \
+//        error("invalid value of type '" +                          \
+//                  std::string(variant_typeid(id->second).name()) + \
+//                  "' for option '" + option_id + "', required '" + \
+//                  std::string(typeid(ty).name()) + "'",            \
+//              pos);                                                \
+//    }
+//    OptionType value;
+//    if (consume("(")) {
+//        switch (cur.type) {
+//            case TokenType::Identifier:
+//                if (cur.literal == "true" || cur.literal == "false") {
+//                    CHECK_TYPE_ID(bool);
+//                    value = cur.literal == "true";
+//                } else {
+//                    CHECK_TYPE_ID(std::string);
+//                    value = cur.literal;
+//                }
+//                break;
+//            case TokenType::String:
+//                CHECK_TYPE_ID(std::string);
+//                value = cur.literal;
+//                break;
+//            case TokenType::Number: {
+//                bool is_float = false;
+//                for (int i = 0; i < cur.literal.size(); i++)
+//                    if (cur.literal[i] == '.') is_float = true;
+//
+//                if (is_float) {
+//                    CHECK_TYPE_ID(float);
+//                    value = stof(cur.literal);
+//                } else {
+//                    CHECK_TYPE_ID(int);
+//                    value = stoi(cur.literal);
+//                }
+//            }
+//                break;
+//            default:
+//                CHECK_TYPE_ID(void);
+//        }
+//        eat();
+//        expect(")");
+//    } else {
+//        CHECK_TYPE_ID(bool);
+//        value = true;
+//    }
+//#undef CHECK_TYPE_ID
+//
+//    if (option_id == "VERSION") {
+//        if (SRCLANG_VERSION > std::get<int>(value)) {
+//            error("Code need SrcLang of version above or equal to "
+//                  "'" + std::to_string(SRCLANG_VERSION) + "'", pos);
+//        }
+//    } else if (option_id == "SEARCH_PATH") {
+//        options[option_id] = std::filesystem::absolute(std::get<std::string>(value)).string() + ":" +
+//                                       std::get<std::string>(options[option_id]);
+//    } else {
+//        options[option_id] = value;
+//    }
     return expect("]");
 }
 
@@ -693,7 +691,7 @@ void Compiler::let() {
     check(TokenType::Identifier);
 
     std::string id = cur.literal;
-    auto s = is_global ? language->symbolTable : symbol_table;
+    auto s = is_global ? global : symbol_table;
     auto symbol = s->resolve(id);
     if (symbol.has_value()) {
         error("Variable already defined '" + id + "'", cur.pos);
@@ -747,8 +745,8 @@ void Compiler::loop() {
         iter = symbol_table->resolve(cur.literal);
         if (iter == std::nullopt) iter = symbol_table->define(cur.literal);
 
-        language->constants.push_back(SRCLANG_VALUE_NUMBER(0));
-        emit(OpCode::CONST_, language->constants.size() - 1);
+        constants.push_back(SRCLANG_VALUE_NUMBER(0));
+        emit(OpCode::CONST_, constants.size() - 1);
         emit(OpCode::STORE, count->scope, count->index);
         emit(OpCode::POP);
         eat();
@@ -777,8 +775,8 @@ void Compiler::loop() {
         emit(OpCode::STORE, iter->scope, iter->index);
         emit(OpCode::POP);
 
-        language->constants.push_back(SRCLANG_VALUE_NUMBER(1));
-        emit(OpCode::CONST_, language->constants.size() - 1);
+        constants.push_back(SRCLANG_VALUE_NUMBER(1));
+        emit(OpCode::CONST_, constants.size() - 1);
         emit(OpCode::LOAD, count->scope, count->index);
         emit(OpCode::ADD);
         emit(OpCode::STORE, count->scope, count->index);
@@ -802,11 +800,23 @@ void Compiler::loop() {
     patch_loop(loop_start, OpCode::BREAK, after_condition);
 }
 
-void Compiler::include() {
+void Compiler::use() {
+    expect("(");
     auto path = cur;
     expect(TokenType::String);
+    expect(")");
 
-    std::stringstream ss(std::get<std::string>(language->options["SEARCH_PATH"]));
+    auto module_path = std::filesystem::path(path.literal);
+    if (module_path.has_extension() && module_path.extension() == ".so") {
+        constants.push_back(SRCLANG_VALUE_STRING(strdup(module_path.c_str())));
+        emit(OpCode::CONST_, constants.size() - 1);
+        emit(OpCode::MODULE);
+        return;
+    }
+
+    std::stringstream ss(
+            std::string(getenv("SRCLANG_SEARCH_PATH") ? getenv("SRCLANG_SEARCH_PATH") : "/usr/include/SrcLang") +
+            ":" + std::filesystem::path(filename).parent_path().string() + ":");
     std::string search_path;
     bool found = false;
     while (getline(ss, search_path, ':')) {
@@ -831,7 +841,9 @@ void Compiler::include() {
 
     auto old_symbol_table = symbol_table;
     symbol_table = new SymbolTable{old_symbol_table};
-    Compiler compiler(input.begin(), input.end(), search_path, language);
+    Compiler compiler(input, search_path, constants,
+                      symbol_table,
+                      memoryManager);
     compiler.symbol_table = symbol_table;
     try {
         compiler.compile();
@@ -844,10 +856,10 @@ void Compiler::include() {
 
     int total = 0;
     // export symbols
-    for (const auto& i: symbol_table->store) {
-        if (i.second.scope == Symbol::Scope::LOCAL && isupper(i.first[0])) {
-            language->constants.push_back(SRCLANG_VALUE_STRING(strdup(i.first.c_str())));
-            instructions->emit(compiler.global_debug_info.get(), 0, OpCode::CONST_, language->constants.size() - 1);
+    for (const auto &i: symbol_table->store) {
+        if (i.second.scope == Symbol::Scope::LOCAL && i.first[0] != '_') {
+            constants.push_back(SRCLANG_VALUE_STRING(strdup(i.first.c_str())));
+            instructions->emit(compiler.global_debug_info.get(), 0, OpCode::CONST_, constants.size() - 1);
             instructions->emit(compiler.global_debug_info.get(), 0, OpCode::LOAD, i.second.scope, i.second.index);
             total++;
         }
@@ -866,10 +878,10 @@ void Compiler::include() {
     auto fun = new Function{FunctionType::Function, "", std::move(instructions), nlocals, 0, false,
                             compiler.global_debug_info};
     auto val = SRCLANG_VALUE_FUNCTION(fun);
-    language->memoryManager->heap.push_back(val);
-    language->constants.push_back(val);
+    memoryManager->heap.push_back(val);
+    constants.push_back(val);
 
-    emit(OpCode::CLOSURE, language->constants.size() - 1, nfree.size());
+    emit(OpCode::CLOSURE, constants.size() - 1, nfree.size());
     emit(OpCode::CALL, 0);
 }
 
@@ -943,19 +955,23 @@ void Compiler::program() {
     }
 }
 
-Compiler::Compiler(const Iterator &start, Iterator end,
+Compiler::Compiler(const std::string &source,
                    const std::string &filename,
-                   Language *language) :
-        iter{start},
-        start{start},
-        end{std::move(end)},
-        language{language},
-        filename{filename} {
+                   std::vector<Value> &constants,
+                   SymbolTable *global,
+                   MemoryManager *memoryManager) :
+        start(source.begin()),
+        end(source.end()),
+        constants(constants),
+        global(global),
+        filename(filename),
+        memoryManager(memoryManager) {
     global_debug_info = std::make_shared<DebugInfo>();
     global_debug_info->filename = filename;
     global_debug_info->position = 0;
     debug_info = global_debug_info.get();
-    symbol_table = language->symbolTable;
+    symbol_table = global;
+    iter = start;
     instructions.push_back(std::make_unique<Instructions>());
     eat();
     eat();

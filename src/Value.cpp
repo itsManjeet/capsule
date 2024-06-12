@@ -1,12 +1,12 @@
 #include "Value.h"
 
 #include "Function.h"
-#include "../Interpreter/MemoryManager/MemoryManager.h"
+#include "MemoryManager.h"
 #include <sstream>
 
-using namespace srclang;
+using namespace SrcLang;
 
-void srclang::SRCLANG_VALUE_FREE(Value value) {
+void SrcLang::SRCLANG_VALUE_FREE(Value value) {
     if (!SRCLANG_VALUE_IS_OBJECT(value)) {
         return;
     }
@@ -55,7 +55,7 @@ void srclang::SRCLANG_VALUE_FREE(Value value) {
 }
 
 
-ValueType srclang::SRCLANG_VALUE_GET_TYPE(Value val) {
+ValueType SrcLang::SRCLANG_VALUE_GET_TYPE(Value val) {
     if (SRCLANG_VALUE_IS_NULL(val)) return ValueType::Null;
     if (SRCLANG_VALUE_IS_BOOL(val)) return ValueType::Boolean;
     if (SRCLANG_VALUE_IS_NUMBER(val)) return ValueType::Number;
@@ -66,7 +66,7 @@ ValueType srclang::SRCLANG_VALUE_GET_TYPE(Value val) {
     throw std::runtime_error("invalid value '" + std::to_string((uint64_t) val) + "'");
 }
 
-std::string srclang::SRCLANG_VALUE_GET_STRING(Value val) {
+std::string SrcLang::SRCLANG_VALUE_GET_STRING(Value val) {
     auto type = SRCLANG_VALUE_GET_TYPE(val);
     switch (type) {
         case ValueType::Null:

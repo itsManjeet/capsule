@@ -7,7 +7,7 @@
 
 #include "DebugInfo.h"
 
-namespace srclang {
+namespace SrcLang {
     using Byte = uint32_t;
 
 #define SRCLANG_OPCODE_LIST \
@@ -54,6 +54,7 @@ namespace srclang {
     X(CHK, 1)               \
     X(DEFER, 0)             \
     X(SIZE, 0)              \
+    X(MODULE, 0)            \
     X(HLT, 0)
 
     enum class OpCode : uint8_t {

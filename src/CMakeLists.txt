@@ -1,14 +1,14 @@
 file(GLOB_RECURSE SourceFiles "*.cpp" "*.h")
-add_library(${PROJECT_NAME}Library SHARED ${SourceFiles})
-set_target_properties(${PROJECT_NAME}Library
+add_executable(${PROJECT_NAME} ${SourceFiles})
+
+set_target_properties(${PROJECT_NAME}
         PROPERTIES
         OUTPUT_NAME "${PROJECT_NAME}"
-        PUBLIC_HEADER "Language/Language.h;Language/Options.h;Value/Value.h;ByteCode/ByteCode.h;ByteCode/DebugInfo.h;ByteCode/Instructions.h")
+        PUBLIC_HEADER "Value.h;ByteCode.h;DebugInfo.h;Instructions.h;Interpreter.h;Compiler.h;SymbolTable.h;MemoryManager.h")
 
-install(TARGETS ${PROJECT_NAME}Library
-        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-        PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+target_link_options(${PROJECT_NAME} PRIVATE
+        -rdynamic)
 
-if (WIN32)
-    target_link_libraries(${PROJECT_NAME}Library PUBLIC wsock32 ws2_32)
-endif ()
+install(TARGETS ${PROJECT_NAME}
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+        PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/SrcLang)

@@ -2,18 +2,18 @@
 #define SRCLANG_INTERPRETER_H
 
 #include <sstream>
+#include <filesystem>
 
-#include "../Builtins/Builtin.h"
-#include "../ByteCode/ByteCode.h"
-#include "../Value/Function.h"
-#include "../Language/Options.h"
-#include "../Value/Value.h"
+#include "MemoryManager.h"
+#include "ByteCode.h"
+#include "Function.h"
+#include "Value.h"
+#include "SymbolTable.h"
 
-namespace srclang {
+namespace SrcLang {
 
-    struct Language;
-
-    struct Interpreter {
+    class Interpreter {
+    private:
         struct Frame {
             typename std::vector<Byte>::iterator ip;
             Closure *closure;
@@ -21,35 +21,40 @@ namespace srclang {
             std::vector<Value> defers;
         };
 
+        struct Context {
+            std::vector<Value> stack;
+            std::vector<Value>::iterator sp;
+            std::vector<Frame> frames;
+            std::vector<Frame>::iterator fp;
+
+            Context() : stack(1024), sp(stack.begin()),
+                        frames(2048), fp(frames.begin()) {
+
+            }
+        };
+
+        std::vector<Context> contexts;
+        std::vector<Context>::iterator cp;
+
         int nextGc = 50;
         float gcHeapGrowFactor = 1.5;
 
         // TODO run GC based on bytes not on object count
         int limitNextGc = 200;
 
-        std::vector<Value> stack;
-        std::vector<Value>::iterator sp;
-        std::vector<Frame> frames;
+        std::vector<Value> globals;
+        std::vector<Value> constants;
+        MemoryManager memoryManager;
+        SymbolTable symbolTable;
 
-        Language *language;
+        std::map<std::string, std::pair<void *, Value>> handlers;
 
         std::stringstream errStream;
 
-        typename std::vector<Frame>::iterator fp;
         std::vector<std::shared_ptr<DebugInfo>> debugInfo;
-        bool debug, break_;
+        bool debug{}, break_{};
 
         void error(std::string const &msg);
-
-        void graceFullExit();
-
-        Interpreter(ByteCode &code, const std::shared_ptr<DebugInfo> &debugInfo, Language *language);
-
-        ~Interpreter();
-
-        void addObject(Value val);
-
-        void gc();
 
         bool isEqual(Value a, Value b);
 
@@ -85,6 +90,29 @@ namespace srclang {
 
         bool run();
 
+        Value loadModule(const std::filesystem::path &modulePath);
+
+        Value run(ByteCode &bytecode, const std::shared_ptr<DebugInfo> &debugInfo);
+
+    public:
+        Interpreter();
+
+        ~Interpreter();
+
+        void graceFullExit();
+
+        void addObject(Value val);
+
+        void gc();
+
+        void push_context();
+
+        void pop_context();
+
+        Value call(Value callee, const std::vector<Value> &args);
+
+        Value run(const std::string &source, const std::string &filename);
+
         std::string getError() {
             std::string e = errStream.str();
             errStream.clear();
@@ -92,6 +120,6 @@ namespace srclang {
         }
     };
 
-}  // srclang
+}  // SrcLang
 
 #endif  // SRCLANG_INTERPRETER_H

@@ -1,8 +1,8 @@
 #include "ByteCode.h"
 
-#include "../Compiler/SymbolTable/SymbolTable.h"
+#include "SymbolTable.h"
 
-using namespace srclang;
+using namespace SrcLang;
 
 int ByteCode::debug(Instructions const &instructions,
                     std::vector<Value> const &constants, int offset,

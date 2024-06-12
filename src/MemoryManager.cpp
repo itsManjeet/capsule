@@ -1,8 +1,8 @@
 #include "MemoryManager.h"
 
-#include "../../Value/Function.h"
+#include "Function.h"
 
-using namespace srclang;
+using namespace SrcLang;
 
 MemoryManager::~MemoryManager() {
     sweep();
@@ -61,4 +61,9 @@ void MemoryManager::sweep() {
             iter = heap.erase(iter);
         }
     }
+}
+
+Value MemoryManager::addObject(Value value) {
+    if (SRCLANG_VALUE_IS_OBJECT(value)) heap.push_back(value);
+    return value;
 }

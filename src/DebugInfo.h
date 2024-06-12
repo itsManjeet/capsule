@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-namespace srclang {
+namespace SrcLang {
 
     struct DebugInfo {
         std::string filename;
@@ -13,6 +13,6 @@ namespace srclang {
         int position{};
     };
 
-}  // srclang
+}  // SrcLang
 
 #endif  // SRCLANG_DEBUGINFO_H

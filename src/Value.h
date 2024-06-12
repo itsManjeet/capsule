@@ -8,7 +8,7 @@
 #include <string>
 #include <vector>
 
-namespace srclang {
+namespace SrcLang {
 #define SRCLANG_VERSION 20230221
     static const char *MAGIC_CODE = "SRCLANG";
 #define SRCLANG_VALUE_TYPE_LIST \
@@ -106,7 +106,7 @@ namespace srclang {
 
 #define SRCLANG_VALUE_BUILTIN(id) \
     SRCLANG_VALUE_HEAP_OBJECT(    \
-        ValueType::Builtin, (void *)srclang::builtin_##id)
+        ValueType::Builtin, (void *)SrcLang::builtin_##id)
 
 
 #define SRCLANG_VALUE_BUILTIN_NEW(v) \
@@ -143,6 +143,14 @@ namespace srclang {
     ((Value)(uint64_t)(SRCLANG_VALUE_QNAN | SRCLANG_VALUE_TAG_NULL))
 
 #define SRCLANG_VALUE_DEBUG(val) SRCLANG_VALUE_GET_STRING(val) + ":" + SRCLANG_VALUE_TYPE_ID[(int)SRCLANG_VALUE_GET_TYPE(val)]
+
+#define SRCLANG_MODULE_INIT_FUN srclang_module_init
+#define SRCLANG_MODULE_INIT extern "C" void SRCLANG_MODULE_INIT_FUN (SrcLang::SrcLangMap* map, SrcLang::Interpreter* interpreter)
+#define SRCLANG_MODULE_DEFINE(id, value) map->insert({#id, value})
+
+#define SRCLANG_MODULE_FUNC(id) static Value module_fun_##id(std::vector<Value> const &args, Interpreter* interpreter)
+#define SRCLANG_MODULE_DEFINE_FUNC(id) map->insert({#id, SRCLANG_VALUE_BUILTIN_NEW(module_fun_##id)})
+
 
 #define SRCLANG_CHECK_ARGS_EXACT(count)                                    \
     if (args.size() != count)                                              \

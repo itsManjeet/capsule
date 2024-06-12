@@ -6,18 +6,15 @@
 #include <string>
 #include <vector>
 
-#include "../ByteCode/ByteCode.h"
-#include "../Value/Function.h"
-#include "../ByteCode/Instructions.h"
-#include "../Interpreter/MemoryManager/MemoryManager.h"
-#include "../Language/Options.h"
-#include "SymbolTable/SymbolTable.h"
-#include "../Value/Value.h"
+#include "ByteCode.h"
+#include "Function.h"
+#include "Instructions.h"
+#include "MemoryManager.h"
+#include "SymbolTable.h"
+#include "Value.h"
 
-namespace srclang {
+namespace SrcLang {
     using Iterator = std::string::const_iterator;
-
-    struct Language;
 
 #define SRCLANG_TOKEN_TYPE_LIST \
     X(Reserved)                 \
@@ -52,8 +49,10 @@ namespace srclang {
 
     class Compiler {
     private:
-        Language *language{nullptr};
         SymbolTable *symbol_table{nullptr};
+        SymbolTable *global;
+        std::vector<Value>& constants;
+        MemoryManager *memoryManager;
 
         Token cur, peek;
         Iterator iter, start, end;
@@ -207,8 +206,8 @@ namespace srclang {
         /// loop ::= 'for' <identifier> 'in' <expression> <block>
         void loop();
 
-        /// include ::= 'include' <string>
-        void include();
+        /// use ::= 'use' '(' <string> ')'
+        void use();
 
         /// defer ::= 'defer' <function>
         void defer();
@@ -235,7 +234,13 @@ namespace srclang {
         void program();
 
     public:
-        Compiler(const Iterator &start, Iterator end, const std::string &filename, Language *language);
+        Compiler(
+                const std::string &source,
+                const std::string &filename,
+                std::vector<Value> &constants,
+                SymbolTable *global,
+                MemoryManager *memoryManager
+        );
 
         void compile();
 
@@ -245,6 +250,6 @@ namespace srclang {
 
     };
 
-}  // srclang
+}  // SrcLang
 
 #endif  // SRCLANG_COMPILER_H

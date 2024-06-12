@@ -1,9 +1,9 @@
 #ifndef SRCLANG_MEMORYMANAGER_H
 #define SRCLANG_MEMORYMANAGER_H
 
-#include "../../Value/Value.h"
+#include "Value.h"
 
-namespace srclang {
+namespace SrcLang {
 
     struct HeapObject {
         ValueType type{};
@@ -57,8 +57,10 @@ namespace srclang {
         void mark(Heap::iterator start, Heap::iterator end);
 
         void sweep();
+
+        Value addObject(Value value);
     };
 
-}  // srclang
+}  // SrcLang
 
 #endif  // SRCLANG_MEMORYMANAGER_H
