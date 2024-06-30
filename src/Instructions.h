@@ -44,7 +44,7 @@ namespace SrcLang {
     X(CALL, 1)              \
     X(PACK, 0)              \
     X(MAP, 0)               \
-    X(INDEX, 2)             \
+    X(INDEX, 1)             \
     X(SET, 0)               \
     X(SET_SELF, 1)          \
     X(POP, 0)               \

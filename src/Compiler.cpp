@@ -722,7 +722,8 @@ void Compiler::patch_loop(int loop_start, OpCode to_patch, int pos) {
             case OpCode::CONTINUE:
             case OpCode::BREAK: {
                 if (j == to_patch && inst()->at(i) == 0)
-                    inst()->at(i++) = pos;
+                    inst()->at(i) = pos;
+                i += SRCLANG_OPCODE_SIZE[int(j)];
             }
                 break;
 
@@ -807,8 +808,8 @@ void Compiler::use() {
     expect(")");
 
     auto module_path = std::filesystem::path(path.literal);
-    if (module_path.has_extension() && module_path.extension() == ".so") {
-        constants.push_back(SRCLANG_VALUE_STRING(strdup(module_path.c_str())));
+    if (module_path.has_extension() && module_path.extension() == ".mod") {
+        constants.push_back(SRCLANG_VALUE_STRING(strdup(reinterpret_cast<const char *>(module_path.c_str()))));
         emit(OpCode::CONST_, constants.size() - 1);
         emit(OpCode::MODULE);
         return;

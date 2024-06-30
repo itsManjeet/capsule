@@ -1,9 +1,15 @@
 function(add_module id)
     add_library(${PROJECT_NAME}_${id} SHARED ${id}.cpp)
+    if (WIN32)
+        target_link_options(${PROJECT_NAME}_${id} PRIVATE
+                "/FORCE")
+    endif ()
+
     set_target_properties(${PROJECT_NAME}_${id}
             PROPERTIES
             OUTPUT_NAME "${id}"
-            PREFIX "" SUFFIX ".so")
+            PREFIX ""
+            SUFFIX ".mod")
     install(TARGETS ${PROJECT_NAME}_${id}
             LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}/SrcLang)
 endfunction()

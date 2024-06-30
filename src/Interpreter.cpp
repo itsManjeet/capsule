@@ -7,7 +7,28 @@
 #include "Compiler.h"
 #include "Builtin.h"
 
+#ifdef _WIN32
+
+#include <windows.h>
+#define RTLD_LAZY 0
+#define RTLD_LOCAL 0
+void *dlopen(const char *library, int flags) {
+    HMODULE module = LoadLibrary(library);
+    return reinterpret_cast<void *>(module);
+}
+
+void* dlsym(void* handler, const char* fun) {
+    FARPROC f = GetProcAddress((HMODULE)handler, fun);
+    return reinterpret_cast<void*>(f);
+}
+
+char* dlerror() {
+    return strdup(("ERROR: "+std::to_string(GetLastError())).c_str());
+}
+
+#else
 #include <dlfcn.h>
+#endif
 
 
 using namespace SrcLang;

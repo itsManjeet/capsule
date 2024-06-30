@@ -23,7 +23,7 @@ int main(int argc, char **argv) {
             (std::istreambuf_iterator<char>())
     );
 
-    auto result = interpreter.run(source, filename);
+    auto result = interpreter.run(source, filename.string());
     if (SRCLANG_VALUE_GET_TYPE(result) == ValueType::Error) {
         std::cerr << (const char *) SRCLANG_VALUE_AS_OBJECT(result)->pointer << std::endl;
         return 2;

@@ -1,0 +1,13 @@
+for i in range(10) {
+    println(i);
+    if i == 6 {
+        break;
+    }
+}
+
+for i in range(10) {
+    println(i);
+    if i == 6 {
+        continue;
+    }
+}
