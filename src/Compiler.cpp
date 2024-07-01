@@ -179,7 +179,7 @@ void Compiler::eat() {
         return;
     }
 
-    for (std::string k : {"let", "fun", "return", "class", "if", "else", "for", "break", "continue", "use",
+    for (std::string k : {"let", "fun", "native", "return", "class", "if", "else", "for", "break", "continue", "use",
                           "global", "as", "in", "defer",
 
                           // special operators
@@ -989,6 +989,8 @@ void Compiler::compile() {
 void Compiler::value(Symbol *symbol) {
     if (consume("fun")) {
         return function(symbol);
+    } else if (consume("native")) {
+        return native(symbol);
     }
     return expression();
 }
@@ -997,4 +999,42 @@ void Compiler::defer() {
     function(nullptr, true);
     emit(OpCode::DEFER);
     return expect(";");
+}
+
+void Compiler::native(Symbol *symbol) {
+    auto native = new Native{};
+    native->id = symbol->name;
+
+    if (cur.type == TokenType::Identifier) {
+        native->id = cur.literal;
+        eat();
+    }
+
+    expect("(");
+
+    while (!consume(")")) {
+        check(TokenType::Identifier);
+        try {
+            native->parameters.push_back(Native::fromString(cur.literal.c_str()));
+        } catch (const std::exception &e) {
+            error(e.what(), cur.pos);
+        }
+
+        eat();
+
+        if (consume(")")) break;
+        expect(",");
+    }
+
+    check(TokenType::Identifier);
+
+    try {
+        native->ret = Native::fromString(cur.literal.c_str());
+    } catch (const std::exception &exception) {
+        error(exception.what(), cur.pos);
+    }
+    eat();
+    constants.push_back(SRCLANG_VALUE_NATIVE(native));
+    emit(OpCode::CONST_, constants.size() - 1);
+    emit(OpCode::STORE, symbol->scope, symbol->index);
 }

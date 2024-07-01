@@ -8,6 +8,9 @@ set_target_properties(${PROJECT_NAME}
 
 target_link_options(${PROJECT_NAME} PRIVATE
         -rdynamic)
+        
+target_link_libraries(${PROJECT_NAME} PRIVATE
+        ${FFI} ${DL})
 
 install(TARGETS ${PROJECT_NAME}
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}

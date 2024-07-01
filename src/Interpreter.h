@@ -68,6 +68,8 @@ namespace SrcLang {
 
         bool callClosure(Value callee, uint8_t count);
 
+        bool callNative(Value callee, uint8_t count);
+
         bool callBuiltin(Value callee, uint8_t count);
 
         bool callMap(Value callee, uint8_t count);

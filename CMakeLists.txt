@@ -7,11 +7,10 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(POSITION_INDEPENDENT_CODE ON)
 
+find_library(DL dl REQUIRED)
+find_library(FFI ffi REQUIRED)
+
 include(GNUInstallDirs)
-if (MSVC)
-    set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS TRUE)
-    set(BUILD_SHARED_LIBS TRUE)
-endif ()
 
 add_subdirectory(src)
 add_subdirectory(modules)

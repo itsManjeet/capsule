@@ -7,6 +7,20 @@
 
 using namespace SrcLang;
 
+const char *Native::TYPE_TO_STR[int(Native::Type::N_Type)] = {
+#define X(id) #id,
+    NATIVE_TYPE_LIST
+#undef X
+};
+
+Native::Type Native::fromString(const char *s) {
+#define X(id) \
+    if (strcmp(s, #id) == 0) return Native::Type::id;
+    NATIVE_TYPE_LIST
+#undef X
+    throw std::runtime_error("invalid ctype");
+}
+
 void SrcLang::SRCLANG_VALUE_FREE(Value value) {
     if (!SRCLANG_VALUE_IS_OBJECT(value)) {
         return;
@@ -41,6 +55,10 @@ void SrcLang::SRCLANG_VALUE_FREE(Value value) {
 
             case ValueType::Pointer:
                 object->cleanup(object->pointer);
+                break;
+
+            case ValueType::Native:
+                delete reinterpret_cast<Native *>(object->pointer);
                 break;
 
             case ValueType::Builtin:
@@ -115,6 +133,10 @@ std::string SrcLang::SRCLANG_VALUE_GET_STRING(Value val) {
 
                     case ValueType::Function: {
                         return "<function()>";
+                    } break;
+
+                    case ValueType::Native: {
+                        return "<native()>";
                     } break;
 
                     case ValueType::Pointer: {

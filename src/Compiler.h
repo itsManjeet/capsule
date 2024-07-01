@@ -152,6 +152,8 @@ namespace SrcLang {
         /// fun '(' args ')' block
         void function(Symbol *symbol, bool skip_args = false);
 
+        void native(Symbol* symbol);
+
         void class_();
 
         /// list ::= '[' (<expression> % ',') ']'

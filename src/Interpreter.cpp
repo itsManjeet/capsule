@@ -1,5 +1,8 @@
 #include "Interpreter.h"
 
+#include <dlfcn.h>
+#include <ffi.h>
+
 #include <array>
 #include <iostream>
 
@@ -7,30 +10,21 @@
 #include "Compiler.h"
 #include "SymbolTable.h"
 
-#ifdef _WIN32
-
-#include <windows.h>
-#define RTLD_LAZY 0
-#define RTLD_LOCAL 0
-void *dlopen(const char *library, int flags) {
-    HMODULE module = LoadLibrary(library);
-    return reinterpret_cast<void *>(module);
-}
-
-void *dlsym(void *handler, const char *fun) {
-    FARPROC f = GetProcAddress((HMODULE)handler, fun);
-    return reinterpret_cast<void *>(f);
-}
-
-char *dlerror() {
-    return strdup(("ERROR: " + std::to_string(GetLastError())).c_str());
-}
-
-#else
-#include <dlfcn.h>
-#endif
-
 using namespace SrcLang;
+
+static std::map<Native::Type, ffi_type *> ctypes = {
+    {Native::Type::i8, &ffi_type_sint8},
+    {Native::Type::i16, &ffi_type_sint16},
+    {Native::Type::i32, &ffi_type_sint32},
+    {Native::Type::i64, &ffi_type_sint64},
+    {Native::Type::u8, &ffi_type_uint8},
+    {Native::Type::u16, &ffi_type_uint16},
+    {Native::Type::u32, &ffi_type_uint32},
+    {Native::Type::u64, &ffi_type_uint64},
+    {Native::Type::f32, &ffi_type_float},
+    {Native::Type::f64, &ffi_type_double},
+    {Native::Type::ptr, &ffi_type_pointer},
+};
 
 void Interpreter::error(std::string const &msg) {
     if (debugInfo.empty() || debugInfo.back() == nullptr) {
@@ -437,6 +431,7 @@ bool Interpreter::callBuiltin(Value callee, uint8_t count) {
     std::vector<Value> args(cp->sp - count, cp->sp);
     cp->sp -= count + 1;
     Value result;
+
     try {
         result = builtin(args, this);
     } catch (std::exception const &exception) {
@@ -445,6 +440,117 @@ bool Interpreter::callBuiltin(Value callee, uint8_t count) {
     }
 
     if (SRCLANG_VALUE_IS_OBJECT(result)) addObject(result);
+    *cp->sp++ = result;
+    return true;
+}
+
+bool Interpreter::callNative(Value callee, uint8_t count) {
+    auto native = SRCLANG_VALUE_AS_NATIVE(callee);
+    Value result_value;
+
+    if (count != native->parameters.size()) {
+        error("expected '" + std::to_string(native->parameters.size()) + "' but '" + std::to_string(count) + "' provided");
+        return false;
+    }
+
+    void *handler = dlsym(nullptr, native->id.c_str());
+    if (handler == nullptr) {
+        error(dlerror());
+        return false;
+    }
+
+    ffi_cif cif;
+    void *values[count];
+    ffi_type *types[count];
+    std::vector<unsigned long> unsigned_value_holder(count);
+    std::vector<long> signed_value_holder(count);
+    std::vector<double> float_value_holder(count);
+
+    int j = 0;
+    for (auto i = cp->sp - count; i != cp->sp; i++, j++) {
+        auto type = SRCLANG_VALUE_GET_TYPE(*i);
+
+        switch (type) {
+            case ValueType::Null:
+                values[j] = nullptr;
+                types[j] = &ffi_type_pointer;
+                break;
+
+            case ValueType::Number: {
+                values[j] = &(*i);
+                auto t = native->parameters[j];
+                if ((int)t >= (int)Native::Type::i8 &&
+                    (int)t <= (int)Native::Type::i64) {
+                    auto value = SRCLANG_VALUE_AS_NUMBER(*i);
+                    signed_value_holder[j] = static_cast<long>(value);
+                    values[j] = &signed_value_holder[j];
+                } else if ((int)t >= (int)Native::Type::u8 &&
+                           (int)t <= (int)Native::Type::u64) {
+                    auto value = SRCLANG_VALUE_AS_NUMBER(*i);
+                    unsigned_value_holder[j] = static_cast<unsigned long>(value);
+                    values[j] = &unsigned_value_holder[j];
+                } else {
+                    auto value = SRCLANG_VALUE_AS_NUMBER(*i);
+                    float_value_holder[j] = value;
+                    values[j] = &float_value_holder[j];
+                }
+
+                types[j] = ctypes[native->parameters[j]];
+            } break;
+
+            case ValueType::Boolean:
+                values[j] = &(*i);
+                types[j] = &ffi_type_sint;
+                break;
+
+            default:
+                values[j] = &SRCLANG_VALUE_AS_OBJECT(*i)->pointer;
+                types[j] = &ffi_type_pointer;
+                break;
+        }
+    }
+
+    ffi_type *ret = ctypes[native->ret];
+
+    if (ffi_prep_cif(&cif, FFI_DEFAULT_ABI, count, ret, types) != FFI_OK) {
+        error("ffi_prep_cif() failed");
+        return false;
+    }
+
+    ffi_arg result;
+
+    ffi_call(&cif, FFI_FN(handler), &result, values);
+
+    switch (native->ret) {
+        case Native::Type::i8:
+        case Native::Type::i16:
+        case Native::Type::i32:
+        case Native::Type::i64:
+            result = SRCLANG_VALUE_NUMBER(static_cast<double>((long)result));
+            break;
+        case Native::Type::u8:
+        case Native::Type::u16:
+        case Native::Type::u32:
+        case Native::Type::u64:
+            result = SRCLANG_VALUE_NUMBER(static_cast<double>((unsigned long)result));
+            break;
+        case Native::Type::ptr:
+            if ((void *)result == nullptr) {
+                result = SRCLANG_VALUE_NULL;
+            } else {
+                result = SRCLANG_VALUE_POINTER((void *)result);
+            }
+            break;
+        // case Native::Type::val:
+        // std::cout << "NATIVE: " << result << std::endl;
+        // break;
+        default:
+            error("ERROR: unsupported return type '" +
+                  SRCLANG_VALUE_TYPE_ID[int(native->ret)] + "'");
+            return false;
+    }
+
+    cp->sp -= count + 1;
     *cp->sp++ = result;
     return true;
 }
@@ -597,6 +703,8 @@ bool Interpreter::call(uint8_t count) {
         switch (SRCLANG_VALUE_AS_OBJECT(callee)->type) {
             case ValueType::Closure:
                 return callClosure(callee, count);
+            case ValueType::Native:
+                return callNative(callee, count);
             case ValueType::Builtin:
                 return callBuiltin(callee, count);
             case ValueType::Bounded:

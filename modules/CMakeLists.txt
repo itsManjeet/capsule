@@ -1,17 +1,5 @@
-function(add_module id)
-    add_library(${PROJECT_NAME}_${id} SHARED ${id}.cpp)
-    if (WIN32)
-        target_link_options(${PROJECT_NAME}_${id} PRIVATE
-                "/FORCE")
-    endif ()
+file(GLOB_RECURSE ModuleFiles "*.src")
 
-    set_target_properties(${PROJECT_NAME}_${id}
-            PROPERTIES
-            OUTPUT_NAME "${id}"
-            PREFIX ""
-            SUFFIX ".mod")
-    install(TARGETS ${PROJECT_NAME}_${id}
-            LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}/SrcLang)
-endfunction()
-
-add_module(os)
+install(FILES ${ModuleFiles}
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/SrcLang
+    PERMISSIONS OWNER_WRITE WORLD_READ)
