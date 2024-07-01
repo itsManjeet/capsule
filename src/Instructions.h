@@ -8,7 +8,7 @@
 #include "DebugInfo.h"
 
 namespace SrcLang {
-    using Byte = uint32_t;
+    using Byte = uint64_t;
 
 #define SRCLANG_OPCODE_LIST \
     X(CONST_, 1)             \
@@ -81,10 +81,10 @@ namespace SrcLang {
 
         Instructions() = default;
 
-        size_t emit(DebugInfo *debug_info, int line) { return 0; }
+        size_t emit(DebugInfo *debug_info, uint64_t line) { return 0; }
 
         template<typename T, typename... Types>
-        size_t emit(DebugInfo *debug_info, int line, T byte, Types... operand) {
+        size_t emit(DebugInfo *debug_info, uint64_t line, T byte, Types... operand) {
             size_t pos = this->size();
             this->push_back(static_cast<Byte>(byte));
             debug_info->lines.push_back(line);

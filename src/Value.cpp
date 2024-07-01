@@ -1,8 +1,9 @@
 #include "Value.h"
 
+#include <sstream>
+
 #include "Function.h"
 #include "MemoryManager.h"
-#include <sstream>
 
 using namespace SrcLang;
 
@@ -10,13 +11,12 @@ void SrcLang::SRCLANG_VALUE_FREE(Value value) {
     if (!SRCLANG_VALUE_IS_OBJECT(value)) {
         return;
     }
-    auto type = SRCLANG_VALUE_GET_TYPE(value);
     auto object = SRCLANG_VALUE_AS_OBJECT(value);
     if (!object->is_ref) {
-        switch (type) {
+        switch (object->type) {
             case ValueType::String:
             case ValueType::Error:
-                free((char *) object->pointer);
+                free((char *)object->pointer);
                 break;
 
             case ValueType::List:
@@ -47,13 +47,12 @@ void SrcLang::SRCLANG_VALUE_FREE(Value value) {
                 break;
 
             default:
-                throw std::runtime_error("can't clean value of type '" + SRCLANG_VALUE_TYPE_ID[int(type)] + "'");
+                throw std::runtime_error("can't clean value of type '" + SRCLANG_VALUE_TYPE_ID[int(object->type)] + "'");
         }
     }
 
     delete object;
 }
-
 
 ValueType SrcLang::SRCLANG_VALUE_GET_TYPE(Value val) {
     if (SRCLANG_VALUE_IS_NULL(val)) return ValueType::Null;
@@ -63,7 +62,7 @@ ValueType SrcLang::SRCLANG_VALUE_GET_TYPE(Value val) {
 
     if (SRCLANG_VALUE_IS_OBJECT(val))
         return (SRCLANG_VALUE_AS_OBJECT(val)->type);
-    throw std::runtime_error("invalid value '" + std::to_string((uint64_t) val) + "'");
+    throw std::runtime_error("invalid value '" + std::to_string((uint64_t)val) + "'");
 }
 
 std::string SrcLang::SRCLANG_VALUE_GET_STRING(Value val) {
@@ -89,37 +88,34 @@ std::string SrcLang::SRCLANG_VALUE_GET_STRING(Value val) {
                 switch (type) {
                     case ValueType::String:
                     case ValueType::Error:
-                        return (char *) object->pointer;
+                        return (char *)object->pointer;
                     case ValueType::List: {
                         std::stringstream ss;
                         ss << "[";
                         std::string sep;
-                        for (auto const &i: *(reinterpret_cast<SrcLangList *>(object->pointer))) {
+                        for (auto const &i : *(reinterpret_cast<SrcLangList *>(object->pointer))) {
                             ss << sep << SRCLANG_VALUE_GET_STRING(i);
                             sep = ", ";
                         }
                         ss << "]";
                         return ss.str();
-                    }
-                        break;
+                    } break;
 
                     case ValueType::Map: {
                         std::stringstream ss;
                         ss << "{";
                         std::string sep;
-                        for (auto const &i: *(reinterpret_cast<SrcLangMap *>(object->pointer))) {
+                        for (auto const &i : *(reinterpret_cast<SrcLangMap *>(object->pointer))) {
                             ss << sep << i.first << ":" << SRCLANG_VALUE_GET_STRING(i.second);
                             sep = ", ";
                         }
                         ss << "}";
                         return ss.str();
-                    }
-                        break;
+                    } break;
 
                     case ValueType::Function: {
                         return "<function()>";
-                    }
-                        break;
+                    } break;
 
                     case ValueType::Pointer: {
                         std::stringstream ss;

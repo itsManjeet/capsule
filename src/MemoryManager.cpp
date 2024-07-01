@@ -5,8 +5,6 @@
 using namespace SrcLang;
 
 MemoryManager::~MemoryManager() {
-    sweep();
-    sweep();
 }
 
 void MemoryManager::mark(Value val) {
@@ -26,7 +24,7 @@ void MemoryManager::mark(Value val) {
             mark(reinterpret_cast<Closure *>(obj->pointer)->free.begin(),
                  reinterpret_cast<Closure *>(obj->pointer)->free.end());
         } else if (obj->type == ValueType::Map) {
-            for (auto &i: *reinterpret_cast<SrcLangMap *>(obj->pointer)) {
+            for (auto &i : *reinterpret_cast<SrcLangMap *>(obj->pointer)) {
                 mark(i.second);
             }
         }

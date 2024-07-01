@@ -6,8 +6,8 @@ for i in range(10) {
 }
 
 for i in range(10) {
-    println(i);
     if i == 6 {
         continue;
     }
+    println(i);
 }
