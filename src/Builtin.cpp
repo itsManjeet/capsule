@@ -4,7 +4,14 @@
 
 using namespace SrcLang;
 
+#ifdef _WIN32
+#include <windows.h>
+#define popen _popen
+#define pclose _pclose
+#define WEXITSTATUS
+#else
 #include <unistd.h>
+#endif
 
 std::vector<Value> SrcLang::builtins = {
 #define X(id) SRCLANG_VALUE_BUILTIN(id),

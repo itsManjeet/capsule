@@ -3,19 +3,19 @@
 #ifdef _WIN32
 #include <windows.h>
 #define RTLD_LAZY 0
-#define RTLD_NOW 0
+#define RTLD_LOCAL 0
 void *dlopen(const char *path, int flags) {
-    HMODULE handler = GetModuleHandler(path);
+    HMODULE handler = GetModuleHandle(path);
     return (void *)handler;
 }
 
 void *dlsym(void *handler, const char *str) {
-    auto proc = GetProcAddress((HMODULE)handlr, str);
+    auto proc = GetProcAddress((HMODULE)handler, str);
     return (void *)proc;
 }
 
 const char *dlerror() {
-    return std::to_string(GetLastError());
+    return "no error code on windows";
 }
 
 #else
@@ -1210,7 +1210,10 @@ void Interpreter::push_context() {
 
 void Interpreter::pop_context() {
     contexts.pop_back();
-    cp = contexts.begin() + contexts.size() - 1;
+    if (!contexts.empty())
+        cp = contexts.begin() + contexts.size() - 1;
+    else
+        cp = contexts.end();
 }
 
 Value Interpreter::call(Value callee, const std::vector<Value> &args) {

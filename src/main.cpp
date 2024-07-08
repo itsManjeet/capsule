@@ -101,7 +101,7 @@ int main(int argc, char** argv) {
             }
         }
 
-        auto result = interpreter.run(source, filename ? *filename : "stdin");
+        auto result = interpreter.run(source, filename ? filename->string() : "stdin");
         if (SRCLANG_VALUE_GET_TYPE(result) == ValueType::Error) {
             std::cerr << SRCLANG_VALUE_AS_ERROR(result) << std::endl;
             if (!interactive) return 1;
