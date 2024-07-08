@@ -3,8 +3,10 @@
 
 #include <filesystem>
 #include <sstream>
+#include <variant>
 
 #include "ByteCode.h"
+#include "Compiler.h"
 #include "Function.h"
 #include "MemoryManager.h"
 #include "SymbolTable.h"
@@ -13,6 +15,16 @@
 namespace SrcLang {
 
 class Interpreter {
+   public:
+    using OptionType = std::variant<std::string, int, float, bool>;
+
+    class Options : public std::map<std::string, OptionType> {
+       public:
+        explicit Options(std::map<std::string, OptionType> const &options)
+            : std::map<std::string, OptionType>(options) {
+        }
+    };
+
    private:
     struct Frame {
         typename std::vector<Byte>::iterator ip;
@@ -33,6 +45,8 @@ class Interpreter {
 
     std::vector<Context> contexts;
     std::vector<Context>::iterator cp;
+    Options options;
+    friend Compiler;
 
     int nextGc = 50;
     float gcHeapGrowFactor = 1.5;
@@ -90,12 +104,26 @@ class Interpreter {
 
     bool run();
 
-    Value loadModule(const std::filesystem::path &modulePath);
+    Value loadModule(std::filesystem::path modulePath);
 
     Value run(ByteCode &bytecode, const std::shared_ptr<DebugInfo> &debugInfo);
 
    public:
-    Interpreter(bool debug = false, bool _break = false);
+    Interpreter();
+
+    template <typename T>
+    void setOption(const std::string &id, T t) {
+        options[id] = t;
+    }
+
+    template <typename T>
+    T getOption(const std::string &id) {
+        return std::get<T>(options[id]);
+    }
+
+    void appendOption(const std::string &id, std::string value, const std::string &sep = ":") {
+        options[id] = std::get<std::string>(options[id]) + sep + value;
+    }
 
     ~Interpreter();
 
@@ -112,6 +140,8 @@ class Interpreter {
     Value call(Value callee, const std::vector<Value> &args);
 
     Value run(const std::string &source, const std::string &filename);
+
+    std::filesystem::path search(const std::string &id);
 
     std::string getError() {
         std::string e = errStream.str();

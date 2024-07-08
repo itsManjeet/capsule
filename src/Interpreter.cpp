@@ -60,10 +60,18 @@ void Interpreter::error(std::string const &msg) {
     errStream << "  ERROR: " << msg;
 }
 
-Interpreter::Interpreter(bool debug, bool _break)
+Interpreter::Interpreter()
     : globals(65536),
-      break_{_break},
-      debug(debug) {
+      options({
+          {"VERSION", SRCLANG_VERSION},
+          {"GC_HEAP_GROW_FACTOR", 1.3f},
+          {"GC_INITIAL_TRIGGER", 10},
+          {"SEARCH_PATH", "/usr/lib/SrcLang"},
+          {"BYTECODE_DUMP", false},
+          {"EXPERIMENTAL_FEATURE", false},
+          {"DEBUG", false},
+          {"BREAK", false},
+      }) {
     for (auto b : builtins) {
         memoryManager.heap.push_back(b);
     }
@@ -749,6 +757,9 @@ bool Interpreter::call(uint8_t count) {
 }
 
 bool Interpreter::run() {
+    debug = getOption<bool>("DEBUG");
+    break_ = getOption<bool>("BREAK");
+    
     while (true) {
         if (debug) {
             if (!debugInfo.empty() && debugInfo.back() != nullptr) {
@@ -1191,7 +1202,7 @@ bool Interpreter::run() {
 }
 
 Value Interpreter::run(const std::string &source, const std::string &filename) {
-    Compiler compiler(source, filename, constants, &symbolTable, &memoryManager);
+    Compiler compiler(source, filename, this, &symbolTable);
     try {
         compiler.compile();
     } catch (const std::exception &exception) {
@@ -1268,30 +1279,19 @@ Value Interpreter::run(ByteCode &bytecode, const std::shared_ptr<DebugInfo> &deb
     return result;
 }
 
-Value Interpreter::loadModule(const std::filesystem::path &modulePath) {
+Value Interpreter::loadModule(std::filesystem::path modulePath) {
     auto itr = handlers.find(modulePath.string());
     if (itr != handlers.end()) {
         return itr->second.second;
     }
 
-    std::stringstream ss(".:" +
-                         std::string(getenv("SRCLANG_SEARCH_PATH")
-                                         ? getenv("SRCLANG_SEARCH_PATH")
-                                         : "/usr/lib/SrcLang"));
-    std::string search_path;
-    bool found = false;
-    while (getline(ss, search_path, ':')) {
-        search_path += "/" + modulePath.string();
-        if (std::filesystem::exists(search_path)) {
-            found = true;
-            break;
-        }
-    }
-    if (!found) {
-        return SRCLANG_VALUE_ERROR(strdup(("missing required module '" + modulePath.string() + "'").c_str()));
+    try {
+        modulePath = search(modulePath);
+    } catch (const std::exception &exception) {
+        return SRCLANG_VALUE_ERROR(strdup(exception.what()));
     }
 
-    void *handler = dlopen(search_path.c_str(), RTLD_LAZY | RTLD_LOCAL);
+    void *handler = dlopen(modulePath.c_str(), RTLD_LAZY | RTLD_LOCAL);
     if (handler == nullptr) {
         return SRCLANG_VALUE_ERROR(strdup(dlerror()));
     }
@@ -1304,4 +1304,15 @@ Value Interpreter::loadModule(const std::filesystem::path &modulePath) {
     fun(map, this);
 
     return SRCLANG_VALUE_MAP(map);
+}
+
+std::filesystem::path Interpreter::search(const std::string &id) {
+    auto search_path = getOption<std::string>("SEARCH_PATH");
+    std::stringstream ss(search_path);
+    for (std::string p; getline(ss, p, ':');) {
+        if (std::filesystem::exists(p + "/" + id)) {
+            return p + "/" + id;
+        }
+    }
+    throw std::runtime_error("missing required module '" + id + "'");
 }

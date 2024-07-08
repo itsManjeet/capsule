@@ -7,7 +7,7 @@ SUCCESS=0
 if [[ -e "${TEST_FILE}.out" ]] ; then
   SUCCESS=0
 elif [[ -e "${TEST_FILE}.err" ]] ; then
-  SUCCESS=2
+  SUCCESS=1
 else
   echo "ERROR: no output file present $TEST_FILE.out"
   exit 1

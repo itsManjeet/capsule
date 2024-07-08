@@ -47,11 +47,10 @@ bool is_complete(const std::string& s) {
 
 int main(int argc, char** argv) {
     bool isProgArgs = false;
-    bool debug = false;
-    bool breakPoint = false;
     bool interactive = false;
     std::optional<std::filesystem::path> filename;
     auto progArgs = new SrcLangList();
+    auto interpreter = SrcLang::Interpreter();
 
     for (int i = 1; i < argc; i++) {
         if (argv[i][0] == '-') {
@@ -61,9 +60,11 @@ int main(int argc, char** argv) {
                 }
             }
             if (strcmp(argv[i], "--debug") == 0)
-                debug = true;
+                interpreter.setOption("DEBUG", true);
             else if (strcmp(argv[i], "--break") == 0)
-                debug = true;
+                interpreter.setOption("BREAK", true);
+            else if (strcmp(argv[i], "--search-path") == 0)
+                interpreter.appendOption("SEARCH_PATH", argv[i]);
             else if (strcmp(argv[i], "--interactive") == 0)
                 interactive = true;
             else {
@@ -88,8 +89,6 @@ int main(int argc, char** argv) {
     } else {
         interactive = true;
     }
-
-    auto interpreter = SrcLang::Interpreter(debug, breakPoint);
 
     do {
         if (interactive) {

@@ -67,6 +67,9 @@ typedef uint64_t Value;
          (SRCLANG_VALUE_QNAN | SRCLANG_VALUE_TAG_TYPE) &&       \
      ((val | SRCLANG_VALUE_SIGN_BIT) != val))
 
+#define SRCLANG_VALUE_IS_CLOSURE(val) (SRCLANG_VALUE_IS_OBJECT((val)) && SRCLANG_VALUE_AS_OBJECT((val))->type == ValueType::Closure)
+#define SRCLANG_VALUE_IS_ERROR(val) (SRCLANG_VALUE_IS_OBJECT((val)) && SRCLANG_VALUE_AS_OBJECT((val))->type == ValueType::Error)
+
 #define SRCLANG_VALUE_AS_BOOL(val) ((val) == SRCLANG_VALUE_TRUE)
 #define SRCLANG_VALUE_AS_NUMBER(val) (srclang_value_to_decimal(val))
 #define SRCLANG_VALUE_AS_OBJECT(val)   \
@@ -154,7 +157,7 @@ typedef uint64_t Value;
 #define SRCLANG_MODULE_INIT extern "C" void SRCLANG_MODULE_INIT_FUN(SrcLang::SrcLangMap *map, SrcLang::Interpreter *interpreter)
 #define SRCLANG_MODULE_DEFINE(id, value) map->insert({#id, value})
 
-#define SRCLANG_MODULE_FUNC(id) static Value module_fun_##id(std::vector<Value> const &args, Interpreter *interpreter)
+#define SRCLANG_MODULE_FUNC(id) static SrcLang::Value module_fun_##id(std::vector<SrcLang::Value> const &args, SrcLang::Interpreter *interpreter)
 #define SRCLANG_MODULE_DEFINE_FUNC(id) map->insert({#id, SRCLANG_VALUE_BUILTIN_NEW(module_fun_##id)})
 
 #define SRCLANG_CHECK_ARGS_EXACT(count)                                    \

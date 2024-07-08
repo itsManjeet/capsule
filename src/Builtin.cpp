@@ -10,6 +10,8 @@ using namespace SrcLang;
 #define pclose _pclose
 #define WEXITSTATUS
 #else
+#include <sys/ioctl.h>
+#include <termios.h>
 #include <unistd.h>
 #endif
 
@@ -36,6 +38,7 @@ SRCLANG_BUILTIN(print) {
     for (auto const &i : args) {
         std::cout << SRCLANG_VALUE_GET_STRING(i);
     }
+    std::cout << std::flush;
     return SRCLANG_VALUE_NUMBER(args.size());
 }
 
@@ -385,4 +388,78 @@ SRCLANG_BUILTIN(exec) {
     int status = pclose(fd);
     status = WEXITSTATUS(status);
     return SRCLANG_VALUE_NUMBER(status);
+}
+
+SRCLANG_BUILTIN(term) {
+    SRCLANG_CHECK_ARGS_EXACT(2);
+
+    SRCLANG_CHECK_ARGS_TYPE(0, ValueType::Closure);
+    SRCLANG_CHECK_ARGS_TYPE(1, ValueType::Closure);
+
+    winsize size;
+    termios attr;
+    termios raw;
+
+    ioctl(STDOUT_FILENO, TIOCGWINSZ, &size);
+
+    if (tcgetattr(STDIN_FILENO, &attr) == -1) {
+        return SRCLANG_VALUE_SET_REF(SRCLANG_VALUE_ERROR(strerror(errno)));
+    }
+    raw = attr;
+    raw.c_lflag &= ~(ECHO | ICANON);
+    raw.c_cc[VMIN] = 1;
+    raw.c_cc[VTIME] = 0;
+
+    if (tcsetattr(STDIN_FILENO, TCSANOW, &raw) == -1) {
+        return SRCLANG_VALUE_SET_REF(SRCLANG_VALUE_ERROR(strerror(errno)));
+    }
+
+    Value result = SRCLANG_VALUE_TRUE;
+    int delta = 0;
+
+    for (;;) {
+        printf("\033[2J\033[H");
+        fflush(stdout);
+
+        if (SRCLANG_VALUE_IS_CLOSURE(args[0])) {
+            std::vector<Value> call_args{
+                SRCLANG_VALUE_NUMBER(size.ws_col),
+                SRCLANG_VALUE_NUMBER(size.ws_row),
+                SRCLANG_VALUE_NUMBER(delta),
+            };
+            result = interpreter->call(args[0], call_args);
+            if (SRCLANG_VALUE_IS_ERROR(result) || (SRCLANG_VALUE_IS_BOOL(result) && !SRCLANG_VALUE_AS_BOOL(result))) {
+                break;
+            }
+        }
+
+        char buf[6];
+        int n;
+        if ((n = read(STDIN_FILENO, buf, sizeof(buf))) > 0) {
+            buf[n] = '\0';
+            if (SRCLANG_VALUE_IS_CLOSURE(args[1])) {
+                std::vector<Value> call_args = {
+                    SRCLANG_VALUE_STRING(strdup(buf)),
+                    SRCLANG_VALUE_NUMBER(size.ws_col),
+                    SRCLANG_VALUE_NUMBER(size.ws_row),
+                    SRCLANG_VALUE_NUMBER(delta),
+                };
+                result = interpreter->call(args[1], call_args);
+                if (SRCLANG_VALUE_IS_ERROR(result) || (SRCLANG_VALUE_IS_BOOL(result) && !SRCLANG_VALUE_AS_BOOL(result))) {
+                    break;
+                }
+            }
+        }
+        delta++;
+    }
+
+    tcsetattr(STDIN_FILENO, TCSANOW, &attr);
+    fflush(stdout);
+
+    return result;
+}
+
+SRCLANG_BUILTIN(random) {
+    SRCLANG_CHECK_ARGS_EXACT(0);
+    return SRCLANG_VALUE_NUMBER(rand());
 }
