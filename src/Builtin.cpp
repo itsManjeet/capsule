@@ -271,7 +271,8 @@ SRCLANG_BUILTIN(open) {
                                    SRCLANG_VALUE_POINTER(reinterpret_cast<void *>(fp)),
                                    +[](void *ptr) {
                                        auto fp = reinterpret_cast<FILE *>(ptr);
-                                       fclose(fp);
+                                       if (fp != nullptr)
+                                           fclose(fp);
                                    })});
 
     object->insert(
@@ -294,6 +295,39 @@ SRCLANG_BUILTIN(open) {
 
                           return SRCLANG_VALUE_NUMBER(num);
                       }))});
+    object->insert(
+        {"Seek", SRCLANG_VALUE_BOUND(
+                     value,
+                     SRCLANG_VALUE_BUILTIN_NEW(+[](std::vector<Value> &args) -> Value {
+                         SRCLANG_CHECK_ARGS_EXACT(3);
+
+                         SRCLANG_CHECK_ARGS_TYPE(0, ValueType::Map);
+                         SRCLANG_CHECK_ARGS_TYPE(1, ValueType::Number);
+                         SRCLANG_CHECK_ARGS_TYPE(2, ValueType::Number);
+
+                         auto self = reinterpret_cast<SrcLangMap *>(SRCLANG_VALUE_AS_OBJECT(args[0])->pointer);
+                         int offset = SRCLANG_VALUE_AS_NUMBER(args[1]);
+                         int whence = SRCLANG_VALUE_AS_NUMBER(args[2]);
+                         auto fp = reinterpret_cast<FILE *>(SRCLANG_VALUE_AS_OBJECT(self->at("__ptr__"))->pointer);
+
+                         if (fseek(fp, offset, whence) != -1) {
+                             return SRCLANG_VALUE_SET_REF(SRCLANG_VALUE_ERROR(strerror(errno)));
+                         }
+                         return SRCLANG_VALUE_NUMBER(ftell(fp));
+                     }))});
+
+    object->insert({"Close",
+                    SRCLANG_VALUE_BOUND(
+                        value,
+                        SRCLANG_VALUE_BUILTIN_NEW(+[](std::vector<Value> &args) -> Value {
+                            SRCLANG_CHECK_ARGS_EXACT(1);
+                            SRCLANG_CHECK_ARGS_TYPE(0, ValueType::Map);
+                            auto self = reinterpret_cast<SrcLangMap *>(SRCLANG_VALUE_AS_OBJECT(args[0])->pointer);
+                            auto fp = reinterpret_cast<FILE *>(SRCLANG_VALUE_AS_OBJECT(self->at("__ptr__"))->pointer);
+
+                            if (fp != nullptr) fclose(fp);
+                            return SRCLANG_VALUE_TRUE;
+                        }))});
 
     object->insert(
         {"Read", SRCLANG_VALUE_BOUND(
