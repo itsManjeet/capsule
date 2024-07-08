@@ -8,7 +8,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(POSITION_INDEPENDENT_CODE ON)
 
 if(UNIX)
-    find_library(DL REQUIRED)
+    find_library(DL dl REQUIRED)
 else()
     set(DL "")
 endif()
