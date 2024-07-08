@@ -150,8 +150,8 @@ void Compiler::eat() {
         return *iter++;
     };
 
-    if (*iter == '/' && *(iter + 1) == '/') {
-        iter += 2;
+    if (*iter == '#') {
+        iter += 1;
         while (*iter != '\n') {
             if (iter == end) {
                 peek.type = TokenType::Eof;
