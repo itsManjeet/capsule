@@ -33,14 +33,12 @@ void Interpreter::error(std::string const &msg) {
     }
 
     errStream << debugInfo.back()->filename << ":"
-              << debugInfo.back()->lines[distance(cp->fp->closure->fun->instructions->begin(), cp->fp->ip)]
+              << debugInfo.back()->lines[distance(SRCLANG_VALUE_AS_CLOSURE(cp->fp->closure)->fun->instructions->begin(), cp->fp->ip)]
               << std::endl;
     errStream << "  ERROR: " << msg;
 }
 
 Interpreter::Interpreter() : globals(65536) {
-    //    debug = true;
-
     for (auto b : builtins) {
         memoryManager.heap.push_back(b);
     }
@@ -417,11 +415,11 @@ bool Interpreter::callClosure(Value callee, uint8_t count) {
     }
 
     cp->fp++;
-    cp->fp->closure = closure;
-    cp->fp->ip = cp->fp->closure->fun->instructions->begin();
+    cp->fp->closure = callee;
+    cp->fp->ip = SRCLANG_VALUE_AS_CLOSURE(cp->fp->closure)->fun->instructions->begin();
     cp->fp->bp = (cp->sp - count);
-    cp->sp = cp->fp->bp + cp->fp->closure->fun->nlocals;
-    debugInfo.push_back(cp->fp->closure->fun->debug_info);
+    cp->sp = cp->fp->bp + SRCLANG_VALUE_AS_CLOSURE(cp->fp->closure)->fun->nlocals;
+    debugInfo.push_back(SRCLANG_VALUE_AS_CLOSURE(cp->fp->closure)->fun->debug_info);
 
     return true;
 }
@@ -725,7 +723,7 @@ bool Interpreter::run() {
         if (debug) {
             if (!debugInfo.empty() && debugInfo.back() != nullptr) {
                 std::cout << debugInfo.back()->filename << ":"
-                          << debugInfo.back()->lines[distance(cp->fp->closure->fun->instructions->begin(), cp->fp->ip)]
+                          << debugInfo.back()->lines[distance(SRCLANG_VALUE_AS_CLOSURE(cp->fp->closure)->fun->instructions->begin(), cp->fp->ip)]
                           << std::endl;
             }
 
@@ -735,8 +733,8 @@ bool Interpreter::run() {
             }
             std::cout << std::endl;
             std::cout << ">> ";
-            ByteCode::debug(*cp->fp->closure->fun->instructions, constants,
-                            std::distance(cp->fp->closure->fun->instructions->begin(), cp->fp->ip), std::cout);
+            ByteCode::debug(*SRCLANG_VALUE_AS_CLOSURE(cp->fp->closure)->fun->instructions, constants,
+                            std::distance(SRCLANG_VALUE_AS_CLOSURE(cp->fp->closure)->fun->instructions->begin(), cp->fp->ip), std::cout);
             std::cout << std::endl;
 
             if (break_) std::cin.get();
@@ -828,7 +826,10 @@ bool Interpreter::run() {
                         *cp->sp++ = SRCLANG_VALUE_TYPES[pos];
                         break;
                     case Symbol::Scope::FREE:
-                        *cp->sp++ = cp->fp->closure->free[pos];
+                        *cp->sp++ = SRCLANG_VALUE_AS_CLOSURE(cp->fp->closure)->free[pos];
+                        break;
+                    case Symbol::Scope::FUNCTION:
+                        *cp->sp++ = cp->fp->closure;
                         break;
                     default:
                         error("ERROR: can't load value of scope '" + SRCLANG_SYMBOL_ID[int(scope)] + "'");
@@ -1007,14 +1008,6 @@ bool Interpreter::run() {
                 }
             } break;
 
-            case OpCode::SET_SELF: {
-                auto freeIndex = *cp->fp->ip++;
-
-                auto currentClosure = cp->fp->closure;
-                currentClosure->free[freeIndex] = memoryManager.addObject(SRCLANG_VALUE_CLOSURE(currentClosure));
-                SRCLANG_VALUE_SET_REF(currentClosure->free[freeIndex]);
-            } break;
-
             case OpCode::SET: {
                 auto val = *--(cp->sp);
                 auto pos = *--(cp->sp);
@@ -1122,16 +1115,16 @@ bool Interpreter::run() {
                 auto condition = *cp->fp->ip++;
                 auto position = *cp->fp->ip++;
                 if (SRCLANG_VALUE_AS_BOOL(*(cp->sp - 1)) && condition == 1) {
-                    cp->fp->ip = (cp->fp->closure->fun->instructions->begin() + position);
+                    cp->fp->ip = (SRCLANG_VALUE_AS_CLOSURE(cp->fp->closure)->fun->instructions->begin() + position);
                 } else if (!SRCLANG_VALUE_AS_BOOL(*(cp->sp - 1)) && condition == 0) {
-                    cp->fp->ip = (cp->fp->closure->fun->instructions->begin() + position);
+                    cp->fp->ip = (SRCLANG_VALUE_AS_CLOSURE(cp->fp->closure)->fun->instructions->begin() + position);
                 }
             } break;
 
             case OpCode::JNZ: {
                 auto value = *--(cp->sp);
                 if (!SRCLANG_VALUE_AS_BOOL(value)) {
-                    cp->fp->ip = (cp->fp->closure->fun->instructions->begin() + *cp->fp->ip);
+                    cp->fp->ip = (SRCLANG_VALUE_AS_CLOSURE(cp->fp->closure)->fun->instructions->begin() + *cp->fp->ip);
                 } else {
                     *cp->fp->ip++;
                 }
@@ -1145,7 +1138,7 @@ bool Interpreter::run() {
             case OpCode::CONTINUE:
             case OpCode::BREAK:
             case OpCode::JMP: {
-                cp->fp->ip = (cp->fp->closure->fun->instructions->begin() + *cp->fp->ip);
+                cp->fp->ip = (SRCLANG_VALUE_AS_CLOSURE(cp->fp->closure)->fun->instructions->begin() + *cp->fp->ip);
             } break;
 
             case OpCode::MODULE: {
@@ -1225,8 +1218,8 @@ Value Interpreter::run(ByteCode &bytecode, const std::shared_ptr<DebugInfo> &deb
                             debug_info};
 
     push_context();
-    cp->fp->closure = new Closure{fun, {}};
-    cp->fp->ip = cp->fp->closure->fun->instructions->begin();
+    cp->fp->closure = SRCLANG_VALUE_CLOSURE((new Closure{fun, {}}));
+    cp->fp->ip = SRCLANG_VALUE_AS_CLOSURE(cp->fp->closure)->fun->instructions->begin();
     cp->fp->bp = cp->sp;
 
     Value result = SRCLANG_VALUE_NULL;

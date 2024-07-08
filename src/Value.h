@@ -78,6 +78,7 @@ typedef uint64_t Value;
 #define SRCLANG_VALUE_AS_MAP(val) ((SrcLangMap *)SRCLANG_VALUE_AS_OBJECT(val)->pointer)
 #define SRCLANG_VALUE_AS_ERROR(val) ((const char *)SRCLANG_VALUE_AS_OBJECT(val)->pointer)
 #define SRCLANG_VALUE_AS_NATIVE(val) ((Native *)SRCLANG_VALUE_AS_OBJECT(val)->pointer)
+#define SRCLANG_VALUE_AS_CLOSURE(val) ((Closure *)SRCLANG_VALUE_AS_OBJECT(val)->pointer)
 
 #define SRCLANG_VALUE_BOOL(b) ((b) ? SRCLANG_VALUE_TRUE : SRCLANG_VALUE_FALSE)
 #define SRCLANG_VALUE_NUMBER(num) (srclang_decimal_to_value((double)(num)))

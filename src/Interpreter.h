@@ -16,7 +16,7 @@ namespace SrcLang {
     private:
         struct Frame {
             typename std::vector<Byte>::iterator ip;
-            Closure *closure;
+            Value closure;
             std::vector<Value>::iterator bp;
             std::vector<Value> defers;
         };

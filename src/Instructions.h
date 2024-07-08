@@ -8,10 +8,10 @@
 #include "DebugInfo.h"
 
 namespace SrcLang {
-    using Byte = uint64_t;
+using Byte = uint64_t;
 
 #define SRCLANG_OPCODE_LIST \
-    X(CONST_, 1)             \
+    X(CONST_, 1)            \
     X(CONST_INT, 1)         \
     X(CONST_TRUE, 0)        \
     X(CONST_FALSE, 0)       \
@@ -46,7 +46,6 @@ namespace SrcLang {
     X(MAP, 0)               \
     X(INDEX, 1)             \
     X(SET, 0)               \
-    X(SET_SELF, 1)          \
     X(POP, 0)               \
     X(RET, 0)               \
     X(JNZ, 1)               \
@@ -57,42 +56,42 @@ namespace SrcLang {
     X(MODULE, 0)            \
     X(HLT, 0)
 
-    enum class OpCode : uint8_t {
+enum class OpCode : uint8_t {
 #define X(id, size) id,
-        SRCLANG_OPCODE_LIST
+    SRCLANG_OPCODE_LIST
 #undef X
-    };
+};
 
-    static const std::vector<std::string> SRCLANG_OPCODE_ID = {
+static const std::vector<std::string> SRCLANG_OPCODE_ID = {
 #define X(id, size) #id,
-            SRCLANG_OPCODE_LIST
+    SRCLANG_OPCODE_LIST
 #undef X
-    };
+};
 
-    static const std::vector<int> SRCLANG_OPCODE_SIZE = {
+static const std::vector<int> SRCLANG_OPCODE_SIZE = {
 #define X(id, size) size,
-            SRCLANG_OPCODE_LIST
+    SRCLANG_OPCODE_LIST
 #undef X
-    };
+};
 
-    class Instructions : public std::vector<Byte> {
-    public:
-        OpCode last_instruction{};
+class Instructions : public std::vector<Byte> {
+   public:
+    OpCode last_instruction{};
 
-        Instructions() = default;
+    Instructions() = default;
 
-        size_t emit(DebugInfo *debug_info, uint64_t line) { return 0; }
+    size_t emit(DebugInfo *debug_info, uint64_t line) { return 0; }
 
-        template<typename T, typename... Types>
-        size_t emit(DebugInfo *debug_info, uint64_t line, T byte, Types... operand) {
-            size_t pos = this->size();
-            this->push_back(static_cast<Byte>(byte));
-            debug_info->lines.push_back(line);
-            emit(debug_info, line, operand...);
-            last_instruction = OpCode(byte);
-            return pos;
-        }
-    };
-}
+    template <typename T, typename... Types>
+    size_t emit(DebugInfo *debug_info, uint64_t line, T byte, Types... operand) {
+        size_t pos = this->size();
+        this->push_back(static_cast<Byte>(byte));
+        debug_info->lines.push_back(line);
+        emit(debug_info, line, operand...);
+        last_instruction = OpCode(byte);
+        return pos;
+    }
+};
+}  // namespace SrcLang
 
 #endif  // SRCLANG_INSTRUCTIONS_H

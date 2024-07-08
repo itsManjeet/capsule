@@ -354,8 +354,7 @@ void Compiler::function(Symbol *symbol, bool skip_args) {
     auto pos = cur.pos;
     push_scope();
     if (symbol != nullptr) {
-        auto freeSymbol = symbol_table->define(*symbol);
-        emit(OpCode::SET_SELF, freeSymbol.index);
+        symbol_table->defineFun(symbol->name);
     }
     int nparam = 0;
     if (!skip_args) {
