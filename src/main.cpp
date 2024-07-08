@@ -3,9 +3,49 @@
 
 #include "Interpreter.h"
 
+#ifdef WITH_READLINE
+#include <readline/readline.h>
+#endif
+
 using namespace SrcLang;
 
-int main(int argc, char **argv) {
+std::string getline(const std::string& prompt) {
+    std::string line;
+#ifdef WITH_READLINE
+    char* l = readline(prompt.c_str());
+    line = l;
+    free(l);
+#else
+    std::cout << prompt;
+    std::getline(std::cin, line);
+#endif
+    return line;
+}
+
+bool is_complete(const std::string& s) {
+    if (s.empty()) return false;
+    std::vector<char> stack;
+    std::map<char, char> mapping = {{'{', '}'}, {'(', ')'}, {'[', ']'}};
+    for (auto ch : s) {
+        switch (ch) {
+            case '(':
+            case '{':
+            case '[':
+                stack.push_back(ch);
+                break;
+            case ')':
+            case '}':
+            case ']':
+                if (stack.empty()) return true;
+                if (mapping[stack.back()] != ch) return true;
+                stack.pop_back();
+                break;
+        }
+    }
+    return stack.empty();
+}
+
+int main(int argc, char** argv) {
     bool isProgArgs = false;
     bool debug = false;
     bool breakPoint = false;
@@ -53,8 +93,12 @@ int main(int argc, char **argv) {
 
     do {
         if (interactive) {
-            std::cout << ">> ";
-            std::getline(std::cin, source);
+            source.clear();
+            std::string prompt = ">> ";
+            while (!is_complete(source)) {
+                source += getline(prompt);
+                prompt = "... ";
+            }
         }
 
         auto result = interpreter.run(source, filename ? *filename : "stdin");

@@ -7,9 +7,21 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(POSITION_INDEPENDENT_CODE ON)
 
-find_library(DL dl REQUIRED)
-find_library(FFI ffi REQUIRED)
+if(UNIX)
+    find_library(DL REQUIRED)
+else()
+    set(DL "")
+endif()
 
+find_library(FFI ffi)
+if(FFI)
+    add_definitions(-DWITH_FFI)
+endif()
+
+find_library(READLINE readline)
+if(READLINE)
+    add_definitions(-DWITH_READLINE)
+endif()
 include(GNUInstallDirs)
 
 file(GLOB_RECURSE SourceFiles "src/*.cpp" "src/*.h")
@@ -24,7 +36,7 @@ target_link_options(${PROJECT_NAME} PRIVATE
         -rdynamic)
         
 target_link_libraries(${PROJECT_NAME} PRIVATE
-        ${FFI} ${DL})
+        ${FFI} ${DL} ${READLINE})
 
 install(TARGETS ${PROJECT_NAME}
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}

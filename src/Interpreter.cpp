@@ -1,7 +1,26 @@
 #include "Interpreter.h"
 
+#ifdef _WIN32
+#include <windows.h>
+#define RTLD_LAZY 0
+#define RTLD_NOW 0
+void *dlopen(const char *path, int flags) {
+    HMODULE handler = GetModuleHandler(path);
+    return (void *)handler;
+}
+
+void *dlsym(void *handler, const char *str) {
+    auto proc = GetProcAddress((HMODULE)handlr, str);
+    return (void *)proc;
+}
+
+const char *dlerror() {
+    return std::to_string(GetLastError());
+}
+
+#else
 #include <dlfcn.h>
-#include <ffi.h>
+#endif
 
 #include <array>
 #include <iostream>
@@ -12,6 +31,8 @@
 
 using namespace SrcLang;
 
+#ifdef WITH_FFI
+#include <ffi.h>
 static std::map<Native::Type, ffi_type *> ctypes = {
     {Native::Type::i8, &ffi_type_sint8},
     {Native::Type::i16, &ffi_type_sint16},
@@ -25,6 +46,7 @@ static std::map<Native::Type, ffi_type *> ctypes = {
     {Native::Type::f64, &ffi_type_double},
     {Native::Type::ptr, &ffi_type_pointer},
 };
+#endif
 
 void Interpreter::error(std::string const &msg) {
     if (debugInfo.empty() || debugInfo.back() == nullptr) {
@@ -446,8 +468,9 @@ bool Interpreter::callBuiltin(Value callee, uint8_t count) {
 }
 
 bool Interpreter::callNative(Value callee, uint8_t count) {
-    auto native = SRCLANG_VALUE_AS_NATIVE(callee);
     Value result_value;
+#ifdef WITH_FFI
+    auto native = SRCLANG_VALUE_AS_NATIVE(callee);
 
     if (count != native->parameters.size()) {
         error("expected '" + std::to_string(native->parameters.size()) + "' but '" + std::to_string(count) + "' provided");
@@ -527,19 +550,19 @@ bool Interpreter::callNative(Value callee, uint8_t count) {
         case Native::Type::i16:
         case Native::Type::i32:
         case Native::Type::i64:
-            result = SRCLANG_VALUE_NUMBER(static_cast<double>((long)result));
+            result_value = SRCLANG_VALUE_NUMBER(static_cast<double>((long)result));
             break;
         case Native::Type::u8:
         case Native::Type::u16:
         case Native::Type::u32:
         case Native::Type::u64:
-            result = SRCLANG_VALUE_NUMBER(static_cast<double>((unsigned long)result));
+            result_value = SRCLANG_VALUE_NUMBER(static_cast<double>((unsigned long)result));
             break;
         case Native::Type::ptr:
             if ((void *)result == nullptr) {
-                result = SRCLANG_VALUE_NULL;
+                result_value = SRCLANG_VALUE_NULL;
             } else {
-                result = SRCLANG_VALUE_POINTER((void *)result);
+                result_value = SRCLANG_VALUE_POINTER((void *)result);
             }
             break;
         // case Native::Type::val:
@@ -550,9 +573,13 @@ bool Interpreter::callNative(Value callee, uint8_t count) {
                   SRCLANG_VALUE_TYPE_ID[int(native->ret)] + "'");
             return false;
     }
+#else
+    error("FFI calling not enabled");
+    return false;
+#endif
 
     cp->sp -= count + 1;
-    *cp->sp++ = result;
+    *cp->sp++ = result_value;
     return true;
 }
 
