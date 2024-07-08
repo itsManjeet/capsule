@@ -38,7 +38,10 @@ void Interpreter::error(std::string const &msg) {
     errStream << "  ERROR: " << msg;
 }
 
-Interpreter::Interpreter() : globals(65536) {
+Interpreter::Interpreter(bool debug, bool _break)
+    : globals(65536),
+      break_{_break},
+      debug(debug) {
     for (auto b : builtins) {
         memoryManager.heap.push_back(b);
     }
