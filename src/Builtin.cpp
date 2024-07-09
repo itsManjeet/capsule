@@ -418,7 +418,7 @@ SRCLANG_BUILTIN(term) {
     int delta = 0;
 
     for (;;) {
-        printf("\033[2J\033[H");
+        printf("\033[H");
         fflush(stdout);
 
         if (SRCLANG_VALUE_IS_CLOSURE(args[0])) {

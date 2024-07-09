@@ -759,7 +759,7 @@ bool Interpreter::call(uint8_t count) {
 bool Interpreter::run() {
     debug = getOption<bool>("DEBUG");
     break_ = getOption<bool>("BREAK");
-    
+
     while (true) {
         if (debug) {
             if (!debugInfo.empty() && debugInfo.back() != nullptr) {
@@ -1071,9 +1071,7 @@ bool Interpreter::run() {
                         buf[long(idx)] = (char)SRCLANG_VALUE_AS_NUMBER(val);
                     } else if (SRCLANG_VALUE_GET_TYPE(val) == ValueType::String) {
                         char *b = (char *)SRCLANG_VALUE_AS_OBJECT(val)->pointer;
-                        size_t b_size = strlen(b);
-                        buf = (char *)realloc(buf, size + b_size);
-                        strcat(buf, b);
+                        buf[long(idx)] = *b;
                     } else {
                         error("can't SET '" + SRCLANG_VALUE_TYPE_ID[int(SRCLANG_VALUE_GET_TYPE(val))] + "' to string");
                         return true;

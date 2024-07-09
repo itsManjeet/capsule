@@ -1,6 +1,10 @@
 PATH_MAX    := 4096;
 BUFSIZ      := 8192;
 
+STDIN       := 0;
+STDOUT      := 1;
+STDERR      := 2;
+
 chdir       := native (ptr) i32;
 chmod       := native (ptr, i32) i32;
 chown       := native (ptr, i32, i32) i32;

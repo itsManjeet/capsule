@@ -5,7 +5,12 @@ function(add_module id)
         OUTPUT_NAME "${id}"
         SUFFIX ".mod")
     target_include_directories(${PROJECT_NAME}_${id} PRIVATE ${CMAKE_SOURCE_DIR}/src)
+    install(TARGETS ${PROJECT_NAME}_${id}
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}/SrcLang
+    )
 endfunction(add_module)
+
+add_module(_termios)
 
 file(GLOB_RECURSE ModuleFiles "*.src")
 
