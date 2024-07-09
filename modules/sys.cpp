@@ -11,6 +11,10 @@ using namespace SrcLang;
 #endif
 #include <dirent.h>
 
+#ifndef PATH_MAX
+#define PATH_MAX 8124
+#endif
+
 #define SYSERROR SRCLANG_VALUE_SET_REF(SRCLANG_VALUE_ERROR(strerror(errno)))
 #define SAFE_SYSCALL(call) \
     if ((call) < 0) return SYSERROR;
