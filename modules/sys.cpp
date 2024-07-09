@@ -83,9 +83,9 @@ SRCLANG_MODULE_FUNC(exit) {
 
 SRCLANG_MODULE_FUNC(getcwd) {
     SRCLANG_CHECK_ARGS_EXACT(0);
-    char path[PATH_MAX];
-    if ((getcwd(path, sizeof(path))) == nullptr) return SYSERROR;
-    return SRCLANG_VALUE_STRING(strdup(path));
+    char p[PATH_MAX];
+    if ((getcwd(p, sizeof(p))) == nullptr) return SYSERROR;
+    return SRCLANG_VALUE_STRING(strdup(p));
 }
 
 SRCLANG_MODULE_FUNC(getenv) {
