@@ -460,6 +460,12 @@ SRCLANG_BUILTIN(term) {
 }
 
 SRCLANG_BUILTIN(random) {
-    SRCLANG_CHECK_ARGS_EXACT(0);
-    return SRCLANG_VALUE_NUMBER(rand());
+    SRCLANG_CHECK_ARGS_RANGE(0, 2);
+    if (args.size() == 1) {
+        return SRCLANG_VALUE_NUMBER((rand() % (long)SRCLANG_VALUE_AS_NUMBER(args[0])));
+    } else if (args.size() == 2) {
+        return SRCLANG_VALUE_NUMBER((rand() % (long)SRCLANG_VALUE_AS_NUMBER(args[1])) + SRCLANG_VALUE_AS_NUMBER(args[0]));
+    } else {
+        return SRCLANG_VALUE_NUMBER(rand());
+    }
 }
