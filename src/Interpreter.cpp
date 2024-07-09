@@ -60,6 +60,8 @@ void Interpreter::error(std::string const &msg) {
     errStream << "  ERROR: " << msg;
 }
 
+Interpreter *Interpreter::m_globalActive = nullptr;
+
 Interpreter::Interpreter()
     : globals(65536),
       options({
@@ -72,6 +74,7 @@ Interpreter::Interpreter()
           {"DEBUG", false},
           {"BREAK", false},
       }) {
+    m_globalActive = this;
     for (auto b : builtins) {
         memoryManager.heap.push_back(b);
     }
@@ -94,9 +97,23 @@ Interpreter::Interpreter()
 Interpreter::~Interpreter() = default;
 
 void Interpreter::graceFullExit() {
+    do {
+        if (cp->sp != cp->stack.begin()) --cp->sp;
+        for (auto i = cp->fp->defers.rbegin(); i != cp->fp->defers.rend(); i++) {
+            call(*i, {});
+        }
+
+        if (cp->fp == cp->frames.begin()) {
+            break;
+        }
+        cp->sp = cp->fp->bp - 1;
+        *cp->sp++ = SRCLANG_VALUE_NULL;
+        debugInfo.pop_back();
+        cp->fp--;
+    } while (true);
 }
 
-void Interpreter::addObject(Value val) {
+Value Interpreter::addObject(Value val) {
 #ifdef SRCLANG_GC_DEBUG
     gc();
 #else
@@ -106,7 +123,7 @@ void Interpreter::addObject(Value val) {
         nextGc = static_cast<int>(static_cast<float>(memoryManager.heap.size()) * gcHeapGrowFactor);
     }
 #endif
-    memoryManager.heap.push_back(val);
+    return memoryManager.addObject(val);
 }
 
 void Interpreter::gc() {
@@ -332,9 +349,9 @@ bool Interpreter::binary(Value lhs, Value rhs, OpCode op) {
             case OpCode::ADD: {
                 auto a_size = strlen(a);
                 auto b_size = strlen(b);
-                auto size = a_size + b_size + 1;
+                auto size = a_size + b_size;
 
-                char *buf = (char *)malloc(size);
+                char *buf = (char *)malloc(size + 1);
                 if (buf == nullptr) {
                     throw std::runtime_error("malloc() failed for string + string, " + std::string(strerror(errno)));
                 }
@@ -342,9 +359,7 @@ bool Interpreter::binary(Value lhs, Value rhs, OpCode op) {
                 memcpy(buf + a_size, b, b_size);
 
                 buf[size] = '\0';
-                auto val = SRCLANG_VALUE_STRING(buf);
-                addObject(val);
-                *cp->sp++ = val;
+                *cp->sp++ = addObject(SRCLANG_VALUE_STRING(buf));
             } break;
             case OpCode::EQ: {
                 *cp->sp++ = strcmp(a, b) == 0 ? SRCLANG_VALUE_TRUE : SRCLANG_VALUE_FALSE;
@@ -632,8 +647,8 @@ bool Interpreter::callTypecastString(uint8_t count) {
             } break;
 
             default:
-                error("invalid type cast " + SRCLANG_VALUE_DEBUG(val));
-                return false;
+                result = SRCLANG_VALUE_STRING(strdup(SRCLANG_VALUE_GET_STRING(val).c_str()));
+                break;
         }
 
     } else {

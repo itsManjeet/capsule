@@ -10,7 +10,7 @@ function(add_module id)
     )
 endfunction(add_module)
 
-add_module(_termios)
+add_module(sys)
 
 file(GLOB_RECURSE ModuleFiles "*.src")
 

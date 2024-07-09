@@ -11,6 +11,7 @@ using namespace SrcLang;
 #define WEXITSTATUS
 #else
 #include <sys/ioctl.h>
+#include <sys/stat.h>
 #include <termios.h>
 #include <unistd.h>
 #endif
@@ -208,32 +209,47 @@ SRCLANG_BUILTIN(eval) {
 }
 
 SRCLANG_BUILTIN(alloc) {
-    SRCLANG_CHECK_ARGS_EXACT(1);
+    SRCLANG_CHECK_ARGS_EXACT(2);
     SRCLANG_CHECK_ARGS_TYPE(0, ValueType::Number);
+    SRCLANG_CHECK_ARGS_TYPE(1, ValueType::Type);
     long size = SRCLANG_VALUE_AS_NUMBER(args[0]);
-    void *ptr = malloc(size * sizeof(unsigned char));
-    if (ptr == nullptr) {
-        std::stringstream ss;
-        ss << "failed to allocate '" << size << "' size, " << strerror(errno);
-        return SRCLANG_VALUE_ERROR(strdup(ss.str().c_str()));
+    switch (SRCLANG_VALUE_AS_TYPE(args[1])) {
+        case ValueType::Pointer: {
+            void *ptr = calloc(size * sizeof(unsigned char), 1);
+            if (ptr == nullptr) {
+                std::stringstream ss;
+                ss << "failed to allocate '" << size << "' size, " << strerror(errno);
+                return SRCLANG_VALUE_ERROR(strdup(ss.str().c_str()));
+            }
+            auto value = SRCLANG_VALUE_POINTER(ptr);
+            SRCLANG_VALUE_SET_SIZE(value, size);
+            return value;
+        } break;
+
+        case ValueType::String: {
+            char *ptr = (char *)malloc((size + 1) * sizeof(char));
+            if (ptr == nullptr) {
+                std::stringstream ss;
+                ss << "failed to allocate '" << size << "' size, " << strerror(errno);
+                return SRCLANG_VALUE_ERROR(strdup(ss.str().c_str()));
+            }
+            memset(ptr, ' ', size);
+            ptr[size] = '\0';
+            auto value = SRCLANG_VALUE_STRING(ptr);
+            return value;
+        } break;
+
+        case ValueType::List: {
+            auto list = new SrcLangList(size);
+            return SRCLANG_VALUE_LIST(list);
+        } break;
     }
-    auto value = SRCLANG_VALUE_POINTER(ptr);
-    SRCLANG_VALUE_SET_SIZE(value, size);
-    return value;
+    return SRCLANG_VALUE_SET_REF(SRCLANG_VALUE_ERROR("invalid type"));
 }
 
 SRCLANG_BUILTIN(bound) {
     SRCLANG_CHECK_ARGS_EXACT(2);
     return SRCLANG_VALUE_BOUND(args[0], args[1]);
-}
-
-SRCLANG_BUILTIN(exit) {
-    SRCLANG_CHECK_ARGS_EXACT(1);
-    SRCLANG_CHECK_ARGS_TYPE(0, ValueType::Number);
-
-    auto status = (int)SRCLANG_VALUE_AS_NUMBER(args[0]);
-    interpreter->graceFullExit();
-    exit(status);
 }
 
 SRCLANG_BUILTIN(free) {
@@ -248,224 +264,8 @@ SRCLANG_BUILTIN(free) {
     return SRCLANG_VALUE_TRUE;
 }
 
-SRCLANG_BUILTIN(open) {
-    SRCLANG_CHECK_ARGS_RANGE(1, 2);
-    const char *mode = "a+";
-    if (args.size() == 2) {
-        SRCLANG_CHECK_ARGS_TYPE(1, ValueType::String);
-        mode = reinterpret_cast<const char *>(SRCLANG_VALUE_AS_OBJECT(args[1])->pointer);
-    }
-
-    FILE *fp = nullptr;
-    switch (SRCLANG_VALUE_GET_TYPE(args[0])) {
-        case ValueType::Number:
-            fp = fdopen(SRCLANG_VALUE_AS_NUMBER(args[0]), mode);
-            break;
-        case ValueType::String:
-            fp = fopen(reinterpret_cast<const char *>(SRCLANG_VALUE_AS_OBJECT(args[0])->pointer), mode);
-            break;
-        case ValueType::Pointer:
-            fp = reinterpret_cast<FILE *>(SRCLANG_VALUE_AS_OBJECT(args[0])->pointer);
-            break;
-        default:
-            SRCLANG_CHECK_ARGS_TYPE(0, ValueType::String);
-    }
-    if (fp == nullptr) {
-        return SRCLANG_VALUE_SET_REF(SRCLANG_VALUE_ERROR(strerror(errno)));
-    }
-
-    auto object = new SrcLangMap();
-    auto value = SRCLANG_VALUE_MAP(object);
-
-    object->insert({"__ptr__", SRCLANG_VALUE_SET_CLEANUP(
-                                   SRCLANG_VALUE_POINTER(reinterpret_cast<void *>(fp)),
-                                   +[](void *ptr) {
-                                       auto fp = reinterpret_cast<FILE *>(ptr);
-                                       if (fp != nullptr)
-                                           fclose(fp);
-                                   })});
-
-    object->insert(
-        {"Write", SRCLANG_VALUE_BOUND(
-                      value,
-                      SRCLANG_VALUE_BUILTIN_NEW(+[](std::vector<Value> &args) -> Value {
-                          SRCLANG_CHECK_ARGS_EXACT(2);
-
-                          SRCLANG_CHECK_ARGS_TYPE(0, ValueType::Map);
-                          SRCLANG_CHECK_ARGS_TYPE(1, ValueType::String);
-
-                          auto self = reinterpret_cast<SrcLangMap *>(SRCLANG_VALUE_AS_OBJECT(args[0])->pointer);
-                          auto data = reinterpret_cast<const char *>(SRCLANG_VALUE_AS_OBJECT(args[1])->pointer);
-                          auto fp = reinterpret_cast<FILE *>(SRCLANG_VALUE_AS_OBJECT(self->at("__ptr__"))->pointer);
-
-                          int num = fwrite(data, sizeof(char), strlen(data), fp);
-                          if (num == -1) {
-                              return SRCLANG_VALUE_SET_REF(SRCLANG_VALUE_ERROR(strerror(errno)));
-                          }
-
-                          return SRCLANG_VALUE_NUMBER(num);
-                      }))});
-    object->insert(
-        {"Seek", SRCLANG_VALUE_BOUND(
-                     value,
-                     SRCLANG_VALUE_BUILTIN_NEW(+[](std::vector<Value> &args) -> Value {
-                         SRCLANG_CHECK_ARGS_EXACT(3);
-
-                         SRCLANG_CHECK_ARGS_TYPE(0, ValueType::Map);
-                         SRCLANG_CHECK_ARGS_TYPE(1, ValueType::Number);
-                         SRCLANG_CHECK_ARGS_TYPE(2, ValueType::Number);
-
-                         auto self = reinterpret_cast<SrcLangMap *>(SRCLANG_VALUE_AS_OBJECT(args[0])->pointer);
-                         int offset = SRCLANG_VALUE_AS_NUMBER(args[1]);
-                         int whence = SRCLANG_VALUE_AS_NUMBER(args[2]);
-                         auto fp = reinterpret_cast<FILE *>(SRCLANG_VALUE_AS_OBJECT(self->at("__ptr__"))->pointer);
-
-                         if (fseek(fp, offset, whence) != -1) {
-                             return SRCLANG_VALUE_SET_REF(SRCLANG_VALUE_ERROR(strerror(errno)));
-                         }
-                         return SRCLANG_VALUE_NUMBER(ftell(fp));
-                     }))});
-
-    object->insert({"Close",
-                    SRCLANG_VALUE_BOUND(
-                        value,
-                        SRCLANG_VALUE_BUILTIN_NEW(+[](std::vector<Value> &args) -> Value {
-                            SRCLANG_CHECK_ARGS_EXACT(1);
-                            SRCLANG_CHECK_ARGS_TYPE(0, ValueType::Map);
-                            auto self = reinterpret_cast<SrcLangMap *>(SRCLANG_VALUE_AS_OBJECT(args[0])->pointer);
-                            auto fp = reinterpret_cast<FILE *>(SRCLANG_VALUE_AS_OBJECT(self->at("__ptr__"))->pointer);
-
-                            if (fp != nullptr) fclose(fp);
-                            return SRCLANG_VALUE_TRUE;
-                        }))});
-
-    object->insert(
-        {"Read", SRCLANG_VALUE_BOUND(
-                     value,
-                     SRCLANG_VALUE_BUILTIN_NEW(+[](std::vector<Value> &args) -> Value {
-                         SRCLANG_CHECK_ARGS_EXACT(2);
-
-                         SRCLANG_CHECK_ARGS_TYPE(0, ValueType::Map);
-                         SRCLANG_CHECK_ARGS_TYPE(1, ValueType::Number);
-
-                         auto self = reinterpret_cast<SrcLangMap *>(SRCLANG_VALUE_AS_OBJECT(args[0])->pointer);
-                         int size = SRCLANG_VALUE_AS_NUMBER(args[1]);
-                         auto fp = reinterpret_cast<FILE *>(SRCLANG_VALUE_AS_OBJECT(self->at("__ptr__"))->pointer);
-
-                         auto buffer = new char[size + 1];
-
-                         int num = fread(buffer, sizeof(char), size, fp);
-                         if (num == -1) {
-                             delete[] buffer;
-                             return SRCLANG_VALUE_SET_REF(SRCLANG_VALUE_ERROR(strerror(errno)));
-                         }
-                         buffer[size] = '\0';
-                         return SRCLANG_VALUE_STRING(buffer);
-                     }))});
-
-    return value;
-}
-
-/**
- * Platform Independent Wrapper for exec syscall to execute system commands and binary files
- */
-SRCLANG_BUILTIN(exec) {
-    SRCLANG_CHECK_ARGS_EXACT(2);
-
-    SRCLANG_CHECK_ARGS_TYPE(0, ValueType::String);
-    auto cmd = reinterpret_cast<const char *>(SRCLANG_VALUE_AS_OBJECT(args[0])->pointer);
-
-    SRCLANG_CHECK_ARGS_TYPE(1, ValueType::Closure);
-
-    char buffer[128] = {};
-    FILE *fd = popen(cmd, "r");
-    if (fd == nullptr) {
-        return SRCLANG_VALUE_SET_REF(SRCLANG_VALUE_ERROR(strerror(errno)));
-    }
-    while (fgets(buffer, sizeof(buffer), fd) != nullptr) {
-        interpreter->call(args[1], {SRCLANG_VALUE_SET_REF(SRCLANG_VALUE_STRING(buffer))});
-    }
-    int status = pclose(fd);
-    status = WEXITSTATUS(status);
-    return SRCLANG_VALUE_NUMBER(status);
-}
-
-SRCLANG_BUILTIN(term) {
-    SRCLANG_CHECK_ARGS_EXACT(2);
-
-    SRCLANG_CHECK_ARGS_TYPE(0, ValueType::Closure);
-    SRCLANG_CHECK_ARGS_TYPE(1, ValueType::Closure);
-
-    winsize size;
-    termios attr;
-    termios raw;
-
-    ioctl(STDOUT_FILENO, TIOCGWINSZ, &size);
-
-    if (tcgetattr(STDIN_FILENO, &attr) == -1) {
-        return SRCLANG_VALUE_SET_REF(SRCLANG_VALUE_ERROR(strerror(errno)));
-    }
-    raw = attr;
-    raw.c_lflag &= ~(ECHO | ICANON);
-    raw.c_cc[VMIN] = 1;
-    raw.c_cc[VTIME] = 0;
-
-    if (tcsetattr(STDIN_FILENO, TCSANOW, &raw) == -1) {
-        return SRCLANG_VALUE_SET_REF(SRCLANG_VALUE_ERROR(strerror(errno)));
-    }
-
-    Value result = SRCLANG_VALUE_TRUE;
-    int delta = 0;
-
-    for (;;) {
-        printf("\033[H");
-        fflush(stdout);
-
-        if (SRCLANG_VALUE_IS_CLOSURE(args[0])) {
-            std::vector<Value> call_args{
-                SRCLANG_VALUE_NUMBER(size.ws_col),
-                SRCLANG_VALUE_NUMBER(size.ws_row),
-                SRCLANG_VALUE_NUMBER(delta),
-            };
-            result = interpreter->call(args[0], call_args);
-            if (SRCLANG_VALUE_IS_ERROR(result) || (SRCLANG_VALUE_IS_BOOL(result) && !SRCLANG_VALUE_AS_BOOL(result))) {
-                break;
-            }
-        }
-
-        char buf[6];
-        int n;
-        if ((n = read(STDIN_FILENO, buf, sizeof(buf))) > 0) {
-            buf[n] = '\0';
-            if (SRCLANG_VALUE_IS_CLOSURE(args[1])) {
-                std::vector<Value> call_args = {
-                    SRCLANG_VALUE_STRING(strdup(buf)),
-                    SRCLANG_VALUE_NUMBER(size.ws_col),
-                    SRCLANG_VALUE_NUMBER(size.ws_row),
-                    SRCLANG_VALUE_NUMBER(delta),
-                };
-                result = interpreter->call(args[1], call_args);
-                if (SRCLANG_VALUE_IS_ERROR(result) || (SRCLANG_VALUE_IS_BOOL(result) && !SRCLANG_VALUE_AS_BOOL(result))) {
-                    break;
-                }
-            }
-        }
-        delta++;
-    }
-
-    tcsetattr(STDIN_FILENO, TCSANOW, &attr);
-    fflush(stdout);
-
-    return result;
-}
-
-SRCLANG_BUILTIN(random) {
-    SRCLANG_CHECK_ARGS_RANGE(0, 2);
-    if (args.size() == 1) {
-        return SRCLANG_VALUE_NUMBER((rand() % (long)SRCLANG_VALUE_AS_NUMBER(args[0])));
-    } else if (args.size() == 2) {
-        return SRCLANG_VALUE_NUMBER((rand() % (long)SRCLANG_VALUE_AS_NUMBER(args[1])) + SRCLANG_VALUE_AS_NUMBER(args[0]));
-    } else {
-        return SRCLANG_VALUE_NUMBER(rand());
-    }
+SRCLANG_BUILTIN(roundoff) {
+    SRCLANG_CHECK_ARGS_EXACT(1);
+    SRCLANG_CHECK_ARGS_TYPE(0, ValueType::Number);
+    return SRCLANG_VALUE_NUMBER((long)SRCLANG_VALUE_AS_NUMBER(args[0]));
 }

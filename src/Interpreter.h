@@ -108,6 +108,8 @@ class Interpreter {
 
     Value run(ByteCode &bytecode, const std::shared_ptr<DebugInfo> &debugInfo);
 
+    static Interpreter *m_globalActive;
+
    public:
     Interpreter();
 
@@ -129,7 +131,7 @@ class Interpreter {
 
     void graceFullExit();
 
-    void addObject(Value val);
+    Value addObject(Value val);
 
     void gc();
 
@@ -147,6 +149,10 @@ class Interpreter {
         std::string e = errStream.str();
         errStream.clear();
         return e;
+    }
+
+    static Interpreter* globalActive() {
+        return m_globalActive;
     }
 };
 

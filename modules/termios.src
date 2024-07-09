@@ -1,3 +1,0 @@
-_termios := use("_termios.mod");
-
-let Size = fun () { return _termios.size(); };
