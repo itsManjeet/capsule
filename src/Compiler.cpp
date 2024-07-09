@@ -930,7 +930,19 @@ void Compiler::statement() {
         return let();
     else if (consume("return"))
         return return_();
-    else if (consume(";"))
+    else if (consume("fun")) {
+        auto id = cur;
+        expect(TokenType::Identifier);
+        auto symbol = symbol_table->resolve(id.literal);
+        if (symbol) {
+            error("function already defined", id.pos);
+        }
+        symbol = symbol_table->define(id.literal);
+        function(&*symbol);
+        emit(OpCode::STORE, symbol->scope, symbol->index);
+        emit(OpCode::POP);
+        return;
+    } else if (consume(";"))
         return;
     else if (consume("if"))
         return condition();
