@@ -44,7 +44,10 @@ int ByteCode::debug(Instructions const &instructions,
             os << constants[constantIndex] << " " << nfree;
         } break;
 
-        case OpCode::CONST_INT:
+        case OpCode::CONST_INT: {
+            auto value = instructions[offset++];
+            os << " '" << SRCLANG_VALUE_AS_NUMBER(value) << "'";
+        } break;
         case OpCode::CALL: {
             auto count = instructions[offset++];
             os << " '" << count << "'";

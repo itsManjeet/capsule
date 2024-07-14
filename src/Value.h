@@ -184,7 +184,7 @@ typedef uint64_t Value;
     if (SRCLANG_VALUE_GET_TYPE(args[pos]) != ty)                      \
         throw std::runtime_error("Expected '" + std::to_string(pos) + \
                                  "' to be '" +                        \
-                                 SRCLANG_VALUE_TYPE_ID[int(ty)] + "'");
+                                 SRCLANG_VALUE_TYPE_ID[int(ty)] + "' but " + SRCLANG_VALUE_DEBUG(args[pos]) + "' provided");
 
 typedef std::vector<Value> SrcLangList;
 typedef std::map<std::string, Value> SrcLangMap;

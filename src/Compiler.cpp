@@ -861,7 +861,7 @@ void Compiler::use() {
     int total = 0;
     // export symbols
     for (const auto &i : symbol_table->store) {
-        if (i.second.scope == Symbol::Scope::LOCAL && i.first[0] != '_') {
+        if (i.second.scope == Symbol::Scope::LOCAL && std::isupper(i.first[0])) {
             interpreter->constants.push_back(SRCLANG_VALUE_STRING(strdup(i.first.c_str())));
             instructions->emit(compiler.global_debug_info.get(), 0, OpCode::CONST_, interpreter->constants.size() - 1);
             instructions->emit(compiler.global_debug_info.get(), 0, OpCode::LOAD, i.second.scope, i.second.index);

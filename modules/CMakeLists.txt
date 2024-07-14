@@ -11,6 +11,7 @@ function(add_module id)
 endfunction(add_module)
 
 add_module(sys)
+add_module(math)
 
 file(GLOB_RECURSE ModuleFiles "*.src")
 

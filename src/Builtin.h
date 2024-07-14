@@ -24,8 +24,7 @@ typedef Value (*Builtin)(std::vector<Value>&, Interpreter*);
     X(pop)                   \
     X(alloc)                 \
     X(free)                  \
-    X(bound)                 \
-    X(roundoff)
+    X(bound)
 
 struct Interpreter;
 #define X(id) SRCLANG_BUILTIN(id);

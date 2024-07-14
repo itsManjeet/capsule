@@ -21,7 +21,7 @@ using namespace SrcLang;
 
 #define SAFE_RETURN(call) SAFE_SYSCALL(call) return SRCLANG_VALUE_TRUE;
 
-SRCLANG_MODULE_FUNC(environ) {
+SRCLANG_MODULE_FUNC(Environ) {
     SRCLANG_CHECK_ARGS_EXACT(0);
     auto env = new SrcLangList();
     for (char **e = environ; e != nullptr; e++) {
@@ -30,12 +30,12 @@ SRCLANG_MODULE_FUNC(environ) {
     return SRCLANG_VALUE_LIST(env);
 }
 
-SRCLANG_MODULE_FUNC(errno) {
+SRCLANG_MODULE_FUNC(Errno) {
     SRCLANG_CHECK_ARGS_EXACT(0);
     return SRCLANG_VALUE_NUMBER(errno);
 }
 
-SRCLANG_MODULE_FUNC(exec) {
+SRCLANG_MODULE_FUNC(Exec) {
     SRCLANG_CHECK_ARGS_EXACT(2);
 
     SRCLANG_CHECK_ARGS_TYPE(0, ValueType::String);
@@ -56,13 +56,13 @@ SRCLANG_MODULE_FUNC(exec) {
     return SRCLANG_VALUE_NUMBER(status);
 }
 
-SRCLANG_MODULE_FUNC(chdir) {
+SRCLANG_MODULE_FUNC(Chdir) {
     SRCLANG_CHECK_ARGS_EXACT(1);
     SRCLANG_CHECK_ARGS_TYPE(0, ValueType::String);
     SAFE_RETURN(chdir(SRCLANG_VALUE_AS_STRING(args[0])));
 }
 
-SRCLANG_MODULE_FUNC(dup) {
+SRCLANG_MODULE_FUNC(Dup) {
     SRCLANG_CHECK_ARGS_RANGE(1, 2);
     SRCLANG_CHECK_ARGS_TYPE(0, ValueType::Number);
     int result;
@@ -76,7 +76,7 @@ SRCLANG_MODULE_FUNC(dup) {
     return SRCLANG_VALUE_NUMBER(result);
 }
 
-SRCLANG_MODULE_FUNC(exit) {
+SRCLANG_MODULE_FUNC(Exit) {
     SRCLANG_CHECK_ARGS_EXACT(1);
     SRCLANG_CHECK_ARGS_TYPE(0, ValueType::Number);
 
@@ -85,14 +85,14 @@ SRCLANG_MODULE_FUNC(exit) {
     exit(status);
 }
 
-SRCLANG_MODULE_FUNC(getcwd) {
+SRCLANG_MODULE_FUNC(Getcwd) {
     SRCLANG_CHECK_ARGS_EXACT(0);
     char p[PATH_MAX];
     if ((getcwd(p, sizeof(p))) == nullptr) return SYSERROR;
     return SRCLANG_VALUE_STRING(strdup(p));
 }
 
-SRCLANG_MODULE_FUNC(getenv) {
+SRCLANG_MODULE_FUNC(Getenv) {
     SRCLANG_CHECK_ARGS_RANGE(1, 2);
     SRCLANG_CHECK_ARGS_TYPE(0, ValueType::String);
     char *value = getenv(SRCLANG_VALUE_AS_STRING(args[0]));
@@ -100,18 +100,18 @@ SRCLANG_MODULE_FUNC(getenv) {
     return args.size() == 2 ? args[1] : SRCLANG_VALUE_NULL;
 }
 
-#define DIRECT_METHOD(id)                   \
+#define DIRECT_METHOD(id, fun)              \
     SRCLANG_MODULE_FUNC(id) {               \
         SRCLANG_CHECK_ARGS_EXACT(0);        \
-        int value = id();                   \
+        int value = fun();                  \
         if (value == -1) return SYSERROR;   \
         return SRCLANG_VALUE_NUMBER(value); \
     }
 
-DIRECT_METHOD(getegid)
-DIRECT_METHOD(geteuid)
+DIRECT_METHOD(Getegid, getegid)
+DIRECT_METHOD(Geteuid, geteuid)
 
-SRCLANG_MODULE_FUNC(getkey) {
+SRCLANG_MODULE_FUNC(Getkey) {
     SRCLANG_CHECK_ARGS_EXACT(0);
     termios raw, original;
 
@@ -133,9 +133,9 @@ SRCLANG_MODULE_FUNC(getkey) {
     return SRCLANG_VALUE_STRING(buf);
 }
 
-DIRECT_METHOD(getgid)
+DIRECT_METHOD(Getgid, getgid)
 
-SRCLANG_MODULE_FUNC(getgroups) {
+SRCLANG_MODULE_FUNC(Getgroups) {
     SRCLANG_CHECK_ARGS_EXACT(0);
 
     int maxgroups = sysconf(_SC_NGROUPS_MAX);
@@ -150,7 +150,7 @@ SRCLANG_MODULE_FUNC(getgroups) {
     return SRCLANG_VALUE_LIST(groups_);
 }
 
-SRCLANG_MODULE_FUNC(getpgid) {
+SRCLANG_MODULE_FUNC(Getpgid) {
     SRCLANG_CHECK_ARGS_EXACT(1);
     SRCLANG_CHECK_ARGS_TYPE(0, ValueType::Number);
 
@@ -160,11 +160,11 @@ SRCLANG_MODULE_FUNC(getpgid) {
     return SRCLANG_VALUE_NUMBER(pgid);
 }
 
-DIRECT_METHOD(getpgrp)
-DIRECT_METHOD(getpid)
-DIRECT_METHOD(getuid)
+DIRECT_METHOD(Getpgrp, getpgrp)
+DIRECT_METHOD(Getpid, getpid)
+DIRECT_METHOD(Getuid, getuid)
 
-SRCLANG_MODULE_FUNC(gettermsize) {
+SRCLANG_MODULE_FUNC(Gettermsize) {
     SRCLANG_CHECK_ARGS_RANGE(0, 1);
     int fd = STDOUT_FILENO;
     if (args.size() == 1) {
@@ -176,13 +176,13 @@ SRCLANG_MODULE_FUNC(gettermsize) {
     SAFE_SYSCALL(ioctl(fd, TIOCGWINSZ, &size));
 
     auto geo = new SrcLangMap();
-    (*geo)["columns"] = SRCLANG_VALUE_NUMBER(size.ws_col);
-    (*geo)["rows"] = SRCLANG_VALUE_NUMBER(size.ws_row);
+    (*geo)["Columns"] = SRCLANG_VALUE_NUMBER(size.ws_col);
+    (*geo)["Rows"] = SRCLANG_VALUE_NUMBER(size.ws_row);
 
     return SRCLANG_VALUE_MAP(geo);
 }
 
-SRCLANG_MODULE_FUNC(mkdir) {
+SRCLANG_MODULE_FUNC(Mkdir) {
     SRCLANG_CHECK_ARGS_EXACT(1);
     SRCLANG_CHECK_ARGS_TYPE(0, ValueType::String);
     std::filesystem::path path = SRCLANG_VALUE_AS_STRING(args[0]);
@@ -195,7 +195,7 @@ SRCLANG_MODULE_FUNC(mkdir) {
     return SRCLANG_VALUE_TRUE;
 }
 
-SRCLANG_MODULE_FUNC(opendir) {
+SRCLANG_MODULE_FUNC(Opendir) {
     SRCLANG_CHECK_ARGS_EXACT(2);
     SRCLANG_CHECK_ARGS_TYPE(0, ValueType::String);
     SRCLANG_CHECK_ARGS_TYPE(1, ValueType::Closure);
@@ -227,7 +227,7 @@ SRCLANG_MODULE_FUNC(opendir) {
     return result;
 }
 
-SRCLANG_MODULE_FUNC(open) {
+SRCLANG_MODULE_FUNC(Open) {
     SRCLANG_CHECK_ARGS_RANGE(1, 2);
     const char *mode = "a+";
     if (args.size() == 2) {
@@ -272,7 +272,7 @@ SRCLANG_MODULE_FUNC(open) {
                                                   fun                                                                                          \
                                               })) });
 
-    ADD_METHOD(write, {
+    ADD_METHOD(Write, {
         SRCLANG_CHECK_ARGS_EXACT(2);
         SRCLANG_CHECK_ARGS_TYPE(1, ValueType::String);
         auto data = SRCLANG_VALUE_AS_STRING(args[1]);
@@ -283,7 +283,7 @@ SRCLANG_MODULE_FUNC(open) {
         return SRCLANG_VALUE_NUMBER(num);
     })
 
-    ADD_METHOD(seek, {
+    ADD_METHOD(Seek, {
         SRCLANG_CHECK_ARGS_EXACT(3);
         SRCLANG_CHECK_ARGS_TYPE(1, ValueType::Number);
         SRCLANG_CHECK_ARGS_TYPE(2, ValueType::Number);
@@ -297,7 +297,7 @@ SRCLANG_MODULE_FUNC(open) {
         return SRCLANG_VALUE_NUMBER(ftell(file));
     })
 
-    ADD_METHOD(chown, {
+    ADD_METHOD(Chown, {
         SRCLANG_CHECK_ARGS_EXACT(3);
         SRCLANG_CHECK_ARGS_TYPE(1, ValueType::Number);
         SRCLANG_CHECK_ARGS_TYPE(2, ValueType::Number);
@@ -311,7 +311,7 @@ SRCLANG_MODULE_FUNC(open) {
         return SRCLANG_VALUE_TRUE;
     })
 
-    ADD_METHOD(datasync, {
+    ADD_METHOD(Datasync, {
         SRCLANG_CHECK_ARGS_EXACT(1);
 
         if (fdatasync(fileno(file)) != -1) {
@@ -320,7 +320,7 @@ SRCLANG_MODULE_FUNC(open) {
         return SRCLANG_VALUE_TRUE;
     })
 
-    ADD_METHOD(sync, {
+    ADD_METHOD(Sync, {
         SRCLANG_CHECK_ARGS_EXACT(1);
 
         if (fsync(fileno(file)) != -1) {
@@ -329,32 +329,32 @@ SRCLANG_MODULE_FUNC(open) {
         return SRCLANG_VALUE_TRUE;
     })
 
-    ADD_METHOD(isatty, {
+    ADD_METHOD(Isatty, {
         SRCLANG_CHECK_ARGS_EXACT(1);
         return isatty(fileno(file)) == 1 ? SRCLANG_VALUE_TRUE : SRCLANG_VALUE_FALSE;
     })
 
-    ADD_METHOD(stat, {
+    ADD_METHOD(Stat, {
         SRCLANG_CHECK_ARGS_EXACT(1);
         struct stat s;
         if (fstat(fileno(file), &s) == -1) {
             return SRCLANG_VALUE_SET_REF(SRCLANG_VALUE_ERROR(strerror(errno)));
         }
         auto status = new SrcLangMap();
-        (*status)["device"] = SRCLANG_VALUE_NUMBER(s.st_dev);
-        (*status)["inode"] = SRCLANG_VALUE_NUMBER(s.st_ino);
-        (*status)["links"] = SRCLANG_VALUE_NUMBER(s.st_nlink);
-        (*status)["mode"] = SRCLANG_VALUE_NUMBER(s.st_mode);
-        (*status)["uid"] = SRCLANG_VALUE_NUMBER(s.st_uid);
-        (*status)["gid"] = SRCLANG_VALUE_NUMBER(s.st_gid);
-        (*status)["rdev"] = SRCLANG_VALUE_NUMBER(s.st_rdev);
-        (*status)["size"] = SRCLANG_VALUE_NUMBER(s.st_size);
-        (*status)["blocksize"] = SRCLANG_VALUE_NUMBER(s.st_blksize);
-        (*status)["blocks"] = SRCLANG_VALUE_NUMBER(s.st_blocks);
+        (*status)["Device"] = SRCLANG_VALUE_NUMBER(s.st_dev);
+        (*status)["Inode"] = SRCLANG_VALUE_NUMBER(s.st_ino);
+        (*status)["Links"] = SRCLANG_VALUE_NUMBER(s.st_nlink);
+        (*status)["Mode"] = SRCLANG_VALUE_NUMBER(s.st_mode);
+        (*status)["Uid"] = SRCLANG_VALUE_NUMBER(s.st_uid);
+        (*status)["Gid"] = SRCLANG_VALUE_NUMBER(s.st_gid);
+        (*status)["Rdev"] = SRCLANG_VALUE_NUMBER(s.st_rdev);
+        (*status)["Size"] = SRCLANG_VALUE_NUMBER(s.st_size);
+        (*status)["Blocksize"] = SRCLANG_VALUE_NUMBER(s.st_blksize);
+        (*status)["Blocks"] = SRCLANG_VALUE_NUMBER(s.st_blocks);
         return SRCLANG_VALUE_MAP(status);
     })
 
-    ADD_METHOD(close, {
+    ADD_METHOD(Close, {
         SRCLANG_CHECK_ARGS_EXACT(1);
 
         if (fclose(file) != -1) {
@@ -363,7 +363,7 @@ SRCLANG_MODULE_FUNC(open) {
         return SRCLANG_VALUE_TRUE;
     })
 
-    ADD_METHOD(read, {
+    ADD_METHOD(Read, {
         SRCLANG_CHECK_ARGS_EXACT(2);
         SRCLANG_CHECK_ARGS_TYPE(1, ValueType::Number);
 
@@ -382,13 +382,13 @@ SRCLANG_MODULE_FUNC(open) {
     return value;
 }
 
-SRCLANG_MODULE_FUNC(putenv) {
+SRCLANG_MODULE_FUNC(Putenv) {
     SRCLANG_CHECK_ARGS_EXACT(1);
     SRCLANG_CHECK_ARGS_TYPE(0, ValueType::String);
     SAFE_RETURN(putenv((char *)SRCLANG_VALUE_AS_STRING(args[0])));
 }
 
-SRCLANG_MODULE_FUNC(random) {
+SRCLANG_MODULE_FUNC(Random) {
     SRCLANG_CHECK_ARGS_RANGE(0, 2);
     if (args.size() == 1) {
         return SRCLANG_VALUE_NUMBER((rand() % (long)SRCLANG_VALUE_AS_NUMBER(args[0])));
@@ -399,18 +399,18 @@ SRCLANG_MODULE_FUNC(random) {
     }
 }
 
-#define SET_METHOD(id)                                     \
-    SRCLANG_MODULE_FUNC(id) {                              \
-        SRCLANG_CHECK_ARGS_EXACT(1);                       \
-        SRCLANG_CHECK_ARGS_TYPE(0, ValueType::Number);     \
-        SAFE_RETURN(id(SRCLANG_VALUE_AS_NUMBER(args[0]))); \
+#define SET_METHOD(id, fun)                                 \
+    SRCLANG_MODULE_FUNC(id) {                               \
+        SRCLANG_CHECK_ARGS_EXACT(1);                        \
+        SRCLANG_CHECK_ARGS_TYPE(0, ValueType::Number);      \
+        SAFE_RETURN(fun(SRCLANG_VALUE_AS_NUMBER(args[0]))); \
     }
 
-SET_METHOD(setegid)
-SET_METHOD(seteuid)
-SET_METHOD(setgid)
+SET_METHOD(Setegid, setegid)
+SET_METHOD(Seteuid, seteuid)
+SET_METHOD(Setgid, setgid)
 
-SRCLANG_MODULE_FUNC(setns) {
+SRCLANG_MODULE_FUNC(Setns) {
     SRCLANG_CHECK_ARGS_EXACT(2);
     SRCLANG_CHECK_ARGS_TYPE(0, ValueType::Number);
     SRCLANG_CHECK_ARGS_TYPE(1, ValueType::Number);
@@ -419,25 +419,25 @@ SRCLANG_MODULE_FUNC(setns) {
                       SRCLANG_VALUE_AS_NUMBER(args[1])))
 }
 
-SRCLANG_MODULE_FUNC(strerror) {
+SRCLANG_MODULE_FUNC(Strerror) {
     SRCLANG_CHECK_ARGS_RANGE(0, 1);
     if (args.size() == 1) SRCLANG_CHECK_ARGS_TYPE(0, ValueType::String);
     return SRCLANG_VALUE_SET_REF(SRCLANG_VALUE_STRING(strerror(args.size() == 1 ? SRCLANG_VALUE_AS_NUMBER(args[0]) : errno)));
 }
 
-SRCLANG_MODULE_FUNC(system) {
+SRCLANG_MODULE_FUNC(System) {
     SRCLANG_CHECK_ARGS_EXACT(1);
     SRCLANG_CHECK_ARGS_TYPE(0, ValueType::String);
     return WEXITSTATUS(system(SRCLANG_VALUE_AS_STRING(args[0])));
 }
 
-SRCLANG_MODULE_FUNC(unsetenv) {
+SRCLANG_MODULE_FUNC(Unsetenv) {
     SRCLANG_CHECK_ARGS_EXACT(1);
     SRCLANG_CHECK_ARGS_TYPE(0, ValueType::String);
     SAFE_RETURN(unsetenv(SRCLANG_VALUE_AS_STRING(args[0])));
 }
 
-SRCLANG_MODULE_FUNC(unshare) {
+SRCLANG_MODULE_FUNC(Unshare) {
     SRCLANG_CHECK_ARGS_EXACT(1);
     SRCLANG_CHECK_ARGS_TYPE(0, ValueType::Number);
     SAFE_RETURN(unshare(SRCLANG_VALUE_AS_NUMBER(args[0])));
@@ -472,43 +472,43 @@ SRCLANG_MODULE_INIT {
     SRCLANG_MODULE_DEFINE_CONST(CLONE_THREAD);
     SRCLANG_MODULE_DEFINE_CONST(CLONE_VM);
 
-    SRCLANG_MODULE_DEFINE_FUNC(environ);
-    SRCLANG_MODULE_DEFINE_FUNC(errno);
+    SRCLANG_MODULE_DEFINE_FUNC(Environ);
+    SRCLANG_MODULE_DEFINE_FUNC(Errno);
 
-    SRCLANG_MODULE_DEFINE_FUNC(chdir);
-    SRCLANG_MODULE_DEFINE_FUNC(dup);
-    SRCLANG_MODULE_DEFINE_FUNC(exit);
-    SRCLANG_MODULE_DEFINE_FUNC(exec);
+    SRCLANG_MODULE_DEFINE_FUNC(Chdir);
+    SRCLANG_MODULE_DEFINE_FUNC(Dup);
+    SRCLANG_MODULE_DEFINE_FUNC(Exit);
+    SRCLANG_MODULE_DEFINE_FUNC(Exec);
 
-    SRCLANG_MODULE_DEFINE_FUNC(getcwd);
-    SRCLANG_MODULE_DEFINE_FUNC(getenv);
-    SRCLANG_MODULE_DEFINE_FUNC(getegid);
-    SRCLANG_MODULE_DEFINE_FUNC(geteuid);
-    SRCLANG_MODULE_DEFINE_FUNC(getkey);
-    SRCLANG_MODULE_DEFINE_FUNC(getgid);
-    SRCLANG_MODULE_DEFINE_FUNC(getgroups);
-    SRCLANG_MODULE_DEFINE_FUNC(getpgid);
-    SRCLANG_MODULE_DEFINE_FUNC(getpgrp);
-    SRCLANG_MODULE_DEFINE_FUNC(getpid);
-    SRCLANG_MODULE_DEFINE_FUNC(getuid);
-    SRCLANG_MODULE_DEFINE_FUNC(gettermsize);
+    SRCLANG_MODULE_DEFINE_FUNC(Getcwd);
+    SRCLANG_MODULE_DEFINE_FUNC(Getenv);
+    SRCLANG_MODULE_DEFINE_FUNC(Getegid);
+    SRCLANG_MODULE_DEFINE_FUNC(Geteuid);
+    SRCLANG_MODULE_DEFINE_FUNC(Getkey);
+    SRCLANG_MODULE_DEFINE_FUNC(Getgid);
+    SRCLANG_MODULE_DEFINE_FUNC(Getgroups);
+    SRCLANG_MODULE_DEFINE_FUNC(Getpgid);
+    SRCLANG_MODULE_DEFINE_FUNC(Getpgrp);
+    SRCLANG_MODULE_DEFINE_FUNC(Getpid);
+    SRCLANG_MODULE_DEFINE_FUNC(Getuid);
+    SRCLANG_MODULE_DEFINE_FUNC(Gettermsize);
 
-    SRCLANG_MODULE_DEFINE_FUNC(mkdir);
+    SRCLANG_MODULE_DEFINE_FUNC(Mkdir);
 
-    SRCLANG_MODULE_DEFINE_FUNC(opendir);
-    SRCLANG_MODULE_DEFINE_FUNC(open);
+    SRCLANG_MODULE_DEFINE_FUNC(Opendir);
+    SRCLANG_MODULE_DEFINE_FUNC(Open);
 
-    SRCLANG_MODULE_DEFINE_FUNC(putenv);
+    SRCLANG_MODULE_DEFINE_FUNC(Putenv);
 
-    SRCLANG_MODULE_DEFINE_FUNC(random);
+    SRCLANG_MODULE_DEFINE_FUNC(Random);
 
-    SRCLANG_MODULE_DEFINE_FUNC(setegid);
-    SRCLANG_MODULE_DEFINE_FUNC(seteuid);
-    SRCLANG_MODULE_DEFINE_FUNC(setgid);
-    SRCLANG_MODULE_DEFINE_FUNC(setns);
-    SRCLANG_MODULE_DEFINE_FUNC(strerror);
+    SRCLANG_MODULE_DEFINE_FUNC(Setegid);
+    SRCLANG_MODULE_DEFINE_FUNC(Seteuid);
+    SRCLANG_MODULE_DEFINE_FUNC(Setgid);
+    SRCLANG_MODULE_DEFINE_FUNC(Setns);
+    SRCLANG_MODULE_DEFINE_FUNC(Strerror);
 
-    SRCLANG_MODULE_DEFINE_FUNC(system);
-    SRCLANG_MODULE_DEFINE_FUNC(unsetenv);
-    SRCLANG_MODULE_DEFINE_FUNC(unshare);
+    SRCLANG_MODULE_DEFINE_FUNC(System);
+    SRCLANG_MODULE_DEFINE_FUNC(Unsetenv);
+    SRCLANG_MODULE_DEFINE_FUNC(Unshare);
 }

@@ -73,6 +73,7 @@ Interpreter::Interpreter()
           {"EXPERIMENTAL_FEATURE", false},
           {"DEBUG", false},
           {"BREAK", false},
+          {"DUMP_AST", false},
       }) {
     m_globalActive = this;
     for (auto b : builtins) {
@@ -774,6 +775,10 @@ bool Interpreter::call(uint8_t count) {
 bool Interpreter::run() {
     debug = getOption<bool>("DEBUG");
     break_ = getOption<bool>("BREAK");
+
+    if (getOption<bool>("DUMP_AST")) {
+        ByteCode::debug(std::cout, *SRCLANG_VALUE_AS_CLOSURE(cp->fp->closure)->fun->instructions, constants);
+    }
 
     while (true) {
         if (debug) {

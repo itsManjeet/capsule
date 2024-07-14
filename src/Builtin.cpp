@@ -263,9 +263,3 @@ SRCLANG_BUILTIN(free) {
     object->pointer = nullptr;
     return SRCLANG_VALUE_TRUE;
 }
-
-SRCLANG_BUILTIN(roundoff) {
-    SRCLANG_CHECK_ARGS_EXACT(1);
-    SRCLANG_CHECK_ARGS_TYPE(0, ValueType::Number);
-    return SRCLANG_VALUE_NUMBER((long)SRCLANG_VALUE_AS_NUMBER(args[0]));
-}

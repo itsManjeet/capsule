@@ -48,6 +48,7 @@ bool is_complete(const std::string& s) {
 int main(int argc, char** argv) {
     bool isProgArgs = false;
     bool interactive = false;
+    bool dumpAst = false;
     std::optional<std::filesystem::path> filename;
     auto progArgs = new SrcLangList();
     auto interpreter = SrcLang::Interpreter();
@@ -67,6 +68,8 @@ int main(int argc, char** argv) {
                 interpreter.appendOption("SEARCH_PATH", argv[i]);
             else if (strcmp(argv[i], "--interactive") == 0)
                 interactive = true;
+            else if (strcmp(argv[i], "--dump-ast") == 0)
+                interpreter.setOption("DUMP_AST", true);
             else {
                 std::cerr << "ERROR: invalid flag '" << argv[i] << "'" << std::endl;
                 return 1;
