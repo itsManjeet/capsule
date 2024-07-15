@@ -155,8 +155,6 @@ class Compiler {
 
     void native(Symbol *symbol);
 
-    void class_();
-
     /// list ::= '[' (<expression> % ',') ']'
     void list();
 
@@ -178,6 +176,7 @@ class Compiler {
 
     /// call ::= '(' (expr % ',' ) ')'
     void call();
+    void call2();
 
     /// index ::= <expression> '[' <expession> (':' <expression>)? ']'
     void index(bool can_assign);

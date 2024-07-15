@@ -258,6 +258,7 @@ Compiler::Precedence Compiler::precedence(std::string tok) {
         {".", P_Call},
         {"[", P_Call},
         {"(", P_Call},
+        {"{", P_Call},
     };
     auto i = prec.find(tok);
     if (i == prec.end()) {
@@ -430,12 +431,6 @@ void Compiler::function(Symbol *symbol, bool skip_args) {
     emit(OpCode::CLOSURE, interpreter->constants.size() - 1, free_symbols.size());
 }
 
-void Compiler::class_() {
-    check(TokenType::Identifier);
-    auto class_id = cur.literal;
-    eat();
-}
-
 /// list ::= '[' (<expression> % ',') ']'
 void Compiler::list() {
     int size = 0;
@@ -529,6 +524,13 @@ void Compiler::call() {
     emit(OpCode::CALL, count);
 }
 
+/// call ::= '{' map '}'
+void Compiler::call2() {
+    auto pos = cur.pos;
+    map_();
+    emit(OpCode::CALL, 1);
+}
+
 /// index ::= <expression> '[' <expession> (':' <expression>)? ']'
 void Compiler::index(bool can_assign) {
     int count = 1;
@@ -596,6 +598,8 @@ void Compiler::infix(bool can_assign) {
 
     if (consume("(")) {
         return call();
+    } else if(consume("{")) {
+        return call2();
     } else if (consume(".")) {
         return subscript(can_assign);
     } else if (consume("[")) {
@@ -613,7 +617,7 @@ void Compiler::expression(int prec) {
     bool can_assign = prec <= P_Assignment;
     prefix(can_assign);
 
-    while ((cur.literal != ";" && cur.literal != "{") && prec <= precedence(cur.literal)) {
+    while ((cur.literal != ";") && prec <= precedence(cur.literal)) {
         infix(can_assign);
     }
 }
@@ -748,6 +752,7 @@ void Compiler::patch_loop(int loop_start, OpCode to_patch, int pos) {
 /// loop ::= 'for' <expression> <block>
 /// loop ::= 'for' <identifier> 'in' <expression> <block>
 void Compiler::loop() {
+    expect("(");
     std::optional<Symbol> count, iter, temp_expr;
     static int loop_iterator = 0;
     static int temp_expr_count = 0;
@@ -797,6 +802,8 @@ void Compiler::loop() {
     } else {
         loop_exit = emit(OpCode::JNZ, 0);
     }
+
+    expect(")");
 
     block();
 
@@ -891,9 +898,11 @@ void Compiler::use() {
 
 /// condition ::= 'if' <expression> <block> (else statement)?
 void Compiler::condition() {
+    expect("(");
     do {
         expression();
     } while (consume(";"));
+    expect(")");
 
     auto false_pos = emit(OpCode::JNZ, 0);
     block();

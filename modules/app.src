@@ -1,5 +1,5 @@
-import "sys.mod";
-import "math.mod";
+sys  := use("sys.mod");
+math := use("math.mod");
 
 let Screen = fun (width, height) {
     let buffer = alloc(width * height, str);

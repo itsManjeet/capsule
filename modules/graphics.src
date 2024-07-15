@@ -1,4 +1,4 @@
-import "math.mod";
+math := use("math.mod");
 
 let Widget = fun (onDraw, onEvent) {
     self := {};
