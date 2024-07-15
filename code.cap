@@ -1,1 +1,1 @@
-(load "fact")
+(eq? "Hello" "Hello")

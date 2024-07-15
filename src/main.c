@@ -84,7 +84,12 @@ int main(int argc, char **argv) {
                 source = new_source;
             }
         }
-        result = Capsule_eval(source, scope);
+        if (dump_ast) {
+            result = Capsule_read(source);
+        } else {
+            result = Capsule_eval(source, scope);
+        }
+
         if (CAPSULE_ERRORP(result)) {
             print_error(filename ? filename : "stdin", source, result);
             if (filename) return 1;

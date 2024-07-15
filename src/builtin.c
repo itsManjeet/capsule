@@ -1,3 +1,5 @@
+#include <string.h>
+
 #include "_priv.h"
 
 #define BUILTIN_ID(id) builtin_##id
@@ -56,6 +58,9 @@ BUILTIN_FUN(eq) {
                 break;
             case CapsuleType_Symbol:
                 eq = (a.as.symbol == b.as.symbol);
+                break;
+            case CapsuleType_String:
+                eq = strcmp(a.as.symbol, b.as.symbol) == 0;
                 break;
             case CapsuleType_Integer:
                 eq = (a.as.integer == b.as.integer);

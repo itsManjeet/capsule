@@ -136,11 +136,11 @@ static Capsule read(const char *input, const char **end) {
         CAPSULE_POSITION(result) = token;
         return result;
     } else if (token[0] == '"') {
-        size_t size = *end - token;
+        size_t size = *end - token + 1;
         char *str = malloc(size);
         memcpy(str, token + 1, size - 1);
-        str[size - 1] = '\0';
-        *end++;
+        str[size] = '\0';
+        *end += 2;
         return CAPSULE_STRING(str);
     } else if (token[0] == ',') {
         Capsule result = CAPSULE_CONS(CAPSULE_SYMBOL(
