@@ -22,7 +22,9 @@ static int lex(const char *str, const char **start, const char **end) {
         *end = str + 1;
     else if (str[0] == ',')
         *end = str + (str[1] == '@' ? 2 : 1);
-    else if (str[0] == ';') {
+    else if (str[0] == '"') {
+        *end = str + strcspn(str + 1, "\"");
+    } else if (str[0] == ';') {
         str = strchr(str, '\n');
         if (!str) {
             *start = *end = NULL;
@@ -133,6 +135,13 @@ static Capsule read(const char *input, const char **end) {
         CAPSULE_CAR(CAPSULE_CDR(result)) = read(*end, end);
         CAPSULE_POSITION(result) = token;
         return result;
+    } else if (token[0] == '"') {
+        size_t size = *end - token;
+        char *str = malloc(size);
+        memcpy(str, token + 1, size - 1);
+        str[size - 1] = '\0';
+        *end++;
+        return CAPSULE_STRING(str);
     } else if (token[0] == ',') {
         Capsule result = CAPSULE_CONS(CAPSULE_SYMBOL(
                                           token[1] == '@' ? "UNQUOTE-SPLICING" : "UNQUOTE"),
@@ -144,7 +153,6 @@ static Capsule read(const char *input, const char **end) {
         return parse_simple(token, *end);
     }
 }
-
 
 Capsule Capsule_read(const char *source) {
     Capsule tree = CAPSULE_CONS(CAPSULE_SYMBOL("BEGIN"), Capsule_nil);

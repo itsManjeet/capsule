@@ -183,6 +183,9 @@ void Capsule_print(Capsule pellet, FILE *out) {
         case CapsuleType_Symbol:
             fprintf(out, "%s", pellet.as.symbol);
             break;
+        case CapsuleType_String:
+            fprintf(out, "%s", pellet.as.symbol);
+            break;
         case CapsuleType_Integer:
             fprintf(out, "%ld", pellet.as.integer);
             break;

@@ -19,6 +19,7 @@ typedef enum CapsuleType {
     CapsuleType_Nil,
     CapsuleType_Pair,
     CapsuleType_Symbol,
+    CapsuleType_String,
     CapsuleType_Integer,
     CapsuleType_Builtin,
     CapsuleType_Closure,
@@ -55,6 +56,7 @@ typedef struct Capsule Capsule;
 #define CAPSULE_ERROR(v) ((Capsule){.type = CapsuleType_Error, .as.error = (v), .position = NULL})
 #define CAPSULE_ERROR_POS(v, p) ((Capsule){.type = CapsuleType_Error, .as.error = (v), .position = (p)})
 #define CAPSULE_SYMBOL(v) Capsule_symbol_new((v))
+#define CAPSULE_STRING(v) ((Capsule){.type = CapsuleType_String, .as.symbol = (v), .position = NULL})
 
 #define CAPSULE_POSITION(cap) ((cap).position)
 
@@ -62,7 +64,7 @@ typedef struct Capsule Capsule;
 
 static const Capsule Capsule_nil = {CapsuleType_Nil};
 
-const char* CapsuleError_str(Capsule error);
+const char *CapsuleError_str(Capsule error);
 
 Capsule Capsule_read(const char *source);
 
