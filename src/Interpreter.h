@@ -104,8 +104,6 @@ class Interpreter {
 
     bool run();
 
-    Value loadModule(std::filesystem::path modulePath);
-
     Value run(ByteCode &bytecode, const std::shared_ptr<DebugInfo> &debugInfo);
 
     static Interpreter *m_globalActive;
@@ -145,13 +143,15 @@ class Interpreter {
 
     std::filesystem::path search(const std::string &id);
 
+    Value loadModule(std::filesystem::path modulePath);
+
     std::string getError() {
         std::string e = errStream.str();
         errStream.clear();
         return e;
     }
 
-    static Interpreter* globalActive() {
+    static Interpreter *globalActive() {
         return m_globalActive;
     }
 };

@@ -263,3 +263,15 @@ SRCLANG_BUILTIN(free) {
     object->pointer = nullptr;
     return SRCLANG_VALUE_TRUE;
 }
+
+SRCLANG_BUILTIN(use) {
+    SRCLANG_CHECK_ARGS_EXACT(1);
+    SRCLANG_CHECK_ARGS_TYPE(0, ValueType::String);
+
+    auto mod = interpreter->loadModule(SRCLANG_VALUE_AS_STRING(args[0]));
+    interpreter->addObject(mod);
+    if (SRCLANG_VALUE_IS_ERROR(mod)) {
+        throw std::runtime_error(SRCLANG_VALUE_AS_ERROR(mod));
+    }
+    return mod;
+}

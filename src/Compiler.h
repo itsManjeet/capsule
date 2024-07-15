@@ -208,8 +208,8 @@ class Compiler {
     /// loop ::= 'for' <identifier> 'in' <expression> <block>
     void loop();
 
-    /// use ::= 'use' '(' <string> ')'
-    void use();
+    /// import ::= 'import' <string>
+    void import_();
 
     /// defer ::= 'defer' <function>
     void defer();

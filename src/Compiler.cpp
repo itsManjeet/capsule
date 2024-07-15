@@ -186,8 +186,9 @@ void Compiler::eat() {
         return;
     }
 
-    for (std::string k : {"let", "fun", "native", "return", "class", "if", "else", "for", "break", "continue", "use",
-                          "global", "as", "in", "defer",
+    for (std::string k : {"let", "fun", "native", "return", "class",
+                          "if", "else", "for", "break", "continue",
+                          "import", "global", "as", "in", "defer",
 
                           // special operators
                           "#!", "not", "...", ":=",
@@ -479,8 +480,6 @@ void Compiler::prefix(bool can_assign) {
         return map_();
     } else if (consume("fun")) {
         return function(nullptr);
-    } else if (consume("use")) {
-        return use();
     } else if (consume("(")) {
         expression();
         return expect(")");
@@ -598,7 +597,7 @@ void Compiler::infix(bool can_assign) {
 
     if (consume("(")) {
         return call();
-    } else if(consume("{")) {
+    } else if (consume("{")) {
         return call2();
     } else if (consume(".")) {
         return subscript(can_assign);
@@ -819,21 +818,12 @@ void Compiler::loop() {
     patch_loop(loop_start, OpCode::BREAK, after_condition);
 }
 
-void Compiler::use() {
-    expect("(");
+void Compiler::import_() {
     auto path = cur;
     expect(TokenType::String);
-    expect(")");
 
-    auto module_path = std::filesystem::path(path.literal);
-    if (module_path.has_extension() && module_path.extension() == ".mod") {
-        interpreter->constants.push_back(SRCLANG_VALUE_STRING(strdup(reinterpret_cast<const char *>(module_path.c_str()))));
-        emit(OpCode::CONST_, interpreter->constants.size() - 1);
-        emit(OpCode::MODULE);
-        return;
-    }
-
-    if (!module_path.has_extension()) {
+    std::string module_path = path.literal;
+    if (!std::filesystem::path(module_path).has_extension()) {
         module_path += ".src";
     }
 
@@ -843,57 +833,33 @@ void Compiler::use() {
         error("missing required module '" + path.literal + "'", path.pos);
     }
 
-    if (std::find(loaded_imports.begin(), loaded_imports.end(), module_path) != loaded_imports.end()) {
-        return;
-    }
-    loaded_imports.push_back(module_path);
-
     std::ifstream reader(module_path);
     std::string input((std::istreambuf_iterator<char>(reader)), (std::istreambuf_iterator<char>()));
     reader.close();
 
-    auto old_symbol_table = symbol_table;
-    symbol_table = new SymbolTable{old_symbol_table};
-    Compiler compiler(input, module_path, interpreter, symbol_table);
-    compiler.symbol_table = symbol_table;
+    auto start_ = start;
+    auto end_ = end;
+    auto iter_ = iter;
+    auto peek_ = peek;
+    auto cur_ = cur;
+
+    start = iter = input.begin();
+    end = input.end();
+    eat();
+    eat();
+
     try {
-        compiler.compile();
+        program();
     } catch (const std::exception &exception) {
-        error("failed to import '" + module_path.string() + "'\n" + exception.what(), cur.pos);
+        error("failed to import '" + module_path + "'\n" + exception.what(), cur.pos);
     }
 
-    auto instructions = std::move(compiler.code().instructions);
-    instructions->pop_back();  // pop OpCode::HLT
+    start = start_;
+    end = end_;
+    cur = cur_;
+    iter = iter_;
+    peek = peek_;
 
-    int total = 0;
-    // export symbols
-    for (const auto &i : symbol_table->store) {
-        if (i.second.scope == Symbol::Scope::LOCAL && std::isupper(i.first[0])) {
-            interpreter->constants.push_back(SRCLANG_VALUE_STRING(strdup(i.first.c_str())));
-            instructions->emit(compiler.global_debug_info.get(), 0, OpCode::CONST_, interpreter->constants.size() - 1);
-            instructions->emit(compiler.global_debug_info.get(), 0, OpCode::LOAD, i.second.scope, i.second.index);
-            total++;
-        }
-    }
-    int nlocals = symbol_table->definitions;
-    auto nfree = symbol_table->free;
-    delete symbol_table;
-    symbol_table = old_symbol_table;
-    instructions->emit(compiler.global_debug_info.get(), 0, OpCode::MAP, total);
-    instructions->emit(compiler.global_debug_info.get(), 0, OpCode::RET);
-
-    for (auto const &i : nfree) {
-        emit(OpCode::LOAD, i.scope, i.index);
-    }
-
-    auto fun = new Function{FunctionType::Function, "", std::move(instructions), nlocals, 0, false,
-                            compiler.global_debug_info};
-    auto val = SRCLANG_VALUE_FUNCTION(fun);
-    interpreter->memoryManager.heap.push_back(val);
-    interpreter->constants.push_back(val);
-
-    emit(OpCode::CLOSURE, interpreter->constants.size() - 1, nfree.size());
-    emit(OpCode::CALL, 0);
 }
 
 /// condition ::= 'if' <expression> <block> (else statement)?
@@ -939,6 +905,8 @@ void Compiler::statement() {
         return let();
     else if (consume("return"))
         return return_();
+    else if (consume("import"))
+        return import_();
     else if (consume("fun")) {
         auto id = cur;
         expect(TokenType::Identifier);
