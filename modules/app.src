@@ -1,5 +1,5 @@
-sys     := use("sys.mod");
-math    := use("math.mod");
+import "sys.mod";
+import "math.mod";
 
 let Screen = fun (width, height) {
     let buffer = alloc(width * height, str);
@@ -30,8 +30,8 @@ let Screen = fun (width, height) {
     };
 
     self.Clear = fun (ch) {
-        for x in range(self.Width) {
-            for y in range(self.Height) {
+        for (x in range(self.Width)) {
+            for (y in range(self.Height)) {
                 self.Buffer[y * self.Width + x] = ch;
             }
         }
@@ -39,7 +39,7 @@ let Screen = fun (width, height) {
 
     self.DrawText = fun (x, y, s) {
         i := 0;
-        for ch in s {
+        for (ch in s) {
             self.PutPixel(x, y, ch);
             x = x + 1;
         }
@@ -50,6 +50,11 @@ let Screen = fun (width, height) {
     };
 
     self.DrawLine = fun (x1, y1, x2, y2, ch) {
+        x1 = math.Round(x1);
+        x2 = math.Round(x2);
+        y1 = math.Round(y1);
+        y2 = math.Round(y2);
+
         let dx = math.Abs(x2 - x1);
         let dy = math.Abs(y2 - y1);
         let sx = -1;
@@ -57,27 +62,27 @@ let Screen = fun (width, height) {
         let err = dx - dy;
         let e2 = 0;
 
-        if x1 < x2 { sx = 1; }
-        if y1 < y2 { sy = 1; }
+        if (x1 < x2) { sx = 1; }
+        if (y1 < y2) { sy = 1; }
 
-        for true {
+        for (true) {
             p := 0;
             z := 0;
-            if x1 >= 0 and x1 < self.Width and
-                y1 >= 0 and y1 < self.Height {
+            if (x1 >= 0 and x1 < self.Width and
+                y1 >= 0 and y1 < self.Height) {
                     self.Buffer[y1 * self.Width + x1] = ch;
                 }
             
-            if x1 == x2 and y1 == y2 {
+            if (x1 == x2 and y1 == y2) {
                 break;
             }
             e2 = 2 * err;
-            if e2 > -dy {
+            if (e2 > -dy) {
                 err = err - dy;
                 x1 = x1 + sx;
             }
 
-            if e2 < dx {
+            if (e2 < dx) {
                 err = err + dx;
                 y1 = y1 + sy;
             }
@@ -85,6 +90,11 @@ let Screen = fun (width, height) {
     };
 
     self.DrawRectangle = fun (x, y, w, h) {
+        x = math.Round(x);
+        y = math.Round(y);
+        w = math.Round(w);
+        h = math.Round(h);
+
         self.DrawLine(x, y, x + w , y, self.Box.Top);
         self.DrawLine(x, y + h, x + w, y + h, self.Box.Bottom);
 
@@ -98,26 +108,21 @@ let Screen = fun (width, height) {
         self.PutPixel(x + w, y + h, self.Box.BottomRight);
     };
 
-    self.Render = fun () {
+    self.PollEvent = fun () {
         print("\033[H");
         print(self.Buffer);
-    };
-
-    self.PollEvent = fun () {
         return sys.Getkey();
     };
-
-    return self;
 };
 
 let Run = fun (w) {
     let size = sys.Gettermsize();
     let screen = Screen(size.Columns, size.Rows);
     
-    for true {
-        if res := w(screen); res == false or type(res) == error {
+    for (true) {
+        screen.Clear(" ");
+        if (w(screen) == false) {
             break;
         }
-        screen.Clear(" ");
     }
 };
