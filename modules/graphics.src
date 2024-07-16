@@ -1,4 +1,5 @@
 math := use("math.mod");
+sys  := use("sys.mod");
 
 let Widget = fun (onDraw, onEvent) {
     self := {};
@@ -25,16 +26,10 @@ let Widget = fun (onDraw, onEvent) {
 let HORIZONTAL = 0;
 let VERTICAL = 1;
 
-let evalValue = fun (v, def) {
-    if (v == null) { return def; }
-    if (type(v) == closure) { return v(); }
-    return v;
-};
-
 let Text = fun (data) {
     return Widget (fun (ctxt, x, y, width, height) {
-        let text = evalValue(data.text, "No Text");
-        let center = evalValue(data.center, true);
+        let text = data.text or "No Text";
+        let center = data.center or true;
 
         let size = len(text);
     
@@ -42,7 +37,7 @@ let Text = fun (data) {
         let iy = y;
 
         if (center) {
-            ix = x + (width / 2) - len(text);
+            ix = x + (width / 2) - (size / 2);
             iy = y + (height / 2);
         }
 
@@ -67,10 +62,10 @@ let Text = fun (data) {
 
 let Box = fun (data) {
     return Widget (fun (ctxt, x, y, width, height) {
-        let children = evalValue(data.children, []);
-        let padding = evalValue(data.padding, 1);
-        let spacing = evalValue(data.spacing, 1);
-        let orientation = evalValue(data.orientation, HORIZONTAL);
+        let children = data.children or [];
+        let padding = data.padding or 1;
+        let spacing = data.spacing or 1;
+        let orientation = data.orientation or HORIZONTAL;
         
         let count = len(children);
 
@@ -109,7 +104,7 @@ let Box = fun (data) {
 
 let Clickable = fun (data) {
     return Widget(fun (ctxt, x, y, width, height) {
-        let child = evalValue(data.child, Box {});
+        let child = data.child or Box {};
         child.Render(ctxt, x, y, width, height);
 
     }, fun (widget, event) {
@@ -122,21 +117,20 @@ let Clickable = fun (data) {
 
 
 let Button = fun (data) {
-    let state = {
-        count: 0,
-    };
     return Clickable {
         child: Box {
             orientation: HORIZONTAL,
             padding: 1,
             children: [
-                Text { text: fun () { return str(state.count); }, },
+                Text { text: data.label or "Click me" },
             ],
         },
         onEvent: fun (widget, event) {
             if (event == "\n") {
-                state.count = state.count + 1;
-                return true;
+                if (data.onClick != null) {
+                    data.onClick();
+                    return true;
+                }
             }
         },
     };

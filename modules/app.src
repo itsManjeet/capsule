@@ -9,15 +9,15 @@ let Screen = fun (width, height) {
         Height: height,
 
         Box: {
-            TopLeft: "┌",
-            Top: "─",
-            TopRight: "┐",
-            Left: "│",
+            TopLeft: "+",
+            Top: "-",
+            TopRight: "+",
+            Left: "|",
             Center: " ",
-            Right: "│",
-            BottomLeft: "└",
-            Bottom: "─",
-            BottomRight: "┘",
+            Right: "|",
+            BottomLeft: "+",
+            Bottom: "-",
+            BottomRight: "+",
         }
     };
 
@@ -115,14 +115,21 @@ let Screen = fun (width, height) {
     };
 };
 
-let Run = fun (w) {
+let appRun = fun (f) {
     let size = sys.Gettermsize();
     let screen = Screen(size.Columns, size.Rows);
     
     for (true) {
         screen.Clear(" ");
-        if (w(screen) == false) {
+        let w = f();
+
+        w.Render(screen, 0, 0, screen.Width - 1, screen.Height - 1);
+
+        let ev = screen.PollEvent();
+        if (ev == "q") {
             break;
         }
+        
+        w.PollEvent(ev);
     }
 };
