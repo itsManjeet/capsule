@@ -8,14 +8,14 @@ condition_2 := fun (v) {
     return v;
 };
 
-if condition_1(false) or condition_2(true) {
+if (condition_1(false) or condition_2(true)) {
     println ("I MUST RUN");
 }
 
-if condition_1(true) or condition_2(true) {
+if (condition_1(true) or condition_2(true)) {
     println ("I MUST RUN");
 }
 
-if condition_1(true) or condition_2(false) {
+if (condition_1(true) or condition_2(false)) {
     println ("I MUST RUN");
 }

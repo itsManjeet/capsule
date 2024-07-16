@@ -1,5 +1,5 @@
 let f = fun () {
-    for true {
+    for (true) {
         let i = 'i';
         let g = fun () {
             println (i);
