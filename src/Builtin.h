@@ -20,12 +20,13 @@ typedef Value (*Builtin)(std::vector<Value>&, Interpreter*);
     X(range)                                                                   \
     X(clone)                                                                   \
     X(eval)                                                                    \
+    X(call)                                                                    \
     X(pop)                                                                     \
     X(alloc)                                                                   \
     X(free)                                                                    \
     X(bound)
 
-struct Interpreter;
+class Interpreter;
 #define X(id) SRCLANG_BUILTIN(id);
 
 SRCLANG_BUILTIN_LIST

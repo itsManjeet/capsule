@@ -21,7 +21,7 @@ Symbol SymbolTable::define(const Symbol& other) {
     return sym;
 }
 
-Symbol SymbolTable::defineFun(const std::wstring& name) {
+Symbol SymbolTable::define_fun(const std::wstring& name) {
     store[name] = Symbol{name, Symbol::FUNCTION, 0};
     return store[name];
 }

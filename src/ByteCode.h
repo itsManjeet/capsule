@@ -9,10 +9,6 @@
 namespace SrcLang {
 
 struct ByteCode {
-    std::unique_ptr<Instructions> instructions;
-    std::vector<Value> constants;
-    using Iterator = typename std::vector<Value>::iterator;
-
     static int debug(Instructions const& instructions,
             std::vector<Value> const& constants, int offset, std::wostream& os);
 

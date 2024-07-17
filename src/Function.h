@@ -13,7 +13,7 @@ enum class FunctionType { Function, Method, Initializer, Native };
 struct Function {
     FunctionType type{FunctionType::Function};
     std::wstring id;
-    std::unique_ptr<Instructions> instructions{nullptr};
+    std::shared_ptr<Instructions> instructions{nullptr};
     int nlocals{0};
     int nparams{0};
     bool is_variadic{false};

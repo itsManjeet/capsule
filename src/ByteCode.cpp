@@ -21,37 +21,32 @@ int ByteCode::debug(Instructions const& instructions,
     } break;
     case OpCode::INDEX:
     case OpCode::PACK:
-    case OpCode::MAP: {
-        os << " " << (int)instructions[offset++];
-    } break;
+    case OpCode::MAP:
+        os << " " << static_cast<int>(instructions[offset++]);
+        break;
+
     case OpCode::CONTINUE:
     case OpCode::BREAK:
     case OpCode::JNZ:
-    case OpCode::JMP: {
-        auto pos = instructions[offset++];
-        os << " '" << pos << "'";
-    } break;
+    case OpCode::JMP: os << " '" << instructions[offset++] << "'"; break;
     case OpCode::LOAD:
     case OpCode::STORE: {
-        auto scope = instructions[offset++];
-        auto pos = instructions[offset++];
+        auto const scope = instructions[offset++];
+        auto const pos = instructions[offset++];
         os << " " << pos << " '" << SRCLANG_SYMBOL_ID[scope] << "'";
     } break;
-    case OpCode::CLOSURE: {
-        auto constantIndex = instructions[offset++];
-        auto nfree = instructions[offset++];
-        os << L" " << constants[constantIndex] << L" " << nfree;
-    } break;
+    case OpCode::CLOSURE:
+        os << L" " << constants[instructions[offset++]] << L" "
+           << instructions[offset++];
+        break;
 
-    case OpCode::CONST_INT: {
-        auto value = instructions[offset++];
-        os << " '" << SRCLANG_VALUE_AS_NUMBER(value) << "'";
-    } break;
-    case OpCode::CALL: {
-        auto count = instructions[offset++];
-        os << " '" << count << "'";
-    } break;
-    default: offset += SRCLANG_OPCODE_SIZE[int(op)]; break;
+    case OpCode::CONST_INT:
+        os << " '" << SRCLANG_VALUE_AS_NUMBER(instructions[offset++]) << "'";
+        break;
+
+    case OpCode::CALL: os << " '" << instructions[offset++] << "'"; break;
+
+    default: offset += SRCLANG_OPCODE_SIZE[static_cast<int>(op)]; break;
     }
 
     return offset;

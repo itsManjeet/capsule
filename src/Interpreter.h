@@ -62,7 +62,6 @@ private:
 
     std::wstringstream errStream;
 
-    std::vector<std::shared_ptr<DebugInfo>> debugInfo;
     bool debug{}, break_{};
 
     void error(std::wstring const& msg);
@@ -105,8 +104,6 @@ private:
 
     bool run();
 
-    Value run(ByteCode& bytecode, const std::shared_ptr<DebugInfo>& debugInfo);
-
     static Interpreter* m_globalActive;
 
 public:
@@ -144,7 +141,8 @@ public:
 
     Value call(Value callee, const std::vector<Value>& args);
 
-    Value run(const std::wstring& source, const std::wstring& filename);
+    Value run(const std::wstring& source, const std::wstring& filename,
+            const std::vector<Value>& args);
 
     std::wstring search(const std::wstring& id);
 

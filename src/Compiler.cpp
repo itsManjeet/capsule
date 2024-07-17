@@ -13,24 +13,25 @@ template <class V> std::type_info const& variant_typeid(V const& v) {
     return visit([](auto&& x) -> decltype(auto) { return typeid(x); }, v);
 }
 
-ByteCode Compiler::code() {
-    return ByteCode{std::move(instructions.back()), interpreter->constants};
-}
-
-Instructions* Compiler::inst() { return instructions.back().get(); }
+Instructions* Compiler::inst() const { return instructions.back().get(); }
 
 void Compiler::push_scope() {
     symbol_table = new SymbolTable(symbol_table);
-    instructions.push_back(std::make_unique<Instructions>());
+    instructions.push_back(std::make_shared<Instructions>());
 }
 
-std::unique_ptr<Instructions> Compiler::pop_scope() {
-    auto old = symbol_table;
+int Compiler::add_constant(Value value) const {
+    interpreter->constants.push_back(value);
+    return static_cast<int>(interpreter->constants.size() - 1);
+}
+
+std::shared_ptr<Instructions> Compiler::pop_scope() {
+    auto const old = symbol_table;
     symbol_table = symbol_table->parent;
     delete old;
-    auto res = std::move(instructions.back());
+    auto res = instructions.back();
     instructions.pop_back();
-    return std::move(res);
+    return res;
 }
 
 Iterator Compiler::get_error_pos(Iterator err_pos, int& line) const {
@@ -62,7 +63,7 @@ std::wstring Compiler::get_error_line(Iterator err_pos) const {
     Iterator i = err_pos;
     // position i to the next EOL
     while (i != end && (*i != '\r' && *i != '\n')) ++i;
-    return std::wstring(err_pos, i);
+    return {err_pos, i};
 }
 
 bool Compiler::consume(const std::wstring& expected) {
@@ -82,10 +83,10 @@ bool Compiler::consume(TokenType type) {
     return true;
 }
 
-void Compiler::check(TokenType type) {
+void Compiler::check(TokenType type) const {
     if (cur.type != type) {
         std::wstringstream ss;
-        ss << "Expected '" << SRCLANG_TOKEN_ID[static_cast<int>(type)]
+        ss << "Expected '" << s2ws(SRCLANG_TOKEN_ID[static_cast<int>(type)])
            << "' but got '" << cur.literal << "'";
         error(ss.str(), cur.pos);
     }
@@ -103,8 +104,8 @@ void Compiler::expect(const std::wstring& expected) {
 void Compiler::expect(TokenType type) {
     if (cur.type != type) {
         std::wstringstream ss;
-        ss << "Expected '" << SRCLANG_TOKEN_ID[int(type)] << "' but got '"
-           << cur.literal << "'";
+        ss << "Expected '" << s2ws(SRCLANG_TOKEN_ID[static_cast<int>(type)])
+           << "' but got '" << cur.literal << "'";
         error(ss.str(), cur.pos);
     }
     return eat();
@@ -222,7 +223,7 @@ void Compiler::eat() {
     error(L"unexpected token", iter);
 }
 
-Compiler::Precedence Compiler::precedence(std::wstring tok) {
+Compiler::Precedence Compiler::precedence(const std::wstring& tok) {
     static std::map<std::wstring, Precedence> prec = {
             {L":=", P_Assignment},
             {L"=", P_Assignment},
@@ -258,23 +259,23 @@ Compiler::Precedence Compiler::precedence(std::wstring tok) {
 void Compiler::number() {
     bool is_float = false;
     int base = 10;
-    std::string number_value;
+    std::wstring number_value;
     if (cur.literal.length() > 1 && cur.literal[0] == '0') {
         base = 8;
         cur.literal = cur.literal.substr(1);
     }
     for (auto i : cur.literal) {
-        if (i == '.') {
+        if (i == L'.') {
             if (is_float) {
                 error(L"multiple floating point detected", cur.pos);
             }
-            number_value += '.';
+            number_value += L'.';
             is_float = true;
-        } else if (i == '_') {
+        } else if (i == L'_') {
             continue;
-        } else if (i == 'b') {
+        } else if (i == L'b') {
             base = 2;
-        } else if (i == 'h') {
+        } else if (i == L'h') {
             base = 16;
         } else if (i == 'o') {
             base = 8;
@@ -297,15 +298,15 @@ void Compiler::number() {
 }
 
 void Compiler::identifier(bool can_assign) {
-    auto iter = std::find(SRCLANG_VALUE_TYPE_ID.begin(),
-            SRCLANG_VALUE_TYPE_ID.end(), ws2s(cur.literal));
-    if (iter != SRCLANG_VALUE_TYPE_ID.end()) {
+    if (auto const iter = std::find(SRCLANG_VALUE_TYPE_ID.begin(),
+                SRCLANG_VALUE_TYPE_ID.end(), ws2s(cur.literal));
+            iter != SRCLANG_VALUE_TYPE_ID.end()) {
         emit(OpCode::LOAD, Symbol::Scope::TYPE,
                 distance(SRCLANG_VALUE_TYPE_ID.begin(), iter));
         return eat();
     }
     check(TokenType::Identifier);
-    auto id = cur;
+    auto const id = cur;
     eat();
     auto symbol = symbol_table->resolve(id.literal);
 
@@ -329,11 +330,8 @@ void Compiler::identifier(bool can_assign) {
 }
 
 void Compiler::string_() {
-    auto *ch = wcsdup(cur.literal.c_str());
-    auto string_value = SRCLANG_VALUE_STRING(ch);
-    interpreter->memoryManager.heap.push_back(string_value);
-    interpreter->constants.push_back(string_value);
-    emit(OpCode::CONST_, interpreter->constants.size() - 1);
+    emit(OpCode::CONST_,
+            add_constant(SRCLANG_VALUE_STRING(wcsdup(cur.literal.c_str()))));
     return expect(TokenType::String);
 }
 
@@ -353,7 +351,7 @@ void Compiler::function(Symbol* symbol, bool skip_args) {
     bool is_variadic = false;
     auto pos = cur.pos;
     push_scope();
-    if (symbol != nullptr) { symbol_table->defineFun(symbol->name); }
+    if (symbol != nullptr) { symbol_table->define_fun(symbol->name); }
     int nparam = 0;
     if (!skip_args) {
         expect(L"(");
@@ -410,14 +408,10 @@ void Compiler::function(Symbol* symbol, bool skip_args) {
         id = symbol->name;
     }
 
-    auto fun = new Function{FunctionType::Function, id,
-            std::move(fun_instructions), nlocals, nparam, is_variadic,
-            fun_debug_info};
-    auto fun_value = SRCLANG_VALUE_FUNCTION(fun);
-    interpreter->memoryManager.heap.push_back(fun_value);
-    interpreter->constants.push_back(fun_value);
-
-    emit(OpCode::CLOSURE, interpreter->constants.size() - 1,
+    emit(OpCode::CLOSURE,
+            add_constant(SRCLANG_VALUE_FUNCTION((new Function{
+                    FunctionType::Function, id, std::move(fun_instructions),
+                    nlocals, nparam, is_variadic, fun_debug_info}))),
             free_symbols.size());
 }
 
@@ -438,9 +432,8 @@ void Compiler::map_() {
     int size = 0;
     while (!consume(L"}")) {
         check(TokenType::Identifier);
-        interpreter->constants.push_back(
-                SRCLANG_VALUE_STRING(wchdup(cur.literal.c_str())));
-        emit(OpCode::CONST_, interpreter->constants.size() - 1);
+        emit(OpCode::CONST_, add_constant(SRCLANG_VALUE_STRING(
+                                     wchdup(cur.literal.c_str()))));
         eat();
 
         expect(L":");
@@ -469,7 +462,8 @@ void Compiler::prefix(bool can_assign) {
         return expect(L")");
     }
 
-    error(L"Unknown expression type '" + SRCLANG_TOKEN_ID[int(cur.type)] + L"'",
+    error(L"Unknown expression type '" +
+                    s2ws(SRCLANG_TOKEN_ID[static_cast<int>(cur.type)]) + L"'",
             cur.pos);
 }
 
@@ -541,11 +535,8 @@ void Compiler::index(bool can_assign) {
 /// subscript ::= <expression> '.' <expression>
 void Compiler::subscript(bool can_assign) {
     check(TokenType::Identifier);
-
-    auto string_value = SRCLANG_VALUE_STRING(wchdup(cur.literal.c_str()));
-    interpreter->memoryManager.heap.push_back(string_value);
-    interpreter->constants.push_back(string_value);
-    emit(OpCode::CONST_, interpreter->constants.size() - 1);
+    emit(OpCode::CONST_,
+            add_constant(SRCLANG_VALUE_STRING(wchdup(cur.literal.c_str()))));
     eat();
 
     if (can_assign && consume(L"=")) {
@@ -577,16 +568,13 @@ void Compiler::infix(bool can_assign) {
             {L"%", OpCode::MOD},
     };
 
-    if (consume(L"(")) {
-        return call();
-    } else if (consume(L"{")) {
-        return call2();
-    } else if (consume(L".")) {
-        return subscript(can_assign);
-    } else if (consume(L"[")) {
-        return index(can_assign);
-    } else if (binop.find(cur.literal) != binop.end()) {
-        std::wstring op = cur.literal;
+    if (consume(L"(")) return call();
+    if (consume(L"{")) return call2();
+    if (consume(L".")) return subscript(can_assign);
+    if (consume(L"[")) return index(can_assign);
+
+    if (binop.find(cur.literal) != binop.end()) {
+        std::wstring const op = cur.literal;
         eat();
         return binary(binop[op], precedence(op));
     }
@@ -608,11 +596,11 @@ void Compiler::compiler_options() {
     expect(L"[");
 
     check(TokenType::Identifier);
-    auto option_id = cur.literal;
-    auto pos = cur.pos;
+    auto const option_id = cur.literal;
+    auto const pos = cur.pos;
     eat();
 
-    auto id = interpreter->options.find(option_id);
+    auto const id = interpreter->options.find(option_id);
     if (id == interpreter->options.end()) {
         error(L"unknown compiler option '" + option_id + L"'", pos);
     }
@@ -642,8 +630,8 @@ void Compiler::compiler_options() {
             break;
         case TokenType::Number: {
             bool is_float = false;
-            for (int i = 0; i < cur.literal.size(); i++)
-                if (cur.literal[i] == '.') is_float = true;
+            for (const wchar_t i : cur.literal)
+                if (i == '.') is_float = true;
 
             if (is_float) {
                 CHECK_TYPE_ID(float);
@@ -742,8 +730,7 @@ void Compiler::loop() {
         iter = symbol_table->resolve(cur.literal);
         if (iter == std::nullopt) iter = symbol_table->define(cur.literal);
 
-        interpreter->constants.push_back(SRCLANG_VALUE_NUMBER(0));
-        emit(OpCode::CONST_, interpreter->constants.size() - 1);
+        emit(OpCode::CONST_, add_constant(SRCLANG_VALUE_NUMBER(0)));
         emit(OpCode::STORE, count->scope, count->index);
         emit(OpCode::POP);
         eat();
@@ -772,8 +759,7 @@ void Compiler::loop() {
         emit(OpCode::STORE, iter->scope, iter->index);
         emit(OpCode::POP);
 
-        interpreter->constants.push_back(SRCLANG_VALUE_NUMBER(1));
-        emit(OpCode::CONST_, interpreter->constants.size() - 1);
+        emit(OpCode::CONST_, add_constant(SRCLANG_VALUE_NUMBER(1)));
         emit(OpCode::LOAD, count->scope, count->index);
         emit(OpCode::ADD);
         emit(OpCode::STORE, count->scope, count->index);
@@ -821,9 +807,8 @@ void Compiler::require() {
     }
 
     if (ends_with(module_path, L".mod")) {
-        interpreter->constants.push_back(
-                SRCLANG_VALUE_STRING(wchdup(module_path.c_str())));
-        emit(OpCode::CONST_, interpreter->constants.size() - 1);
+        emit(OpCode::CONST_, add_constant(SRCLANG_VALUE_STRING(
+                                     wchdup(module_path.c_str()))));
         emit(OpCode::MODULE);
         return;
     }
@@ -844,28 +829,29 @@ void Compiler::require() {
     symbol_table = new SymbolTable{old_symbol_table};
     Compiler compiler(input, module_path, interpreter, symbol_table);
     compiler.symbol_table = symbol_table;
+    Value module;
     try {
-        compiler.compile();
+        module = compiler.compile();
     } catch (const std::exception& exception) {
         error(L"failed to import '" + module_path + L"'\n" +
                         s2ws(exception.what()),
                 cur.pos);
     }
 
-    auto instructions = std::move(compiler.code().instructions);
-    instructions->pop_back(); // pop OpCode::HLT
+    auto closure = SRCLANG_VALUE_AS_CLOSURE(module);
+    closure->fun->instructions->pop_back(); // pop OpCode::HLT
 
     int total = 0;
     // export symbols
     for (const auto& i : symbol_table->store) {
         if (i.second.scope == Symbol::Scope::LOCAL &&
                 std::isupper(i.first[0])) {
-            interpreter->constants.push_back(
-                    SRCLANG_VALUE_STRING(wchdup(i.first.c_str())));
-            instructions->emit(compiler.global_debug_info.get(), 0,
-                    OpCode::CONST_, interpreter->constants.size() - 1);
-            instructions->emit(compiler.global_debug_info.get(), 0,
-                    OpCode::LOAD, i.second.scope, i.second.index);
+            closure->fun->instructions->emit(compiler.global_debug_info.get(),
+                    0, OpCode::CONST_,
+                    add_constant(
+                            SRCLANG_VALUE_STRING(wchdup(i.first.c_str()))));
+            closure->fun->instructions->emit(compiler.global_debug_info.get(),
+                    0, OpCode::LOAD, i.second.scope, i.second.index);
             total++;
         }
     }
@@ -873,20 +859,14 @@ void Compiler::require() {
     auto nfree = symbol_table->free;
     delete symbol_table;
     symbol_table = old_symbol_table;
-    instructions->emit(compiler.global_debug_info.get(), 0, OpCode::MAP, total);
-    instructions->emit(compiler.global_debug_info.get(), 0, OpCode::RET);
+    closure->fun->instructions->emit(
+            compiler.global_debug_info.get(), 0, OpCode::MAP, total);
+    closure->fun->instructions->emit(
+            compiler.global_debug_info.get(), 0, OpCode::RET);
 
     for (auto const& i : nfree) { emit(OpCode::LOAD, i.scope, i.index); }
 
-    auto fun = new Function{FunctionType::Function, module_id.literal,
-            std::move(instructions), nlocals, 0, false,
-            compiler.global_debug_info};
-
-    auto val = SRCLANG_VALUE_FUNCTION(fun);
-    interpreter->memoryManager.heap.push_back(val);
-    interpreter->constants.push_back(val);
-
-    emit(OpCode::CLOSURE, interpreter->constants.size() - 1, nfree.size());
+    emit(OpCode::CONST_, add_constant(module));
     emit(OpCode::CALL, 0);
 }
 
@@ -917,12 +897,15 @@ void Compiler::condition() {
     inst()->at(jmp_pos + 1) = after_alt_pos;
 }
 
-ValueType Compiler::type(std::string literal) {
-    auto type = literal;
-    auto iter = std::find(
-            SRCLANG_VALUE_TYPE_ID.begin(), SRCLANG_VALUE_TYPE_ID.end(), type);
+ValueType Compiler::type() {
+    auto const ty = cur;
+    expect(TokenType::Identifier);
+    auto const iter = std::find_if(SRCLANG_VALUE_TYPE_ID.begin(),
+            SRCLANG_VALUE_TYPE_ID.end(), [ty](const std::string& v) -> bool {
+                return s2ws(v) == ty.literal;
+            });
     if (iter == SRCLANG_VALUE_TYPE_ID.end()) {
-        throw std::runtime_error("Invalid type '" + type + "'");
+        error(L"Invalid type " + ty.literal + L"'", ty.pos);
     }
     return SRCLANG_VALUE_AS_TYPE(
             SRCLANG_VALUE_TYPES[distance(SRCLANG_VALUE_TYPE_ID.begin(), iter)]);
@@ -980,9 +963,15 @@ Compiler::Compiler(const std::wstring& source, const std::wstring& filename,
     eat();
 }
 
-void Compiler::compile() {
+Value Compiler::compile() {
     program();
     emit(OpCode::HLT);
+
+    return SRCLANG_VALUE_CLOSURE(
+            (new Closure{new Function{FunctionType::Function, filename,
+                                 std::move(instructions.back()), 0, 0, false,
+                                 global_debug_info},
+                    {}}));
 }
 
 void Compiler::value(Symbol* symbol) {
@@ -1030,7 +1019,6 @@ void Compiler::native(Symbol* symbol) {
         error(s2ws(exception.what()), cur.pos);
     }
     eat();
-    interpreter->constants.push_back(SRCLANG_VALUE_NATIVE(native));
-    emit(OpCode::CONST_, interpreter->constants.size() - 1);
+    emit(OpCode::CONST_, add_constant(SRCLANG_VALUE_NATIVE(native)));
     emit(OpCode::STORE, symbol->scope, symbol->index);
 }

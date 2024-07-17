@@ -26,12 +26,10 @@ enum class TokenType : uint8_t {
 #undef X
 };
 
-static const std::vector<std::wstring> SRCLANG_TOKEN_ID = {
-        L"Reserved",
-        L"Identifier",
-        L"String",
-        L"Number",
-        L"Eof",
+static const std::vector<std::string> SRCLANG_TOKEN_ID = {
+#define X(id) #id,
+        SRCLANG_TOKEN_TYPE_LIST
+#undef X
 };
 
 struct Token {
@@ -40,7 +38,7 @@ struct Token {
     Iterator pos;
 
     friend std::wostream& operator<<(std::wostream& os, const Token& token) {
-        os << SRCLANG_TOKEN_ID[static_cast<int>(token.type)] << ":"
+        os << s2ws(SRCLANG_TOKEN_ID[static_cast<int>(token.type)]) << ":"
            << token.literal;
         return os;
     }
@@ -59,17 +57,17 @@ private:
     std::wstring filename;
 
     std::vector<std::wstring> loaded_imports;
-    std::vector<std::unique_ptr<Instructions>> instructions;
+    std::vector<std::shared_ptr<Instructions>> instructions;
     DebugInfo* debug_info;
     std::shared_ptr<DebugInfo> global_debug_info;
 
-    Instructions* inst();
+    [[nodiscard]] Instructions* inst() const;
 
     void push_scope();
 
-    std::unique_ptr<Instructions> pop_scope();
+    std::shared_ptr<Instructions> pop_scope();
 
-    void error(const std::wstring& mesg, Iterator pos) {
+    void error(const std::wstring& mesg, const Iterator& pos) const {
         int line;
         Iterator line_start = get_error_pos(pos, line);
         std::wstringstream err;
@@ -94,7 +92,7 @@ private:
 
     bool consume(TokenType type);
 
-    void check(TokenType type);
+    void check(TokenType type) const;
 
     void expect(const std::wstring& expected);
 
@@ -119,13 +117,15 @@ private:
         P_Primary,
     };
 
-    Precedence precedence(std::wstring tok);
+    static Precedence precedence(const std::wstring& tok);
 
     template <typename T, typename... Ts> int emit(T t, Ts... ts) {
         int line;
         get_error_pos(cur.pos, line);
         return inst()->emit(debug_info, line, t, ts...);
     }
+
+    int add_constant(Value value) const;
 
     /// comment ::= '//' (.*) '\n'
 
@@ -215,7 +215,7 @@ private:
     void condition();
 
     /// type ::= 'identifier'
-    ValueType type(std::string literal);
+    ValueType type();
 
     /// statement ::= let
     ///           ::= return
@@ -236,11 +236,7 @@ public:
     Compiler(const std::wstring& source, const std::wstring& filename,
             Interpreter* interpreter, SymbolTable* symbol_table);
 
-    void compile();
-
-    ByteCode code();
-
-    std::shared_ptr<DebugInfo> debugInfo() { return global_debug_info; }
+    Value compile();
 };
 
 } // namespace SrcLang

@@ -46,16 +46,19 @@ static std::map<Native::Type, ffi_type*> ctypes = {
 #endif
 
 void Interpreter::error(std::wstring const& msg) {
-    if (debugInfo.empty() || debugInfo.back() == nullptr) {
+    if (SRCLANG_VALUE_AS_CLOSURE(cp->fp->closure)->fun->debug_info == nullptr) {
         errStream << L"ERROR: " << msg << std::endl;
         return;
     }
 
-    errStream << debugInfo.back()->filename << ":"
-              << debugInfo.back()->lines[distance(
-                         SRCLANG_VALUE_AS_CLOSURE(cp->fp->closure)
-                                 ->fun->instructions->begin(),
-                         cp->fp->ip)]
+    errStream << SRCLANG_VALUE_AS_CLOSURE(cp->fp->closure)
+                         ->fun->debug_info->filename
+              << ":"
+              << SRCLANG_VALUE_AS_CLOSURE(cp->fp->closure)
+                         ->fun->debug_info->lines[distance(
+                                 SRCLANG_VALUE_AS_CLOSURE(cp->fp->closure)
+                                         ->fun->instructions->begin(),
+                                 cp->fp->ip)]
               << std::endl;
     errStream << L"  ERROR: " << msg;
 }
@@ -98,15 +101,14 @@ void Interpreter::graceFullExit() {
     do {
         if (cp->sp != cp->stack.begin()) --cp->sp;
         for (auto i = cp->fp->defers.rbegin(); i != cp->fp->defers.rend();
-                i++) {
+                ++i) {
             call(*i, {});
         }
 
         if (cp->fp == cp->frames.begin()) { break; }
         cp->sp = cp->fp->bp - 1;
         *cp->sp++ = SRCLANG_VALUE_NULL;
-        debugInfo.pop_back();
-        cp->fp--;
+        --cp->fp;
     } while (true);
 }
 
@@ -445,7 +447,7 @@ bool Interpreter::isFalsy(Value val) {
 void Interpreter::printStack() {
     if (debug) {
         std::wcout << L"  ";
-        for (auto i = cp->stack.begin(); i != cp->sp; i++) {
+        for (auto i = cp->stack.begin(); i != cp->sp; ++i) {
             std::wcout << L"[" << SRCLANG_VALUE_GET_STRING(*i) << L"] ";
         }
         std::wcout << std::endl;
@@ -491,9 +493,6 @@ bool Interpreter::callClosure(Value callee, uint8_t count) {
     cp->fp->bp = (cp->sp - count);
     cp->sp = cp->fp->bp +
              SRCLANG_VALUE_AS_CLOSURE(cp->fp->closure)->fun->nlocals;
-    debugInfo.push_back(
-            SRCLANG_VALUE_AS_CLOSURE(cp->fp->closure)->fun->debug_info);
-
     return true;
 }
 
@@ -800,13 +799,19 @@ bool Interpreter::run() {
 
     while (true) {
         if (debug) {
-            if (!debugInfo.empty() && debugInfo.back() != nullptr) {
-                std::wcout << debugInfo.back()->filename << ":"
-                           << debugInfo.back()->lines[distance(
-                                      SRCLANG_VALUE_AS_CLOSURE(cp->fp->closure)
-                                              ->fun->instructions->begin(),
-                                      cp->fp->ip)]
-                           << std::endl;
+            if (SRCLANG_VALUE_AS_CLOSURE(cp->fp->closure)->fun->debug_info !=
+                    nullptr) {
+                std::wcout
+                        << SRCLANG_VALUE_AS_CLOSURE(cp->fp->closure)
+                                   ->fun->debug_info->filename
+                        << ":"
+                        << SRCLANG_VALUE_AS_CLOSURE(cp->fp->closure)
+                                   ->fun->debug_info->lines[distance(
+                                           SRCLANG_VALUE_AS_CLOSURE(
+                                                   cp->fp->closure)
+                                                   ->fun->instructions->begin(),
+                                           cp->fp->ip)]
+                        << std::endl;
             }
 
             std::wcout << "  ";
@@ -1171,13 +1176,17 @@ bool Interpreter::run() {
         case OpCode::RET: {
             auto value = *--(cp->sp);
             for (auto i = cp->fp->defers.rbegin(); i != cp->fp->defers.rend();
-                    i++)
+                    ++i)
                 call(*i, {});
 
+            if (cp->fp == cp->frames.begin()) {
+                *cp->sp++ = value;
+                return true;
+            }
+
             cp->sp = cp->fp->bp - 1;
-            cp->fp--;
+            --cp->fp;
             *cp->sp++ = value;
-            debugInfo.pop_back();
         } break;
 
         case OpCode::CHK: {
@@ -1241,18 +1250,16 @@ bool Interpreter::run() {
     }
 }
 
-Value Interpreter::run(
-        const std::wstring& source, const std::wstring& filename) {
+Value Interpreter::run(const std::wstring& source, const std::wstring& filename,
+        const std::vector<Value>& args) {
     Compiler compiler(source, filename, this, &symbolTable);
+    Value code;
     try {
-        compiler.compile();
+        code = compiler.compile();
     } catch (const std::wstring& exception) {
         return SRCLANG_VALUE_ERROR(wchdup(exception.c_str()));
     }
-
-    auto code = compiler.code();
-
-    return run(code, compiler.debugInfo());
+    return call(code, args);
 }
 
 void Interpreter::push_context() {
@@ -1269,59 +1276,30 @@ void Interpreter::pop_context() {
 }
 
 Value Interpreter::call(Value callee, const std::vector<Value>& args) {
-    ByteCode code;
-    code.instructions = std::make_unique<Instructions>();
-    code.constants = this->constants;
-
-    code.constants.push_back(callee);
-    code.instructions->push_back(
-            static_cast<const unsigned int>(OpCode::CONST_));
-    code.instructions->push_back(code.constants.size() - 1);
-
-    for (auto arg : args) {
-        code.constants.push_back(arg);
-        code.instructions->push_back(
-                static_cast<const unsigned int>(OpCode::CONST_));
-        code.instructions->push_back(code.constants.size() - 1);
-    }
-
-    code.instructions->push_back(static_cast<const unsigned int>(OpCode::CALL));
-    code.instructions->push_back(args.size());
-    code.instructions->push_back(static_cast<const unsigned int>(OpCode::HLT));
-
-    this->constants = code.constants;
-
-    return run(code, nullptr);
-}
-
-Value Interpreter::run(
-        ByteCode& bytecode, const std::shared_ptr<DebugInfo>& debug_info) {
-    debugInfo.push_back(debug_info);
-    auto fun = new Function{FunctionType::Function, L"<script>",
-            std::move(bytecode.instructions), 0, 0, false, debug_info};
-
     push_context();
-    cp->fp->closure = SRCLANG_VALUE_CLOSURE((new Closure{fun, {}}));
+    cp->fp->closure = callee;
     cp->fp->ip = SRCLANG_VALUE_AS_CLOSURE(cp->fp->closure)
                          ->fun->instructions->begin();
-    cp->fp->bp = cp->sp;
+    *cp->sp++ = callee;
+    for (auto const arg : args) { *cp->sp++ = arg; }
+    cp->sp += SRCLANG_VALUE_AS_CLOSURE(cp->fp->closure)->fun->nlocals;
+    cp->fp->bp = (cp->sp - args.size() -
+                  SRCLANG_VALUE_AS_CLOSURE(cp->fp->closure)->fun->nlocals);
 
     Value result = SRCLANG_VALUE_NULL;
     if (run()) {
-        if (std::distance(cp->stack.begin(), cp->sp) > 0) {
-            result = *(cp->sp - 1);
-        }
+        if (cp->stack.begin() < cp->sp) { result = *(cp->sp - 1); }
     } else {
         result = SRCLANG_VALUE_ERROR(wchdup(getError().c_str()));
     }
-
     pop_context();
     return result;
 }
 
 Value Interpreter::loadModule(std::wstring modulePath) {
-    auto itr = handlers.find(modulePath);
-    if (itr != handlers.end()) { return itr->second.second; }
+    if (auto const itr = handlers.find(modulePath); itr != handlers.end()) {
+        return itr->second.second;
+    }
 
     try {
         modulePath = search(modulePath);

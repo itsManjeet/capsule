@@ -179,6 +179,11 @@ typedef uint64_t Value;
 #define SRCLANG_MODULE_DEFINE_FUNC(id)                                         \
     map->insert({s2ws(#id), SRCLANG_VALUE_BUILTIN_NEW(module_fun_##id)})
 
+#define SRCLANG_CHECK_ARGS_NONE                                                \
+    if (!args.empty())                                                         \
+        throw std::runtime_error("Expected no args but '" +                    \
+                                 std::to_string(args.size()) + "' provided");
+
 #define SRCLANG_CHECK_ARGS_EXACT(count)                                        \
     if (args.size() != count)                                                  \
         throw std::runtime_error("Expected '" + std::to_string(count) +        \
@@ -260,13 +265,9 @@ static const std::vector<Value> SRCLANG_VALUE_TYPES = {
 #undef X
 };
 
-static inline size_t wchlen(const wchar_t* source) {
-    return wcslen(source);
-}
+static inline size_t wchlen(const wchar_t* source) { return wcslen(source); }
 
-static inline wchar_t* wchdup(const wchar_t* src) {
-    return wcsdup(src);
-}
+static inline wchar_t* wchdup(const wchar_t* src) { return wcsdup(src); }
 
 static inline std::wstring s2ws(const std::string& str) {
     using convert_typeX = std::codecvt_utf8<wchar_t>;

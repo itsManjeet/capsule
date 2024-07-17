@@ -42,16 +42,15 @@ bool is_complete(const std::wstring& s) {
 int main(int argc, char** argv) {
     bool isProgArgs = false;
     bool interactive = false;
-    bool dumpAst = false;
     std::optional<std::filesystem::path> filename;
-    auto progArgs = new SrcLangList();
+    auto prog_args = std::vector<Value>();
     auto interpreter = SrcLang::Interpreter();
 
     for (int i = 1; i < argc; i++) {
         if (argv[i][0] == '-') {
             if (strcmp(argv[i], "--") == 0) {
                 while (i < argc) {
-                    progArgs->emplace_back(SRCLANG_VALUE_STRING(argv[i++]));
+                    prog_args.emplace_back(SRCLANG_VALUE_STRING(argv[i++]));
                 }
             }
             if (strcmp(argv[i], "--debug") == 0)
@@ -74,7 +73,7 @@ int main(int argc, char** argv) {
             filename = std::filesystem::current_path() / *filename;
             interactive = false;
         } else {
-            progArgs->emplace_back(SRCLANG_VALUE_STRING(strdup(argv[i])));
+            prog_args.emplace_back(SRCLANG_VALUE_STRING(strdup(argv[i])));
         }
     }
 
@@ -108,8 +107,8 @@ int main(int argc, char** argv) {
             }
         }
 
-        auto result = interpreter.run(
-                source, filename ? s2ws(filename->string()) : L"stdin");
+        auto result = interpreter.run(source,
+                filename ? s2ws(filename->string()) : L"stdin", prog_args);
         if (SRCLANG_VALUE_GET_TYPE(result) == ValueType::Error) {
             std::wcerr << SRCLANG_VALUE_AS_ERROR(result) << std::endl;
             if (!interactive) return 1;

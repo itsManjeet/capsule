@@ -49,7 +49,7 @@ public:
 
     Symbol define(const Symbol& other);
 
-    Symbol defineFun(const std::wstring& name);
+    Symbol define_fun(const std::wstring& name);
 
     std::optional<Symbol> resolve(const std::wstring& name);
 };
