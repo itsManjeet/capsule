@@ -1,6 +1,8 @@
 #include "Interpreter.h"
+#include <codecvt>
 #include <filesystem>
 #include <fstream>
+#include <locale>
 
 #ifdef WITH_READLINE
 #    include <readline/readline.h>
@@ -76,11 +78,22 @@ int main(int argc, char** argv) {
         }
     }
 
+    constexpr char locale_name[] = "";
+
+    setlocale(LC_ALL, locale_name);
+    std::locale::global(std::locale(locale_name));
+    std::wcin.imbue(std::locale());
+    std::wcout.imbue(std::locale());
+    std::wcerr.imbue(std::locale());
+
     std::wstring source;
     if (filename) {
         std::wifstream reader(*filename);
-        source = std::wstring((std::istreambuf_iterator<wchar_t>(reader)),
-                (std::istreambuf_iterator<wchar_t>()));
+        reader.imbue(
+                std::locale(std::locale(), new std::codecvt_utf8<wchar_t>));
+        std::wstringstream wss;
+        wss << reader.rdbuf();
+        source = wss.str();
     } else {
         interactive = true;
     }
@@ -98,7 +111,7 @@ int main(int argc, char** argv) {
         auto result = interpreter.run(
                 source, filename ? s2ws(filename->string()) : L"stdin");
         if (SRCLANG_VALUE_GET_TYPE(result) == ValueType::Error) {
-            std::cerr << SRCLANG_VALUE_AS_ERROR(result) << std::endl;
+            std::wcerr << SRCLANG_VALUE_AS_ERROR(result) << std::endl;
             if (!interactive) return 1;
         } else if (interactive) {
             std::wcout << L":: " << SRCLANG_VALUE_GET_STRING(result)

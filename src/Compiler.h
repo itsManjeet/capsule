@@ -4,10 +4,8 @@
 #include "ByteCode.h"
 #include "Function.h"
 #include "Instructions.h"
-#include "MemoryManager.h"
 #include "SymbolTable.h"
 #include "Value.h"
-#include <iostream>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -60,7 +58,7 @@ private:
     Iterator iter, start, end;
     std::wstring filename;
 
-    std::vector<std::string> loaded_imports;
+    std::vector<std::wstring> loaded_imports;
     std::vector<std::unique_ptr<Instructions>> instructions;
     DebugInfo* debug_info;
     std::shared_ptr<DebugInfo> global_debug_info;
@@ -85,7 +83,7 @@ private:
             err << L"Unexpected end of file. ";
             err << mesg << L" line " << line;
         }
-        throw std::runtime_error(ws2s(err.str()));
+        throw err.str();
     }
 
     Iterator get_error_pos(Iterator err_pos, int& line) const;
@@ -207,8 +205,8 @@ private:
     /// loop ::= 'for' <identifier> 'in' <expression> <block>
     void loop();
 
-    /// import ::= 'import' <string>
-    void import_();
+    /// require ::= 'require' '(' <string> ')';
+    void require();
 
     /// defer ::= 'defer' <function>
     void defer();

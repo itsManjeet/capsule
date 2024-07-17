@@ -100,10 +100,9 @@ SRCLANG_MODULE_FUNC(Getcwd) {
 SRCLANG_MODULE_FUNC(Getenv) {
     SRCLANG_CHECK_ARGS_RANGE(1, 2);
     SRCLANG_CHECK_ARGS_TYPE(0, ValueType::String);
-    auto ch8str = wchtoch(SRCLANG_VALUE_AS_STRING(args[0]));
-    char* value = getenv(ch8str);
-    free(ch8str);
-    if (value == nullptr) return SRCLANG_VALUE_STRING(strdup(value));
+    return SRCLANG_VALUE_STRING(
+            wcsdup(s2ws(getenv(ws2s(SRCLANG_VALUE_AS_STRING(args[0])).c_str()))
+                            .c_str()));
     return args.size() == 2 ? args[1] : SRCLANG_VALUE_NULL;
 }
 
@@ -137,7 +136,7 @@ SRCLANG_MODULE_FUNC(Getkey) {
     if (count == -1) return SYSERROR;
     buf[count] = '\0';
 
-    return SRCLANG_VALUE_STRING(chtowch(buf));
+    return SRCLANG_VALUE_STRING(wcsdup(s2ws(buf).c_str()));
 }
 
 DIRECT_METHOD(Getgid, getgid)

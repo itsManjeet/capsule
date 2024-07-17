@@ -124,11 +124,11 @@ void Compiler::eat() {
 
     peek.pos = iter;
 
-    auto escape = [&](Iterator& iterator, bool& status) -> wchar_t {
+    auto escape = [](Iterator& iterator) -> wchar_t {
         if (*iterator == L'\\') {
-            auto const ech = *iterator++;
+            auto const ch = *++iterator;
             ++iterator;
-            switch (ech) {
+            switch (ch) {
             case L'a': return L'\a';
             case L'b': return L'\b';
             case L'n': return L'\n';
@@ -138,14 +138,14 @@ void Compiler::eat() {
             case L'\'': return L'\'';
             case L'"': return L'"';
             case L'0':
-                if (*iter == L'3' && *(iter + 1) == L'3') {
-                    iter += 2;
+                if (*iterator == L'3' && *(iterator + 1) == L'3') {
+                    iterator += 2;
                     return L'\033';
                 }
-            default: error(L"invalid escape sequence", iterator - 1);
+            default: throw(L"invalid escape sequence", iterator - 1);
             }
         }
-        return *iter++;
+        return *iterator++;
     };
 
     if (*iter == L'/' && *(iter + 1) == L'/') {
@@ -164,10 +164,11 @@ void Compiler::eat() {
     if (*iter == L'"' || *iter == L'\'') {
         auto starting = *iter++;
         peek.literal.clear();
-        bool status = true;
         while (*iter != starting) {
             if (iter == end) { error(L"unterminated string", peek.pos); }
-            peek.literal += escape(iter, status);
+            try {
+                peek.literal += escape(iter);
+            } catch (const std::wstring& str) { error(str, iter); }
         }
         ++iter;
         peek.type = TokenType::String;
@@ -175,7 +176,7 @@ void Compiler::eat() {
     }
 
     for (std::wstring k : {L"let", L"fun", L"native", L"return", L"class",
-                 L"if", L"else", L"for", L"break", L"continue", L"import",
+                 L"if", L"else", L"for", L"break", L"continue", L"require",
                  L"global", L"as", L"in", L"defer",
 
                  // special operators
@@ -328,7 +329,8 @@ void Compiler::identifier(bool can_assign) {
 }
 
 void Compiler::string_() {
-    auto string_value = SRCLANG_VALUE_STRING(wchdup(cur.literal.c_str()));
+    auto *ch = wcsdup(cur.literal.c_str());
+    auto string_value = SRCLANG_VALUE_STRING(ch);
     interpreter->memoryManager.heap.push_back(string_value);
     interpreter->constants.push_back(string_value);
     emit(OpCode::CONST_, interpreter->constants.size() - 1);
@@ -452,23 +454,17 @@ void Compiler::map_() {
 }
 
 void Compiler::prefix(bool can_assign) {
-    if (cur.type == TokenType::Number) {
-        return number();
-    } else if (cur.type == TokenType::String) {
-        return string_();
-    } else if (cur.type == TokenType::Identifier) {
-        return identifier(can_assign);
-    } else if (consume(L"not")) {
-        return unary(OpCode::NOT);
-    } else if (consume(L"-")) {
-        return unary(OpCode::NEG);
-    } else if (consume(L"[")) {
-        return list();
-    } else if (consume(L"{")) {
-        return map_();
-    } else if (consume(L"fun")) {
-        return function(nullptr);
-    } else if (consume(L"(")) {
+    if (cur.type == TokenType::Number) return number();
+    if (cur.type == TokenType::String) return string_();
+    if (cur.type == TokenType::Identifier) return identifier(can_assign);
+    if (consume(L"not")) return unary(OpCode::NOT);
+    if (consume(L"-")) return unary(OpCode::NEG);
+    if (consume(L"[")) return list();
+    if (consume(L"{")) return map_();
+    if (consume(L"fun")) return function(nullptr);
+    if (consume(L"require")) return require();
+
+    if (consume(L"(")) {
         expression();
         return expect(L")");
     }
@@ -675,7 +671,7 @@ void Compiler::compiler_options() {
                     pos);
         }
     } else if (option_id == L"SEARCH_PATH") {
-        interpreter->appendOption(
+        interpreter->prependOption(
                 option_id, std::get<std::wstring>(value), L":");
     } else {
         interpreter->setOption(option_id, value);
@@ -803,53 +799,95 @@ void Compiler::loop() {
     patch_loop(loop_start, OpCode::BREAK, after_condition);
 }
 
-void Compiler::import_() {
-    auto path = cur;
+static bool ends_with(const std::wstring& str, const std::wstring& suffix) {
+    return str.size() >= suffix.size() &&
+           str.compare(str.size() - suffix.size(), suffix.size(), suffix) == 0;
+}
+
+void Compiler::require() {
+    expect(L"(");
+    auto module_id = cur;
     expect(TokenType::String);
+    expect(L")");
 
-    using convert_type = std::codecvt_utf8<wchar_t>;
-    std::wstring_convert<convert_type, wchar_t> converter;
-
-    std::wstring module_path = path.literal;
-    if (!std::filesystem::path(module_path).has_extension()) {
-        module_path += L".src";
-    }
+    std::wstring module_path;
 
     try {
-        module_path = interpreter->search(module_path);
+        module_path = interpreter->search(module_id.literal);
     } catch (const std::exception& exception) {
-        error(L"missing required module '" + path.literal + L"'", path.pos);
+        error(L"missing required module '" + module_id.literal + L"'" +
+                        s2ws(exception.what()),
+                module_id.pos);
     }
 
-    std::wifstream reader(converter.to_bytes(module_path));
-    std::wstring input((std::istreambuf_iterator<wchar_t>(reader)),
-            (std::istreambuf_iterator<wchar_t>()));
-    reader.close();
+    if (ends_with(module_path, L".mod")) {
+        interpreter->constants.push_back(
+                SRCLANG_VALUE_STRING(wchdup(module_path.c_str())));
+        emit(OpCode::CONST_, interpreter->constants.size() - 1);
+        emit(OpCode::MODULE);
+        return;
+    }
 
-    auto start_ = start;
-    auto end_ = end;
-    auto iter_ = iter;
-    auto peek_ = peek;
-    auto cur_ = cur;
+    if (std::find(loaded_imports.begin(), loaded_imports.end(), module_path) !=
+            loaded_imports.end()) {
+        return;
+    }
+    loaded_imports.push_back(module_path);
 
-    start = iter = input.begin();
-    end = input.end();
-    eat();
-    eat();
+    std::wifstream reader(ws2s(module_path));
+    reader.imbue(std::locale(std::locale(), new std::codecvt_utf8<wchar_t>));
+    std::wstringstream wss;
+    wss << reader.rdbuf();
+    auto input = wss.str();
 
+    auto old_symbol_table = symbol_table;
+    symbol_table = new SymbolTable{old_symbol_table};
+    Compiler compiler(input, module_path, interpreter, symbol_table);
+    compiler.symbol_table = symbol_table;
     try {
-        program();
+        compiler.compile();
     } catch (const std::exception& exception) {
         error(L"failed to import '" + module_path + L"'\n" +
                         s2ws(exception.what()),
                 cur.pos);
     }
 
-    start = start_;
-    end = end_;
-    cur = cur_;
-    iter = iter_;
-    peek = peek_;
+    auto instructions = std::move(compiler.code().instructions);
+    instructions->pop_back(); // pop OpCode::HLT
+
+    int total = 0;
+    // export symbols
+    for (const auto& i : symbol_table->store) {
+        if (i.second.scope == Symbol::Scope::LOCAL &&
+                std::isupper(i.first[0])) {
+            interpreter->constants.push_back(
+                    SRCLANG_VALUE_STRING(wchdup(i.first.c_str())));
+            instructions->emit(compiler.global_debug_info.get(), 0,
+                    OpCode::CONST_, interpreter->constants.size() - 1);
+            instructions->emit(compiler.global_debug_info.get(), 0,
+                    OpCode::LOAD, i.second.scope, i.second.index);
+            total++;
+        }
+    }
+    int nlocals = symbol_table->definitions;
+    auto nfree = symbol_table->free;
+    delete symbol_table;
+    symbol_table = old_symbol_table;
+    instructions->emit(compiler.global_debug_info.get(), 0, OpCode::MAP, total);
+    instructions->emit(compiler.global_debug_info.get(), 0, OpCode::RET);
+
+    for (auto const& i : nfree) { emit(OpCode::LOAD, i.scope, i.index); }
+
+    auto fun = new Function{FunctionType::Function, module_id.literal,
+            std::move(instructions), nlocals, 0, false,
+            compiler.global_debug_info};
+
+    auto val = SRCLANG_VALUE_FUNCTION(fun);
+    interpreter->memoryManager.heap.push_back(val);
+    interpreter->constants.push_back(val);
+
+    emit(OpCode::CLOSURE, interpreter->constants.size() - 1, nfree.size());
+    emit(OpCode::CALL, 0);
 }
 
 /// condition ::= 'if' <expression> <block> (else statement)?
@@ -891,13 +929,9 @@ ValueType Compiler::type(std::string literal) {
 };
 
 void Compiler::statement() {
-    if (consume(L"let"))
-        return let();
-    else if (consume(L"return"))
-        return return_();
-    else if (consume(L"import"))
-        return import_();
-    else if (consume(L"fun")) {
+    if (consume(L"let")) return let();
+    if (consume(L"return")) return return_();
+    if (consume(L"fun")) {
         auto id = cur;
         expect(TokenType::Identifier);
         auto symbol = symbol_table->resolve(id.literal);
@@ -907,23 +941,20 @@ void Compiler::statement() {
         emit(OpCode::STORE, symbol->scope, symbol->index);
         emit(OpCode::POP);
         return;
-    } else if (consume(L";"))
-        return;
-    else if (consume(L"if"))
-        return condition();
-    else if (consume(L"for"))
-        return loop();
-    else if (consume(L"break")) {
+    }
+    if (consume(L";")) return;
+    if (consume(L"if")) return condition();
+    if (consume(L"for")) return loop();
+    if (consume(L"break")) {
         emit(OpCode::BREAK, 0);
         return;
-    } else if (consume(L"continue")) {
+    }
+    if (consume(L"continue")) {
         emit(OpCode::CONTINUE, 0);
         return;
-    } else if (consume(L"defer")) {
-        return defer();
-    } else if (consume(L"#!")) {
-        return compiler_options();
     }
+    if (consume(L"defer")) return defer();
+    if (consume(L"#!")) return compiler_options();
 
     expression();
     emit(OpCode::POP);
@@ -955,11 +986,9 @@ void Compiler::compile() {
 }
 
 void Compiler::value(Symbol* symbol) {
-    if (consume(L"fun")) {
-        return function(symbol);
-    } else if (consume(L"native")) {
-        return native(symbol);
-    }
+    if (consume(L"fun")) return function(symbol);
+    if (consume(L"native")) return native(symbol);
+
     return expression();
 }
 

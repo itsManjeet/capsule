@@ -42,10 +42,8 @@ SRCLANG_BUILTIN(print) {
 }
 
 SRCLANG_BUILTIN(println) {
-    std::wstring sep;
     for (auto const& i : args) {
-        std::wcout << sep << SRCLANG_VALUE_GET_STRING(i);
-        sep = L" ";
+        std::wcout <<  SRCLANG_VALUE_GET_STRING(i);
     }
     std::wcout << std::endl;
     return SRCLANG_VALUE_NUMBER(args.size());
@@ -55,12 +53,9 @@ SRCLANG_BUILTIN(len) {
     SRCLANG_CHECK_ARGS_EXACT(1);
     switch (SRCLANG_VALUE_GET_TYPE(args[0])) {
     case ValueType::String:
-        return SRCLANG_VALUE_NUMBER(
-                strlen((char*)SRCLANG_VALUE_AS_OBJECT(args[0])->pointer));
+        return SRCLANG_VALUE_NUMBER(wchlen(SRCLANG_VALUE_AS_STRING(args[0])));
     case ValueType::List:
-        return SRCLANG_VALUE_NUMBER(
-                ((std::vector<Value>*)SRCLANG_VALUE_AS_OBJECT(args[0])->pointer)
-                        ->size());
+        return SRCLANG_VALUE_NUMBER(SRCLANG_VALUE_AS_LIST(args[0])->size());
     case ValueType::Pointer:
         return SRCLANG_VALUE_NUMBER(SRCLANG_VALUE_AS_OBJECT(args[0])->size);
 
@@ -72,26 +67,24 @@ SRCLANG_BUILTIN(append) {
     SRCLANG_CHECK_ARGS_EXACT(2);
     switch (SRCLANG_VALUE_GET_TYPE(args[0])) {
     case ValueType::List: {
-        auto list = reinterpret_cast<SrcLangList*>(
-                SRCLANG_VALUE_AS_OBJECT(args[0])->pointer);
+        auto list = SRCLANG_VALUE_AS_LIST(args[0]);
         list->push_back(args[1]);
         return SRCLANG_VALUE_LIST(list);
     } break;
     case ValueType::String: {
-        auto str = (char*)(SRCLANG_VALUE_AS_OBJECT(args[0])->pointer);
-        auto len = strlen(str);
+        auto str = SRCLANG_VALUE_AS_STRING(args[0]);
+        auto const len = wchlen(str);
         switch (SRCLANG_VALUE_GET_TYPE(args[1])) {
-            break;
         case ValueType::String: {
-            auto str2 = (char*)(SRCLANG_VALUE_AS_OBJECT(args[1])->pointer);
-            auto len2 = strlen(str2);
-            str = (char*)realloc(str, len + len2 + 1);
+            auto str2 = SRCLANG_VALUE_AS_STRING(args[1]);
+            auto const len2 = wchlen(str2);
+            str = static_cast<wchar_t*>(realloc(str, len + len2 + 1));
             if (str == nullptr) {
                 throw std::runtime_error(
                         "realloc() failed, SrcLang::append(), " +
                         std::string(strerror(errno)));
             }
-            strcat(str, str2);
+            memccpy(str + len, str2, len2, sizeof(wchar_t));
         } break;
         default: throw std::runtime_error("invalid append operation");
         }
@@ -141,15 +134,14 @@ SRCLANG_BUILTIN(pop) {
     SRCLANG_CHECK_ARGS_EXACT(1);
     switch (SRCLANG_VALUE_GET_TYPE(args[0])) {
     case ValueType::List: {
-        auto list = reinterpret_cast<SrcLangList*>(
-                SRCLANG_VALUE_AS_OBJECT(args[0])->pointer);
+        auto list = SRCLANG_VALUE_AS_LIST(args[0]);
         list->pop_back();
 
         return SRCLANG_VALUE_LIST(list);
     } break;
     case ValueType::String: {
-        auto str = (char*)(SRCLANG_VALUE_AS_OBJECT(args[0])->pointer);
-        auto len = strlen(str);
+        auto const str = SRCLANG_VALUE_AS_STRING(args[0]);
+        auto const len = wchlen(str);
         str[len - 1] = '\0';
         return SRCLANG_VALUE_STRING(str);
     } break;
@@ -169,11 +161,10 @@ SRCLANG_BUILTIN(clone) {
         case ValueType::String:
         case ValueType::Error: {
             return SRCLANG_VALUE_STRING(
-                    strdup((char*)SRCLANG_VALUE_AS_OBJECT(args[0])->pointer));
+                    wchdup(SRCLANG_VALUE_AS_STRING(args[0])));
         };
         case ValueType::List: {
-            auto list = reinterpret_cast<SrcLangList*>(
-                    SRCLANG_VALUE_AS_OBJECT(args[0])->pointer);
+            auto list = SRCLANG_VALUE_AS_LIST(args[0]);
             auto new_list = new SrcLangList(list->begin(), list->end());
             return SRCLANG_VALUE_LIST(new_list);
         };
@@ -236,15 +227,15 @@ SRCLANG_BUILTIN(alloc) {
     } break;
 
     case ValueType::String: {
-        char* ptr = (char*)malloc((size + 1) * sizeof(char));
+        auto* ptr = static_cast<wchar_t*>(malloc((size + 1) * sizeof(wchar_t)));
         if (ptr == nullptr) {
-            std::stringstream ss;
-            ss << "failed to allocate '" << size << "' size, "
-               << strerror(errno);
-            return SRCLANG_VALUE_ERROR(strdup(ss.str().c_str()));
+            std::wstringstream ss;
+            ss << L"failed to allocate '" << size << L"' size, "
+               << s2ws(strerror(errno));
+            return SRCLANG_VALUE_ERROR(wchdup(ss.str().c_str()));
         }
-        memset(ptr, ' ', size);
-        ptr[size] = '\0';
+        for (int i = 0; i < size; i++) ptr[i] = L' ';
+        ptr[size] = L'\0';
         auto value = SRCLANG_VALUE_STRING(ptr);
         return value;
     } break;
@@ -254,7 +245,7 @@ SRCLANG_BUILTIN(alloc) {
         return SRCLANG_VALUE_LIST(list);
     } break;
     }
-    return SRCLANG_VALUE_SET_REF(SRCLANG_VALUE_ERROR("invalid type"));
+    return SRCLANG_VALUE_SET_REF(SRCLANG_VALUE_ERROR(L"invalid type"));
 }
 
 SRCLANG_BUILTIN(bound) {
@@ -270,17 +261,4 @@ SRCLANG_BUILTIN(free) {
     object->cleanup(object->pointer);
     object->pointer = nullptr;
     return SRCLANG_VALUE_TRUE;
-}
-
-SRCLANG_BUILTIN(use) {
-    SRCLANG_CHECK_ARGS_EXACT(1);
-    SRCLANG_CHECK_ARGS_TYPE(0, ValueType::String);
-
-    auto mod =
-            interpreter->loadModule((wchar_t*)SRCLANG_VALUE_AS_STRING(args[0]));
-    interpreter->addObject(mod);
-    if (SRCLANG_VALUE_IS_ERROR(mod)) {
-        throw std::runtime_error(SRCLANG_VALUE_AS_ERROR(mod));
-    }
-    return mod;
 }

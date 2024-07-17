@@ -1,13 +1,13 @@
 #include <Interpreter.h>
 using namespace SrcLang;
 
-#include <math.h>
+#include <cmath>
 
-#define DEFINE_FUNC_1(id, fun)                                              \
-    SRCLANG_MODULE_FUNC(id) {                                               \
-        SRCLANG_CHECK_ARGS_EXACT(1);                                        \
-        SRCLANG_CHECK_ARGS_TYPE(0, ValueType::Number);                      \
-        return SRCLANG_VALUE_NUMBER(fun(SRCLANG_VALUE_AS_NUMBER(args[0]))); \
+#define DEFINE_FUNC_1(id, fun)                                                 \
+    SRCLANG_MODULE_FUNC(id) {                                                  \
+        SRCLANG_CHECK_ARGS_EXACT(1);                                           \
+        SRCLANG_CHECK_ARGS_TYPE(0, ValueType::Number);                         \
+        return SRCLANG_VALUE_NUMBER(fun(SRCLANG_VALUE_AS_NUMBER(args[0])));    \
     }
 
 DEFINE_FUNC_1(Abs, abs);

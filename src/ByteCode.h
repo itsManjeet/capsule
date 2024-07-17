@@ -20,7 +20,7 @@ struct ByteCode {
             std::vector<Value> const& constants) {
         os << L"== CODE ==" << std::endl;
         for (int offset = 0; offset < instructions.size();) {
-            offset = ByteCode::debug(instructions, constants, offset, os);
+            offset = debug(instructions, constants, offset, os);
             os << std::endl;
         }
         os << L"\n== CONSTANTS ==" << std::endl;

@@ -101,13 +101,14 @@ std::wstring SrcLang::SRCLANG_VALUE_GET_STRING(Value val) {
             auto object = SRCLANG_VALUE_AS_OBJECT(val);
             switch (type) {
             case ValueType::String:
-            case ValueType::Error: return (wchar_t*)object->pointer;
+            case ValueType::Error:
+                return static_cast<wchar_t*>(object->pointer);
             case ValueType::List: {
                 std::wstringstream ss;
                 ss << L"[";
                 std::wstring sep;
                 for (auto const& i :
-                        *(reinterpret_cast<SrcLangList*>(object->pointer))) {
+                        *(static_cast<SrcLangList*>(object->pointer))) {
                     ss << sep << SRCLANG_VALUE_GET_STRING(i);
                     sep = L", ";
                 }
@@ -131,6 +132,10 @@ std::wstring SrcLang::SRCLANG_VALUE_GET_STRING(Value val) {
 
             case ValueType::Function: {
                 return L"<function()>";
+            } break;
+
+            case ValueType::Closure: {
+                return L"<closure()>";
             } break;
 
             case ValueType::Native: {

@@ -67,7 +67,7 @@ Interpreter::Interpreter()
                                   {L"VERSION", SRCLANG_VERSION},
                                   {L"GC_HEAP_GROW_FACTOR", 1.3f},
                                   {L"GC_INITIAL_TRIGGER", 10},
-                                  {L"SEARCH_PATH", L"/usr/lib/SrcLang"},
+                                  {L"SEARCH_PATH", L""},
                                   {L"BYTECODE_DUMP", false},
                                   {L"EXPERIMENTAL_FEATURE", false},
                                   {L"DEBUG", false},
@@ -151,14 +151,14 @@ bool Interpreter::isEqual(Value a, Value b) {
     switch (aType) {
     case ValueType::Error:
     case ValueType::String: {
-        char* aBuffer = (char*)SRCLANG_VALUE_AS_OBJECT(a)->pointer;
-        char* bBuffer = (char*)SRCLANG_VALUE_AS_OBJECT(b)->pointer;
-        return !strcmp(aBuffer, bBuffer);
+        auto* aBuffer = SRCLANG_VALUE_AS_STRING(a);
+        auto* bBuffer = SRCLANG_VALUE_AS_STRING(b);
+        return !wcscmp(aBuffer, bBuffer);
     }
 
     case ValueType::List: {
-        auto* aList = (SrcLangList*)SRCLANG_VALUE_AS_OBJECT(a)->pointer;
-        auto* bList = (SrcLangList*)SRCLANG_VALUE_AS_OBJECT(b)->pointer;
+        auto* aList = SRCLANG_VALUE_AS_LIST(a);
+        auto* bList = SRCLANG_VALUE_AS_LIST(b);
         if (aList->size() != bList->size()) return false;
         for (int i = 0; i < aList->size(); i++) {
             if (!isEqual(aList->at(i), bList->at(i))) return false;
@@ -167,8 +167,8 @@ bool Interpreter::isEqual(Value a, Value b) {
     }
 
     case ValueType::Map: {
-        auto* aMap = (SrcLangMap*)SRCLANG_VALUE_AS_OBJECT(a)->pointer;
-        auto* bMap = (SrcLangMap*)SRCLANG_VALUE_AS_OBJECT(b)->pointer;
+        auto* aMap = SRCLANG_VALUE_AS_MAP(a);
+        auto* bMap = SRCLANG_VALUE_AS_MAP(b);
         if (aMap->size() != bMap->size()) return false;
         for (auto const& i : *aMap) {
             auto iter = bMap->find(i.first);
@@ -334,8 +334,7 @@ bool Interpreter::binary(Value lhs, Value rhs, OpCode op) {
             return false;
         }
     } else if (SRCLANG_VALUE_GET_TYPE(lhs) == ValueType::String) {
-        char* a =
-                reinterpret_cast<char*>(SRCLANG_VALUE_AS_OBJECT(lhs)->pointer);
+        auto* a = SRCLANG_VALUE_AS_STRING(lhs);
         if (SRCLANG_VALUE_GET_TYPE(rhs) != ValueType::String) {
             error("can't apply binary operation '" +
                     SRCLANG_OPCODE_ID[static_cast<int>(op)] + "' for '" +
@@ -345,13 +344,12 @@ bool Interpreter::binary(Value lhs, Value rhs, OpCode op) {
                     "'");
             return false;
         }
-        char* b =
-                reinterpret_cast<char*>(SRCLANG_VALUE_AS_OBJECT(rhs)->pointer);
+        auto* b = SRCLANG_VALUE_AS_STRING(rhs);
 
         switch (op) {
         case OpCode::ADD: {
-            auto a_size = strlen(a);
-            auto b_size = strlen(b);
+            auto a_size = wcslen(a);
+            auto b_size = wcslen(b);
             auto size = a_size + b_size;
 
             auto* buf = (wchar_t*)malloc(size + 1);
@@ -367,18 +365,18 @@ bool Interpreter::binary(Value lhs, Value rhs, OpCode op) {
             *cp->sp++ = addObject(SRCLANG_VALUE_STRING(buf));
         } break;
         case OpCode::EQ: {
-            *cp->sp++ = strcmp(a, b) == 0 ? SRCLANG_VALUE_TRUE
+            *cp->sp++ = wcscmp(a, b) == 0 ? SRCLANG_VALUE_TRUE
                                           : SRCLANG_VALUE_FALSE;
         } break;
         case OpCode::NE: {
-            *cp->sp++ = strcmp(a, b) != 0 ? SRCLANG_VALUE_TRUE
+            *cp->sp++ = wcscmp(a, b) != 0 ? SRCLANG_VALUE_TRUE
                                           : SRCLANG_VALUE_FALSE;
         } break;
         case OpCode::GT:
-            *cp->sp++ = SRCLANG_VALUE_BOOL(strlen(a) > strlen(b));
+            *cp->sp++ = SRCLANG_VALUE_BOOL(wcslen(a) > wcslen(b));
             break;
         case OpCode::LT:
-            *cp->sp++ = SRCLANG_VALUE_BOOL(strlen(a) < strlen(b));
+            *cp->sp++ = SRCLANG_VALUE_BOOL(wcslen(a) < wcslen(b));
             break;
         default:
             error("ERROR: unexpected binary operator '" +
@@ -647,7 +645,7 @@ bool Interpreter::callTypecastNum(uint8_t count) {
             SRCLANG_VALUE_AS_OBJECT(val)->type == ValueType::String) {
         try {
             *cp->sp++ = SRCLANG_VALUE_NUMBER(
-                    std::stod((char*)(SRCLANG_VALUE_AS_OBJECT(val)->pointer)));
+                    std::stod(SRCLANG_VALUE_AS_STRING(val)));
         } catch (...) {
             error("invalid typecast str -> num");
             return false;
@@ -665,12 +663,11 @@ bool Interpreter::callTypecastString(uint8_t count) {
         Value val = *(cp->sp - count);
         switch (SRCLANG_VALUE_GET_TYPE(val)) {
         case ValueType::Pointer: {
-            result = SRCLANG_VALUE_STRING(strdup(reinterpret_cast<const char*>(
-                    SRCLANG_VALUE_AS_OBJECT(val)->pointer)));
+            result = SRCLANG_VALUE_STRING(wcsdup(SRCLANG_VALUE_AS_STRING(val)));
         } break;
 
         case ValueType::List: {
-            auto list = (SrcLangList*)SRCLANG_VALUE_AS_OBJECT(val)->pointer;
+            auto list = SRCLANG_VALUE_AS_LIST(val);
             std::wstring buf;
             for (auto i : *list) { buf += SRCLANG_VALUE_GET_STRING(i); }
             result = SRCLANG_VALUE_STRING(wchdup(buf.c_str()));
@@ -812,12 +809,12 @@ bool Interpreter::run() {
                            << std::endl;
             }
 
-            std::cout << "  ";
-            for (auto i = cp->stack.begin(); i != cp->sp; i++) {
+            std::wcout << "  ";
+            for (auto i = cp->stack.begin(); i != cp->sp; ++i) {
                 std::wcout << "[" << SRCLANG_VALUE_DEBUG(*i) << "] ";
             }
-            std::cout << std::endl;
-            std::cout << ">> ";
+            std::wcout << std::endl;
+            std::wcout << ">> ";
             ByteCode::debug(*SRCLANG_VALUE_AS_CLOSURE(cp->fp->closure)
                                      ->fun->instructions,
                     constants,
@@ -825,7 +822,7 @@ bool Interpreter::run() {
                                           ->fun->instructions->begin(),
                             cp->fp->ip),
                     std::wcout);
-            std::cout << std::endl;
+            std::wcout << std::endl;
 
             if (break_) std::cin.get();
         }
@@ -1131,10 +1128,10 @@ bool Interpreter::run() {
             } else if (SRCLANG_VALUE_GET_TYPE(container) ==
                                ValueType::Pointer &&
                        SRCLANG_VALUE_GET_TYPE(pos) == ValueType::Number) {
-                auto idx = SRCLANG_VALUE_AS_NUMBER(pos);
-                char* buf = (char*)SRCLANG_VALUE_AS_OBJECT(container)->pointer;
-                char value = SRCLANG_VALUE_AS_NUMBER(val);
-                buf[long(idx)] = value;
+                int idx = SRCLANG_VALUE_AS_NUMBER(pos);
+                auto* buf = SRCLANG_VALUE_AS_STRING(container);
+                wchar_t value = SRCLANG_VALUE_AS_NUMBER(val);
+                buf[idx] = value;
             } else {
                 error("invalid SET operation for '" +
                         SRCLANG_VALUE_TYPE_ID[int(
@@ -1157,7 +1154,8 @@ bool Interpreter::run() {
             auto obj = SRCLANG_VALUE_AS_OBJECT(val);
             switch (obj->type) {
             case ValueType::String:
-                *cp->sp++ = SRCLANG_VALUE_NUMBER(strlen((char*)obj->pointer));
+                *cp->sp++ = SRCLANG_VALUE_NUMBER(
+                        wcslen(SRCLANG_VALUE_AS_STRING(val)));
                 break;
             case ValueType::List:
                 *cp->sp++ = SRCLANG_VALUE_NUMBER(
@@ -1248,8 +1246,8 @@ Value Interpreter::run(
     Compiler compiler(source, filename, this, &symbolTable);
     try {
         compiler.compile();
-    } catch (const std::exception& exception) {
-        return SRCLANG_VALUE_ERROR(strdup(exception.what()));
+    } catch (const std::wstring& exception) {
+        return SRCLANG_VALUE_ERROR(wchdup(exception.c_str()));
     }
 
     auto code = compiler.code();
@@ -1334,9 +1332,9 @@ Value Interpreter::loadModule(std::wstring modulePath) {
     void* handler = dlopen(ws2s(modulePath).c_str(), RTLD_LAZY | RTLD_LOCAL);
     if (handler == nullptr) { return SRCLANG_VALUE_ERROR(strdup(dlerror())); }
 
-    auto map = new SrcLangMap();
-    auto* fun = (void (*)(SrcLangMap*, Interpreter*))dlsym(
-            handler, "srclang_module_init");
+    auto const map = new SrcLangMap();
+    auto* fun = reinterpret_cast<void (*)(SrcLangMap*, Interpreter*)>(
+            dlsym(handler, "srclang_module_init"));
     if (fun == nullptr) { return SRCLANG_VALUE_ERROR(strdup(dlerror())); }
     fun(map, this);
 
@@ -1350,6 +1348,12 @@ std::wstring Interpreter::search(const std::wstring& id) {
     for (std::string p; getline(ss, p, ':');) {
         auto pt = std::filesystem::path(p) / ws2s(id);
         if (std::filesystem::exists(pt)) { return s2ws(pt.string()); }
+        if (std::filesystem::exists(pt.string() + ".mod")) {
+            return s2ws(pt.string() + ".mod");
+        }
+        if (std::filesystem::exists(pt.string() + ".src")) {
+            return s2ws(pt.string() + ".src");
+        }
     }
     throw std::runtime_error("missing required module '" + ws2s(id) + "'");
 }

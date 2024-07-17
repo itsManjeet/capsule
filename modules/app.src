@@ -1,5 +1,5 @@
-sys  := use("sys.mod");
-math := use("math.mod");
+sys  := require("sys");
+math := require("math");
 
 let Screen = fun (width, height) {
     let buffer = alloc(width * height, str);
@@ -9,15 +9,15 @@ let Screen = fun (width, height) {
         Height: height,
 
         Box: {
-            TopLeft: "+",
-            Top: "-",
-            TopRight: "+",
-            Left: "|",
+            TopLeft: "┌",
+            Top: "─",
+            TopRight: "┐",
+            Left: "│",
             Center: " ",
-            Right: "|",
-            BottomLeft: "+",
-            Bottom: "-",
-            BottomRight: "+",
+            Right: "│",
+            BottomLeft: "└",
+            Bottom: "─",
+            BottomRight: "┘",
         }
     };
 
@@ -115,7 +115,7 @@ let Screen = fun (width, height) {
     };
 };
 
-let runApp = fun (f) {
+Run := fun (f) {
     let size = sys.Gettermsize();
     let screen = Screen(size.Columns, size.Rows);
     

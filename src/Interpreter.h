@@ -125,6 +125,11 @@ public:
         options[id] = std::get<std::wstring>(options[id]) + sep + value;
     }
 
+    void prependOption(const std::wstring& id, std::wstring value,
+            const std::wstring& sep = L":") {
+        options[id] = value + sep + std::get<std::wstring>(options[id]);
+    }
+
     ~Interpreter();
 
     void graceFullExit();

@@ -93,7 +93,7 @@ typedef uint64_t Value;
 #define SRCLANG_VALUE_AS_MAP(val)                                              \
     ((SrcLangMap*)SRCLANG_VALUE_AS_OBJECT(val)->pointer)
 #define SRCLANG_VALUE_AS_ERROR(val)                                            \
-    ((const char*)SRCLANG_VALUE_AS_OBJECT(val)->pointer)
+    ((wchar_t*)SRCLANG_VALUE_AS_OBJECT(val)->pointer)
 #define SRCLANG_VALUE_AS_NATIVE(val)                                           \
     ((Native*)SRCLANG_VALUE_AS_OBJECT(val)->pointer)
 #define SRCLANG_VALUE_AS_CLOSURE(val)                                          \
@@ -261,61 +261,11 @@ static const std::vector<Value> SRCLANG_VALUE_TYPES = {
 };
 
 static inline size_t wchlen(const wchar_t* source) {
-    size_t len32 = 0;
-    while (source[len32] != U'\0') { len32++; }
-    return len32;
+    return wcslen(source);
 }
 
 static inline wchar_t* wchdup(const wchar_t* src) {
-    if (src == NULL) { return NULL; }
-    size_t len = wchlen(src) + 1;
-    auto* dst = (wchar_t*)malloc(len * sizeof(wchar_t));
-    if (dst == NULL) { return NULL; }
-
-    for (size_t i = 0; i < len; i++) { dst[i] = src[i]; }
-
-    return dst;
-}
-
-static inline char* wchtoch(const wchar_t* source) {
-    size_t len32 = 0;
-    while (source[len32] != U'\0') { len32++; }
-
-    size_t len8 = 4 * len32 + 1;
-    char* output = (char*)malloc(len8);
-    if (!output) { return NULL; }
-
-    // Convert from UTF-32 to UTF-8
-    char* out_ptr = output;
-    for (size_t i = 0; i < len32; i++) {
-        out_ptr += wcrtomb(out_ptr, source[i], NULL);
-    }
-    *out_ptr = '\0';
-
-    return output;
-}
-
-static inline wchar_t* chtowch(const char* input) {
-    size_t len8 = 0;
-    while (input[len8] != '\0') { len8++; }
-
-    size_t len32 = len8 + 1;
-    auto* output = (wchar_t*)malloc(len32 * sizeof(wchar_t));
-    if (!output) { return NULL; }
-
-    mbstate_t state = {0};
-    const char* in_ptr = input;
-    wchar_t* out_ptr = output;
-    size_t ret;
-
-    while ((ret = mbrtowc(out_ptr, in_ptr, len8, &state)) > 0) {
-        in_ptr += ret;
-        len8 -= ret;
-        out_ptr++;
-    }
-    *out_ptr = U'\0';
-
-    return output;
+    return wcsdup(src);
 }
 
 static inline std::wstring s2ws(const std::string& str) {
@@ -328,8 +278,15 @@ static inline std::wstring s2ws(const std::string& str) {
 static inline std::string ws2s(const std::wstring& wstr) {
     using convert_typeX = std::codecvt_utf8<wchar_t>;
     std::wstring_convert<convert_typeX, wchar_t> converterX;
-
     return converterX.to_bytes(wstr);
+}
+
+static inline char* wchtoch(const wchar_t* source) {
+    return strdup(ws2s(source).c_str());
+}
+
+static inline wchar_t* chtowch(const char* input) {
+    return wcsdup(s2ws(input).c_str());
 }
 
 ValueType SRCLANG_VALUE_GET_TYPE(Value val);

@@ -12,7 +12,7 @@ int ByteCode::debug(Instructions const& instructions,
     offset += 1;
     switch (op) {
     case OpCode::CONST_: {
-        auto pos = instructions[offset++];
+        auto const pos = instructions[offset++];
         if (!constants.empty()) {
             os << L" " << pos << L" '" << SRCLANG_VALUE_DEBUG(constants[pos])
                << L"'";
@@ -40,7 +40,7 @@ int ByteCode::debug(Instructions const& instructions,
     case OpCode::CLOSURE: {
         auto constantIndex = instructions[offset++];
         auto nfree = instructions[offset++];
-        os << constants[constantIndex] << " " << nfree;
+        os << L" " << constants[constantIndex] << L" " << nfree;
     } break;
 
     case OpCode::CONST_INT: {

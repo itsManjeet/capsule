@@ -1,5 +1,5 @@
-math := use("math.mod");
-sys  := use("sys.mod");
+math := require("math.mod");
+sys  := require("sys.mod");
 
 let Widget = fun (onDraw, onEvent) {
     self := {};
