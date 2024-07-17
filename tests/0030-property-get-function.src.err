@@ -1,1 +1,1 @@
-  ERROR: InvalidOperation b/w 'bar:str' and '<object(closure)>:closure'
+  ERROR: InvalidOperation b/w 'bar:str' and '<closure()>:closure'
