@@ -433,7 +433,7 @@ void Compiler::map_() {
     while (!consume(L"}")) {
         check(TokenType::Identifier);
         emit(OpCode::CONST_, add_constant(SRCLANG_VALUE_STRING(
-                                     wchdup(cur.literal.c_str()))));
+                                     wcsdup(cur.literal.c_str()))));
         eat();
 
         expect(L":");
@@ -536,7 +536,7 @@ void Compiler::index(bool can_assign) {
 void Compiler::subscript(bool can_assign) {
     check(TokenType::Identifier);
     emit(OpCode::CONST_,
-            add_constant(SRCLANG_VALUE_STRING(wchdup(cur.literal.c_str()))));
+            add_constant(SRCLANG_VALUE_STRING(wcsdup(cur.literal.c_str()))));
     eat();
 
     if (can_assign && consume(L"=")) {
@@ -808,7 +808,7 @@ void Compiler::require() {
 
     if (ends_with(module_path, L".mod")) {
         emit(OpCode::CONST_, add_constant(SRCLANG_VALUE_STRING(
-                                     wchdup(module_path.c_str()))));
+                                     wcsdup(module_path.c_str()))));
         emit(OpCode::MODULE);
         return;
     }
@@ -849,7 +849,7 @@ void Compiler::require() {
             closure->fun->instructions->emit(compiler.global_debug_info.get(),
                     0, OpCode::CONST_,
                     add_constant(
-                            SRCLANG_VALUE_STRING(wchdup(i.first.c_str()))));
+                            SRCLANG_VALUE_STRING(wcsdup(i.first.c_str()))));
             closure->fun->instructions->emit(compiler.global_debug_info.get(),
                     0, OpCode::LOAD, i.second.scope, i.second.index);
             total++;

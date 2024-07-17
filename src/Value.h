@@ -265,10 +265,6 @@ static const std::vector<Value> SRCLANG_VALUE_TYPES = {
 #undef X
 };
 
-static inline size_t wchlen(const wchar_t* source) { return wcslen(source); }
-
-static inline wchar_t* wchdup(const wchar_t* src) { return wcsdup(src); }
-
 static inline std::wstring s2ws(const std::string& str) {
     using convert_typeX = std::codecvt_utf8<wchar_t>;
     std::wstring_convert<convert_typeX, wchar_t> converterX;
@@ -280,14 +276,6 @@ static inline std::string ws2s(const std::wstring& wstr) {
     using convert_typeX = std::codecvt_utf8<wchar_t>;
     std::wstring_convert<convert_typeX, wchar_t> converterX;
     return converterX.to_bytes(wstr);
-}
-
-static inline char* wchtoch(const wchar_t* source) {
-    return strdup(ws2s(source).c_str());
-}
-
-static inline wchar_t* chtowch(const char* input) {
-    return wcsdup(s2ws(input).c_str());
 }
 
 ValueType SRCLANG_VALUE_GET_TYPE(Value val);

@@ -669,12 +669,12 @@ bool Interpreter::callTypecastString(uint8_t count) {
             auto list = SRCLANG_VALUE_AS_LIST(val);
             std::wstring buf;
             for (auto i : *list) { buf += SRCLANG_VALUE_GET_STRING(i); }
-            result = SRCLANG_VALUE_STRING(wchdup(buf.c_str()));
+            result = SRCLANG_VALUE_STRING(wcsdup(buf.c_str()));
         } break;
 
         default:
             result = SRCLANG_VALUE_STRING(
-                    wchdup(SRCLANG_VALUE_GET_STRING(val).c_str()));
+                    wcsdup(SRCLANG_VALUE_GET_STRING(val).c_str()));
             break;
         }
     } else {
@@ -682,7 +682,7 @@ bool Interpreter::callTypecastString(uint8_t count) {
         for (auto i = cp->sp - count; i != cp->sp; i++) {
             buf += SRCLANG_VALUE_GET_STRING(*i);
         }
-        result = SRCLANG_VALUE_STRING(wchdup(buf.c_str()));
+        result = SRCLANG_VALUE_STRING(wcsdup(buf.c_str()));
     }
 
     cp->sp -= count + 1;
@@ -696,7 +696,7 @@ bool Interpreter::callTypecastError(uint8_t count) {
         buf += SRCLANG_VALUE_GET_STRING(*i);
     }
     cp->sp -= count + 1;
-    *cp->sp++ = SRCLANG_VALUE_ERROR(wchdup(buf.c_str()));
+    *cp->sp++ = SRCLANG_VALUE_ERROR(wcsdup(buf.c_str()));
     return true;
 }
 
@@ -978,7 +978,7 @@ bool Interpreter::run() {
                     SRCLANG_VALUE_GET_TYPE(pos) == ValueType::Number) {
                 auto* buffer = SRCLANG_VALUE_AS_STRING(container);
                 int index = SRCLANG_VALUE_AS_NUMBER(pos);
-                int len = wchlen(buffer);
+                int len = wcslen(buffer);
                 switch (count) {
                 case 1: {
                     if (len <= index || index < 0) {
@@ -1081,7 +1081,7 @@ bool Interpreter::run() {
                     SRCLANG_VALUE_GET_TYPE(pos) == ValueType::Number) {
                 auto idx = SRCLANG_VALUE_AS_NUMBER(pos);
                 auto* buf = SRCLANG_VALUE_AS_STRING(container);
-                int size = wchlen(buf);
+                int size = wcslen(buf);
                 if (idx < 0 || size <= idx) {
                     error("out of bound");
                     return false;
@@ -1257,7 +1257,7 @@ Value Interpreter::run(const std::wstring& source, const std::wstring& filename,
     try {
         code = compiler.compile();
     } catch (const std::wstring& exception) {
-        return SRCLANG_VALUE_ERROR(wchdup(exception.c_str()));
+        return SRCLANG_VALUE_ERROR(wcsdup(exception.c_str()));
     }
     return call(code, args);
 }
@@ -1290,7 +1290,7 @@ Value Interpreter::call(Value callee, const std::vector<Value>& args) {
     if (run()) {
         if (cp->stack.begin() < cp->sp) { result = *(cp->sp - 1); }
     } else {
-        result = SRCLANG_VALUE_ERROR(wchdup(getError().c_str()));
+        result = SRCLANG_VALUE_ERROR(wcsdup(getError().c_str()));
     }
     pop_context();
     return result;

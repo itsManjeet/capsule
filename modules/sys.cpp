@@ -25,7 +25,7 @@ SRCLANG_MODULE_FUNC(Environ) {
     SRCLANG_CHECK_ARGS_EXACT(0);
     auto env = new SrcLangList();
     for (char** e = environ; e != nullptr; e++) {
-        env->push_back(SRCLANG_VALUE_SET_REF(SRCLANG_VALUE_STRING(e)));
+        env->push_back(SRCLANG_VALUE_STRING(wcsdup(s2ws(*e).c_str())));
     }
     return SRCLANG_VALUE_LIST(env);
 }
@@ -39,8 +39,7 @@ SRCLANG_MODULE_FUNC(Exec) {
     SRCLANG_CHECK_ARGS_EXACT(2);
 
     SRCLANG_CHECK_ARGS_TYPE(0, ValueType::String);
-    auto cmd = reinterpret_cast<const char*>(
-            SRCLANG_VALUE_AS_OBJECT(args[0])->pointer);
+    auto cmd = ws2s(SRCLANG_VALUE_AS_STRING(args[0])).c_str();
 
     SRCLANG_CHECK_ARGS_TYPE(1, ValueType::Closure);
 
@@ -51,7 +50,7 @@ SRCLANG_MODULE_FUNC(Exec) {
     }
     while (fgets(buffer, sizeof(buffer), fd) != nullptr) {
         interpreter->call(
-                args[1], {SRCLANG_VALUE_SET_REF(SRCLANG_VALUE_STRING(buffer))});
+                args[1], {SRCLANG_VALUE_STRING(wcsdup(s2ws(buffer).c_str()))});
     }
     int status = pclose(fd);
     status = WEXITSTATUS(status);
@@ -61,10 +60,7 @@ SRCLANG_MODULE_FUNC(Exec) {
 SRCLANG_MODULE_FUNC(Chdir) {
     SRCLANG_CHECK_ARGS_EXACT(1);
     SRCLANG_CHECK_ARGS_TYPE(0, ValueType::String);
-    auto ch8str = wchtoch(SRCLANG_VALUE_AS_STRING(args[0]));
-    int status = chdir(ch8str);
-    free(ch8str);
-    SAFE_RETURN(status);
+    SAFE_RETURN(chdir(ws2s(SRCLANG_VALUE_AS_STRING(args[0])).c_str()));
 }
 
 SRCLANG_MODULE_FUNC(Dup) {
@@ -203,16 +199,14 @@ SRCLANG_MODULE_FUNC(Opendir) {
     SRCLANG_CHECK_ARGS_EXACT(2);
     SRCLANG_CHECK_ARGS_TYPE(0, ValueType::String);
     SRCLANG_CHECK_ARGS_TYPE(1, ValueType::Closure);
-    auto ch8str = wchtoch(SRCLANG_VALUE_AS_STRING(args[0]));
-    auto dir = opendir(ch8str);
-    free(ch8str);
+    auto const dir = opendir(ws2s(SRCLANG_VALUE_AS_STRING(args[0])).c_str());
     if (dir == nullptr) return SYSERROR;
 
     auto cmd_args = std::vector<Value>(2);
     cmd_args[1] = args[0];
 
-    auto sdirent = new SrcLangMap();
-    auto svalue = interpreter->addObject(SRCLANG_VALUE_MAP(sdirent));
+    auto const sdirent = new SrcLangMap();
+    auto const svalue = interpreter->addObject(SRCLANG_VALUE_MAP(sdirent));
     Value result = SRCLANG_VALUE_TRUE;
 
     for (dirent* iter; iter = readdir(dir);) {
@@ -239,8 +233,7 @@ SRCLANG_MODULE_FUNC(Open) {
     const char* mode = "a+";
     if (args.size() == 2) {
         SRCLANG_CHECK_ARGS_TYPE(1, ValueType::String);
-        mode = reinterpret_cast<const char*>(
-                SRCLANG_VALUE_AS_OBJECT(args[1])->pointer);
+        mode = ws2s(SRCLANG_VALUE_AS_STRING(args[1])).c_str();
     }
 
     FILE* fp = nullptr;
@@ -249,12 +242,10 @@ SRCLANG_MODULE_FUNC(Open) {
         fp = fdopen(SRCLANG_VALUE_AS_NUMBER(args[0]), mode);
         break;
     case ValueType::String:
-        fp = fopen(reinterpret_cast<const char*>(
-                           SRCLANG_VALUE_AS_OBJECT(args[0])->pointer),
-                mode);
+        fp = fopen(ws2s(SRCLANG_VALUE_AS_STRING(args[0])).c_str(), mode);
         break;
     case ValueType::Pointer:
-        fp = reinterpret_cast<FILE*>(SRCLANG_VALUE_AS_OBJECT(args[0])->pointer);
+        fp = static_cast<FILE*>(SRCLANG_VALUE_AS_OBJECT(args[0])->pointer);
         break;
     default: SRCLANG_CHECK_ARGS_TYPE(0, ValueType::String);
     }
@@ -262,14 +253,14 @@ SRCLANG_MODULE_FUNC(Open) {
         return SRCLANG_VALUE_SET_REF(SRCLANG_VALUE_ERROR(strerror(errno)));
     }
 
-    auto object = new SrcLangMap();
-    auto value = SRCLANG_VALUE_MAP(object);
+    auto const object = new SrcLangMap();
+    auto const value = SRCLANG_VALUE_MAP(object);
 
     object->insert({L"__ptr__",
             SRCLANG_VALUE_SET_CLEANUP(
                     SRCLANG_VALUE_POINTER(reinterpret_cast<void*>(fp)),
                     +[](void* ptr) {
-                        auto fp = reinterpret_cast<FILE*>(ptr);
+                        auto const fp = static_cast<FILE*>(ptr);
                         if (fp != nullptr) fclose(fp);
                     })});
 
@@ -291,7 +282,7 @@ SRCLANG_MODULE_FUNC(Open) {
         SRCLANG_CHECK_ARGS_EXACT(2);
         SRCLANG_CHECK_ARGS_TYPE(1, ValueType::String);
         auto data = SRCLANG_VALUE_AS_STRING(args[1]);
-        int num = fwrite(data, sizeof(wchar_t), wchlen(data), file);
+        int num = fwrite(data, sizeof(wchar_t), wcslen(data), file);
         if (num == -1) {
             return SRCLANG_VALUE_SET_REF(SRCLANG_VALUE_ERROR(strerror(errno)));
         }
@@ -401,7 +392,7 @@ SRCLANG_MODULE_FUNC(Open) {
 SRCLANG_MODULE_FUNC(Putenv) {
     SRCLANG_CHECK_ARGS_EXACT(1);
     SRCLANG_CHECK_ARGS_TYPE(0, ValueType::String);
-    SAFE_RETURN(putenv((char*)SRCLANG_VALUE_AS_STRING(args[0])));
+    SAFE_RETURN(putenv((char*)ws2s(SRCLANG_VALUE_AS_STRING(args[0])).c_str()));
 }
 
 SRCLANG_MODULE_FUNC(Random) {
@@ -448,19 +439,15 @@ SRCLANG_MODULE_FUNC(Strerror) {
 SRCLANG_MODULE_FUNC(System) {
     SRCLANG_CHECK_ARGS_EXACT(1);
     SRCLANG_CHECK_ARGS_TYPE(0, ValueType::String);
-    auto chstr = wchtoch(SRCLANG_VALUE_AS_STRING(args[0]));
-    int status = WEXITSTATUS(system(chstr));
-    free(chstr);
-    return SRCLANG_VALUE_NUMBER(status);
+    return SRCLANG_VALUE_NUMBER(WEXITSTATUS(
+            system(ws2s(SRCLANG_VALUE_AS_STRING(args[0])).c_str())));
 }
 
 SRCLANG_MODULE_FUNC(Unsetenv) {
     SRCLANG_CHECK_ARGS_EXACT(1);
     SRCLANG_CHECK_ARGS_TYPE(0, ValueType::String);
-    auto chstr = wchtoch(SRCLANG_VALUE_AS_STRING(args[0]));
-    int status = unsetenv(chstr);
-    free(chstr);
-    SAFE_RETURN(status);
+    SAFE_RETURN(WEXITSTATUS(
+            unsetenv(ws2s(SRCLANG_VALUE_AS_STRING(args[0])).c_str())));
 }
 
 SRCLANG_MODULE_FUNC(Unshare) {

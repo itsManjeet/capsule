@@ -49,7 +49,7 @@ SRCLANG_BUILTIN(len) {
     SRCLANG_CHECK_ARGS_EXACT(1);
     switch (SRCLANG_VALUE_GET_TYPE(args[0])) {
     case ValueType::String:
-        return SRCLANG_VALUE_NUMBER(wchlen(SRCLANG_VALUE_AS_STRING(args[0])));
+        return SRCLANG_VALUE_NUMBER(wcslen(SRCLANG_VALUE_AS_STRING(args[0])));
     case ValueType::List:
         return SRCLANG_VALUE_NUMBER(SRCLANG_VALUE_AS_LIST(args[0])->size());
     case ValueType::Pointer:
@@ -69,11 +69,11 @@ SRCLANG_BUILTIN(append) {
     }
     case ValueType::String: {
         auto str = SRCLANG_VALUE_AS_STRING(args[0]);
-        auto const len = wchlen(str);
+        auto const len = wcslen(str);
         switch (SRCLANG_VALUE_GET_TYPE(args[1])) {
         case ValueType::String: {
             auto str2 = SRCLANG_VALUE_AS_STRING(args[1]);
-            auto const len2 = wchlen(str2);
+            auto const len2 = wcslen(str2);
             wchar_t* new_str = str;
             str = static_cast<wchar_t*>(realloc(new_str, len + len2 + 1));
             if (str == nullptr) {
@@ -139,7 +139,7 @@ SRCLANG_BUILTIN(pop) {
     }
     case ValueType::String: {
         auto const str = SRCLANG_VALUE_AS_STRING(args[0]);
-        auto const len = wchlen(str);
+        auto const len = wcslen(str);
         str[len - 1] = '\0';
         return SRCLANG_VALUE_STRING(str);
     }
@@ -160,7 +160,7 @@ SRCLANG_BUILTIN(clone) {
         case ValueType::String:
         case ValueType::Error: {
             return SRCLANG_VALUE_STRING(
-                    wchdup(SRCLANG_VALUE_AS_STRING(args[0])));
+                    wcsdup(SRCLANG_VALUE_AS_STRING(args[0])));
         }
         case ValueType::List: {
             auto const list = SRCLANG_VALUE_AS_LIST(args[0]);
