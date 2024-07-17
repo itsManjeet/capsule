@@ -115,7 +115,7 @@ let Screen = fun (width, height) {
     };
 };
 
-let appRun = fun (f) {
+let runApp = fun (f) {
     let size = sys.Gettermsize();
     let screen = Screen(size.Columns, size.Rows);
     

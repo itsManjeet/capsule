@@ -1,22 +1,21 @@
 #ifndef SRCLANG_SYMBOLTABLE_H
 #define SRCLANG_SYMBOLTABLE_H
 
-#include <optional>
-
 #include "Value.h"
+#include <optional>
 
 namespace SrcLang {
 
-#define SRCLANG_SYMBOL_SCOPE_LIST \
-    X(BUILTIN)                    \
-    X(GLOBAL)                     \
-    X(LOCAL)                      \
-    X(FREE)                       \
-    X(FUNCTION)                   \
+#define SRCLANG_SYMBOL_SCOPE_LIST                                              \
+    X(BUILTIN)                                                                 \
+    X(GLOBAL)                                                                  \
+    X(LOCAL)                                                                   \
+    X(FREE)                                                                    \
+    X(FUNCTION)                                                                \
     X(TYPE)
 
 struct Symbol {
-    std::string name{};
+    std::wstring name{};
     enum Scope {
 #define X(id) id,
         SRCLANG_SYMBOL_SCOPE_LIST
@@ -25,32 +24,35 @@ struct Symbol {
     int index{0};
 };
 
-static const std::vector<std::string> SRCLANG_SYMBOL_ID = {
-#define X(id) #id,
-    SRCLANG_SYMBOL_SCOPE_LIST
-#undef X
+static const std::vector<std::wstring> SRCLANG_SYMBOL_ID = {
+        L"Builtin",
+        L"Global",
+        L"Local",
+        L"Free",
+        L"Function",
+        L"Type",
 };
 
 class SymbolTable {
-   public:
-    SymbolTable *parent{nullptr};
-    std::map<std::string, Symbol> store;
+public:
+    SymbolTable* parent{nullptr};
+    std::map<std::wstring, Symbol> store;
     std::vector<Symbol> free;
     int definitions{0};
 
-   public:
-    explicit SymbolTable(SymbolTable *parent = nullptr);
+public:
+    explicit SymbolTable(SymbolTable* parent = nullptr);
 
-    Symbol define(const std::string &name);
+    Symbol define(const std::wstring& name);
 
-    Symbol define(const std::string &name, int index);
+    Symbol define(const std::wstring& name, int index);
 
-    Symbol define(const Symbol &other);
+    Symbol define(const Symbol& other);
 
-    Symbol defineFun(const std::string &name);
+    Symbol defineFun(const std::wstring& name);
 
-    std::optional<Symbol> resolve(const std::string &name);
+    std::optional<Symbol> resolve(const std::wstring& name);
 };
-}  // namespace SrcLang
+} // namespace SrcLang
 
-#endif  // SRCLANG_SYMBOLTABLE_H
+#endif // SRCLANG_SYMBOLTABLE_H

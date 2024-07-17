@@ -2,21 +2,21 @@
 using namespace SrcLang;
 
 #ifdef _WIN32
-#include <windows.h>
+#    include <windows.h>
 #else
-#include <sys/ioctl.h>
-#include <sys/stat.h>
-#include <termios.h>
-#include <unistd.h>
+#    include <sys/ioctl.h>
+#    include <sys/stat.h>
+#    include <termios.h>
+#    include <unistd.h>
 #endif
 #include <dirent.h>
 
 #ifndef PATH_MAX
-#define PATH_MAX 8124
+#    define PATH_MAX 8124
 #endif
 
 #define SYSERROR SRCLANG_VALUE_SET_REF(SRCLANG_VALUE_ERROR(strerror(errno)))
-#define SAFE_SYSCALL(call) \
+#define SAFE_SYSCALL(call)                                                     \
     if ((call) < 0) return SYSERROR;
 
 #define SAFE_RETURN(call) SAFE_SYSCALL(call) return SRCLANG_VALUE_TRUE;
@@ -24,7 +24,7 @@ using namespace SrcLang;
 SRCLANG_MODULE_FUNC(Environ) {
     SRCLANG_CHECK_ARGS_EXACT(0);
     auto env = new SrcLangList();
-    for (char **e = environ; e != nullptr; e++) {
+    for (char** e = environ; e != nullptr; e++) {
         env->push_back(SRCLANG_VALUE_SET_REF(SRCLANG_VALUE_STRING(e)));
     }
     return SRCLANG_VALUE_LIST(env);
@@ -39,17 +39,19 @@ SRCLANG_MODULE_FUNC(Exec) {
     SRCLANG_CHECK_ARGS_EXACT(2);
 
     SRCLANG_CHECK_ARGS_TYPE(0, ValueType::String);
-    auto cmd = reinterpret_cast<const char *>(SRCLANG_VALUE_AS_OBJECT(args[0])->pointer);
+    auto cmd = reinterpret_cast<const char*>(
+            SRCLANG_VALUE_AS_OBJECT(args[0])->pointer);
 
     SRCLANG_CHECK_ARGS_TYPE(1, ValueType::Closure);
 
     char buffer[128] = {};
-    FILE *fd = popen(cmd, "r");
+    FILE* fd = popen(cmd, "r");
     if (fd == nullptr) {
         return SRCLANG_VALUE_SET_REF(SRCLANG_VALUE_ERROR(strerror(errno)));
     }
     while (fgets(buffer, sizeof(buffer), fd) != nullptr) {
-        interpreter->call(args[1], {SRCLANG_VALUE_SET_REF(SRCLANG_VALUE_STRING(buffer))});
+        interpreter->call(
+                args[1], {SRCLANG_VALUE_SET_REF(SRCLANG_VALUE_STRING(buffer))});
     }
     int status = pclose(fd);
     status = WEXITSTATUS(status);
@@ -59,7 +61,10 @@ SRCLANG_MODULE_FUNC(Exec) {
 SRCLANG_MODULE_FUNC(Chdir) {
     SRCLANG_CHECK_ARGS_EXACT(1);
     SRCLANG_CHECK_ARGS_TYPE(0, ValueType::String);
-    SAFE_RETURN(chdir(SRCLANG_VALUE_AS_STRING(args[0])));
+    auto ch8str = wchtoch(SRCLANG_VALUE_AS_STRING(args[0]));
+    int status = chdir(ch8str);
+    free(ch8str);
+    SAFE_RETURN(status);
 }
 
 SRCLANG_MODULE_FUNC(Dup) {
@@ -70,7 +75,7 @@ SRCLANG_MODULE_FUNC(Dup) {
         result = dup(SRCLANG_VALUE_AS_NUMBER(args[0]));
     } else {
         result = dup2(SRCLANG_VALUE_AS_NUMBER(args[0]),
-                      SRCLANG_VALUE_AS_NUMBER(args[1]));
+                SRCLANG_VALUE_AS_NUMBER(args[1]));
     }
     SAFE_SYSCALL(result);
     return SRCLANG_VALUE_NUMBER(result);
@@ -95,17 +100,19 @@ SRCLANG_MODULE_FUNC(Getcwd) {
 SRCLANG_MODULE_FUNC(Getenv) {
     SRCLANG_CHECK_ARGS_RANGE(1, 2);
     SRCLANG_CHECK_ARGS_TYPE(0, ValueType::String);
-    char *value = getenv(SRCLANG_VALUE_AS_STRING(args[0]));
+    auto ch8str = wchtoch(SRCLANG_VALUE_AS_STRING(args[0]));
+    char* value = getenv(ch8str);
+    free(ch8str);
     if (value == nullptr) return SRCLANG_VALUE_STRING(strdup(value));
     return args.size() == 2 ? args[1] : SRCLANG_VALUE_NULL;
 }
 
-#define DIRECT_METHOD(id, fun)              \
-    SRCLANG_MODULE_FUNC(id) {               \
-        SRCLANG_CHECK_ARGS_EXACT(0);        \
-        int value = fun();                  \
-        if (value == -1) return SYSERROR;   \
-        return SRCLANG_VALUE_NUMBER(value); \
+#define DIRECT_METHOD(id, fun)                                                 \
+    SRCLANG_MODULE_FUNC(id) {                                                  \
+        SRCLANG_CHECK_ARGS_EXACT(0);                                           \
+        int value = fun();                                                     \
+        if (value == -1) return SYSERROR;                                      \
+        return SRCLANG_VALUE_NUMBER(value);                                    \
     }
 
 DIRECT_METHOD(Getegid, getegid)
@@ -124,13 +131,13 @@ SRCLANG_MODULE_FUNC(Getkey) {
 
     SAFE_SYSCALL(tcsetattr(STDIN_FILENO, TCSANOW, &raw));
 
-    char *buf = new char[6];
-    int count = read(STDIN_FILENO, buf, 6);
+    char buf[6];
+    auto const count = read(STDIN_FILENO, buf, 6);
     tcsetattr(STDIN_FILENO, TCSANOW, &original);
     if (count == -1) return SYSERROR;
     buf[count] = '\0';
 
-    return SRCLANG_VALUE_STRING(buf);
+    return SRCLANG_VALUE_STRING(chtowch(buf));
 }
 
 DIRECT_METHOD(Getgid, getgid)
@@ -176,8 +183,8 @@ SRCLANG_MODULE_FUNC(Gettermsize) {
     SAFE_SYSCALL(ioctl(fd, TIOCGWINSZ, &size));
 
     auto geo = new SrcLangMap();
-    (*geo)["Columns"] = SRCLANG_VALUE_NUMBER(size.ws_col);
-    (*geo)["Rows"] = SRCLANG_VALUE_NUMBER(size.ws_row);
+    (*geo)[L"Columns"] = SRCLANG_VALUE_NUMBER(size.ws_col);
+    (*geo)[L"Rows"] = SRCLANG_VALUE_NUMBER(size.ws_row);
 
     return SRCLANG_VALUE_MAP(geo);
 }
@@ -189,9 +196,7 @@ SRCLANG_MODULE_FUNC(Mkdir) {
 
     std::error_code error;
     std::filesystem::create_directories(path, error);
-    if (error) {
-        return SRCLANG_VALUE_ERROR(strdup(error.message().c_str()));
-    }
+    if (error) { return SRCLANG_VALUE_ERROR(strdup(error.message().c_str())); }
     return SRCLANG_VALUE_TRUE;
 }
 
@@ -199,8 +204,9 @@ SRCLANG_MODULE_FUNC(Opendir) {
     SRCLANG_CHECK_ARGS_EXACT(2);
     SRCLANG_CHECK_ARGS_TYPE(0, ValueType::String);
     SRCLANG_CHECK_ARGS_TYPE(1, ValueType::Closure);
-
-    auto dir = opendir(SRCLANG_VALUE_AS_STRING(args[0]));
+    auto ch8str = wchtoch(SRCLANG_VALUE_AS_STRING(args[0]));
+    auto dir = opendir(ch8str);
+    free(ch8str);
     if (dir == nullptr) return SYSERROR;
 
     auto cmd_args = std::vector<Value>(2);
@@ -210,15 +216,17 @@ SRCLANG_MODULE_FUNC(Opendir) {
     auto svalue = interpreter->addObject(SRCLANG_VALUE_MAP(sdirent));
     Value result = SRCLANG_VALUE_TRUE;
 
-    for (dirent *iter; iter = readdir(dir);) {
-        (*sdirent)["name"] = SRCLANG_VALUE_SET_REF(SRCLANG_VALUE_STRING(iter->d_name));
-        (*sdirent)["type"] = SRCLANG_VALUE_NUMBER(iter->d_type);
-        (*sdirent)["inode"] = SRCLANG_VALUE_NUMBER(iter->d_ino);
-        (*sdirent)["offset"] = SRCLANG_VALUE_NUMBER(iter->d_off);
-        (*sdirent)["reclen"] = SRCLANG_VALUE_NUMBER(iter->d_reclen);
+    for (dirent* iter; iter = readdir(dir);) {
+        (*sdirent)[L"name"] =
+                SRCLANG_VALUE_SET_REF(SRCLANG_VALUE_STRING(iter->d_name));
+        (*sdirent)[L"type"] = SRCLANG_VALUE_NUMBER(iter->d_type);
+        (*sdirent)[L"inode"] = SRCLANG_VALUE_NUMBER(iter->d_ino);
+        (*sdirent)[L"offset"] = SRCLANG_VALUE_NUMBER(iter->d_off);
+        (*sdirent)[L"reclen"] = SRCLANG_VALUE_NUMBER(iter->d_reclen);
 
         cmd_args[0] = svalue;
-        if (result = interpreter->call(args[1], cmd_args); SRCLANG_VALUE_IS_ERROR(result)) {
+        if (result = interpreter->call(args[1], cmd_args);
+                SRCLANG_VALUE_IS_ERROR(result)) {
             break;
         }
     }
@@ -229,25 +237,27 @@ SRCLANG_MODULE_FUNC(Opendir) {
 
 SRCLANG_MODULE_FUNC(Open) {
     SRCLANG_CHECK_ARGS_RANGE(1, 2);
-    const char *mode = "a+";
+    const char* mode = "a+";
     if (args.size() == 2) {
         SRCLANG_CHECK_ARGS_TYPE(1, ValueType::String);
-        mode = reinterpret_cast<const char *>(SRCLANG_VALUE_AS_OBJECT(args[1])->pointer);
+        mode = reinterpret_cast<const char*>(
+                SRCLANG_VALUE_AS_OBJECT(args[1])->pointer);
     }
 
-    FILE *fp = nullptr;
+    FILE* fp = nullptr;
     switch (SRCLANG_VALUE_GET_TYPE(args[0])) {
-        case ValueType::Number:
-            fp = fdopen(SRCLANG_VALUE_AS_NUMBER(args[0]), mode);
-            break;
-        case ValueType::String:
-            fp = fopen(reinterpret_cast<const char *>(SRCLANG_VALUE_AS_OBJECT(args[0])->pointer), mode);
-            break;
-        case ValueType::Pointer:
-            fp = reinterpret_cast<FILE *>(SRCLANG_VALUE_AS_OBJECT(args[0])->pointer);
-            break;
-        default:
-            SRCLANG_CHECK_ARGS_TYPE(0, ValueType::String);
+    case ValueType::Number:
+        fp = fdopen(SRCLANG_VALUE_AS_NUMBER(args[0]), mode);
+        break;
+    case ValueType::String:
+        fp = fopen(reinterpret_cast<const char*>(
+                           SRCLANG_VALUE_AS_OBJECT(args[0])->pointer),
+                mode);
+        break;
+    case ValueType::Pointer:
+        fp = reinterpret_cast<FILE*>(SRCLANG_VALUE_AS_OBJECT(args[0])->pointer);
+        break;
+    default: SRCLANG_CHECK_ARGS_TYPE(0, ValueType::String);
     }
     if (fp == nullptr) {
         return SRCLANG_VALUE_SET_REF(SRCLANG_VALUE_ERROR(strerror(errno)));
@@ -256,27 +266,33 @@ SRCLANG_MODULE_FUNC(Open) {
     auto object = new SrcLangMap();
     auto value = SRCLANG_VALUE_MAP(object);
 
-    object->insert({"__ptr__", SRCLANG_VALUE_SET_CLEANUP(
-                                   SRCLANG_VALUE_POINTER(reinterpret_cast<void *>(fp)),
-                                   +[](void *ptr) {
-                                       auto fp = reinterpret_cast<FILE *>(ptr);
-                                       if (fp != nullptr)
-                                           fclose(fp);
-                                   })});
+    object->insert({L"__ptr__",
+            SRCLANG_VALUE_SET_CLEANUP(
+                    SRCLANG_VALUE_POINTER(reinterpret_cast<void*>(fp)),
+                    +[](void* ptr) {
+                        auto fp = reinterpret_cast<FILE*>(ptr);
+                        if (fp != nullptr) fclose(fp);
+                    })});
 
-#define ADD_METHOD(id, fun)                                                                                                                    \
-    object->insert({ #id, SRCLANG_VALUE_BOUND(value, SRCLANG_VALUE_BUILTIN_NEW(+[](std::vector<Value> &args) -> Value {                        \
-                                                  SRCLANG_CHECK_ARGS_TYPE(0, ValueType::Map);                                                  \
-                                                  auto self = reinterpret_cast<SrcLangMap *>(SRCLANG_VALUE_AS_OBJECT(args[0])->pointer);       \
-                                                  auto file = reinterpret_cast<FILE *>(SRCLANG_VALUE_AS_OBJECT(self->at("__ptr__"))->pointer); \
-                                                  fun                                                                                          \
-                                              })) });
+#define ADD_METHOD(id, fun)                                                    \
+    object->insert({s2ws(#id),                                                 \
+            SRCLANG_VALUE_BOUND(value,                                         \
+                    SRCLANG_VALUE_BUILTIN_NEW(+[](std::vector<Value>& args)    \
+                                                      -> Value {               \
+                        SRCLANG_CHECK_ARGS_TYPE(0, ValueType::Map);            \
+                        auto self = reinterpret_cast<SrcLangMap*>(             \
+                                SRCLANG_VALUE_AS_OBJECT(args[0])->pointer);    \
+                        auto file = reinterpret_cast<FILE*>(                   \
+                                SRCLANG_VALUE_AS_OBJECT(self->at(L"__ptr__"))  \
+                                        ->pointer);                            \
+                        fun                                                    \
+                    }))});
 
     ADD_METHOD(Write, {
         SRCLANG_CHECK_ARGS_EXACT(2);
         SRCLANG_CHECK_ARGS_TYPE(1, ValueType::String);
         auto data = SRCLANG_VALUE_AS_STRING(args[1]);
-        int num = fwrite(data, sizeof(char), strlen(data), file);
+        int num = fwrite(data, sizeof(wchar_t), wchlen(data), file);
         if (num == -1) {
             return SRCLANG_VALUE_SET_REF(SRCLANG_VALUE_ERROR(strerror(errno)));
         }
@@ -331,7 +347,8 @@ SRCLANG_MODULE_FUNC(Open) {
 
     ADD_METHOD(Isatty, {
         SRCLANG_CHECK_ARGS_EXACT(1);
-        return isatty(fileno(file)) == 1 ? SRCLANG_VALUE_TRUE : SRCLANG_VALUE_FALSE;
+        return isatty(fileno(file)) == 1 ? SRCLANG_VALUE_TRUE
+                                         : SRCLANG_VALUE_FALSE;
     })
 
     ADD_METHOD(Stat, {
@@ -341,16 +358,16 @@ SRCLANG_MODULE_FUNC(Open) {
             return SRCLANG_VALUE_SET_REF(SRCLANG_VALUE_ERROR(strerror(errno)));
         }
         auto status = new SrcLangMap();
-        (*status)["Device"] = SRCLANG_VALUE_NUMBER(s.st_dev);
-        (*status)["Inode"] = SRCLANG_VALUE_NUMBER(s.st_ino);
-        (*status)["Links"] = SRCLANG_VALUE_NUMBER(s.st_nlink);
-        (*status)["Mode"] = SRCLANG_VALUE_NUMBER(s.st_mode);
-        (*status)["Uid"] = SRCLANG_VALUE_NUMBER(s.st_uid);
-        (*status)["Gid"] = SRCLANG_VALUE_NUMBER(s.st_gid);
-        (*status)["Rdev"] = SRCLANG_VALUE_NUMBER(s.st_rdev);
-        (*status)["Size"] = SRCLANG_VALUE_NUMBER(s.st_size);
-        (*status)["Blocksize"] = SRCLANG_VALUE_NUMBER(s.st_blksize);
-        (*status)["Blocks"] = SRCLANG_VALUE_NUMBER(s.st_blocks);
+        (*status)[L"Device"] = SRCLANG_VALUE_NUMBER(s.st_dev);
+        (*status)[L"Inode"] = SRCLANG_VALUE_NUMBER(s.st_ino);
+        (*status)[L"Links"] = SRCLANG_VALUE_NUMBER(s.st_nlink);
+        (*status)[L"Mode"] = SRCLANG_VALUE_NUMBER(s.st_mode);
+        (*status)[L"Uid"] = SRCLANG_VALUE_NUMBER(s.st_uid);
+        (*status)[L"Gid"] = SRCLANG_VALUE_NUMBER(s.st_gid);
+        (*status)[L"Rdev"] = SRCLANG_VALUE_NUMBER(s.st_rdev);
+        (*status)[L"Size"] = SRCLANG_VALUE_NUMBER(s.st_size);
+        (*status)[L"Blocksize"] = SRCLANG_VALUE_NUMBER(s.st_blksize);
+        (*status)[L"Blocks"] = SRCLANG_VALUE_NUMBER(s.st_blocks);
         return SRCLANG_VALUE_MAP(status);
     })
 
@@ -385,25 +402,28 @@ SRCLANG_MODULE_FUNC(Open) {
 SRCLANG_MODULE_FUNC(Putenv) {
     SRCLANG_CHECK_ARGS_EXACT(1);
     SRCLANG_CHECK_ARGS_TYPE(0, ValueType::String);
-    SAFE_RETURN(putenv((char *)SRCLANG_VALUE_AS_STRING(args[0])));
+    SAFE_RETURN(putenv((char*)SRCLANG_VALUE_AS_STRING(args[0])));
 }
 
 SRCLANG_MODULE_FUNC(Random) {
     SRCLANG_CHECK_ARGS_RANGE(0, 2);
     if (args.size() == 1) {
-        return SRCLANG_VALUE_NUMBER((rand() % (long)SRCLANG_VALUE_AS_NUMBER(args[0])));
+        return SRCLANG_VALUE_NUMBER(
+                (rand() % (long)SRCLANG_VALUE_AS_NUMBER(args[0])));
     } else if (args.size() == 2) {
-        return SRCLANG_VALUE_NUMBER((rand() % (long)SRCLANG_VALUE_AS_NUMBER(args[1])) + SRCLANG_VALUE_AS_NUMBER(args[0]));
+        return SRCLANG_VALUE_NUMBER(
+                (rand() % (long)SRCLANG_VALUE_AS_NUMBER(args[1])) +
+                SRCLANG_VALUE_AS_NUMBER(args[0]));
     } else {
         return SRCLANG_VALUE_NUMBER(rand());
     }
 }
 
-#define SET_METHOD(id, fun)                                 \
-    SRCLANG_MODULE_FUNC(id) {                               \
-        SRCLANG_CHECK_ARGS_EXACT(1);                        \
-        SRCLANG_CHECK_ARGS_TYPE(0, ValueType::Number);      \
-        SAFE_RETURN(fun(SRCLANG_VALUE_AS_NUMBER(args[0]))); \
+#define SET_METHOD(id, fun)                                                    \
+    SRCLANG_MODULE_FUNC(id) {                                                  \
+        SRCLANG_CHECK_ARGS_EXACT(1);                                           \
+        SRCLANG_CHECK_ARGS_TYPE(0, ValueType::Number);                         \
+        SAFE_RETURN(fun(SRCLANG_VALUE_AS_NUMBER(args[0])));                    \
     }
 
 SET_METHOD(Setegid, setegid)
@@ -415,26 +435,33 @@ SRCLANG_MODULE_FUNC(Setns) {
     SRCLANG_CHECK_ARGS_TYPE(0, ValueType::Number);
     SRCLANG_CHECK_ARGS_TYPE(1, ValueType::Number);
 
-    SAFE_RETURN(setns(SRCLANG_VALUE_AS_NUMBER(args[0]),
-                      SRCLANG_VALUE_AS_NUMBER(args[1])))
+    SAFE_RETURN(setns(
+            SRCLANG_VALUE_AS_NUMBER(args[0]), SRCLANG_VALUE_AS_NUMBER(args[1])))
 }
 
 SRCLANG_MODULE_FUNC(Strerror) {
     SRCLANG_CHECK_ARGS_RANGE(0, 1);
     if (args.size() == 1) SRCLANG_CHECK_ARGS_TYPE(0, ValueType::String);
-    return SRCLANG_VALUE_SET_REF(SRCLANG_VALUE_STRING(strerror(args.size() == 1 ? SRCLANG_VALUE_AS_NUMBER(args[0]) : errno)));
+    return SRCLANG_VALUE_SET_REF(SRCLANG_VALUE_STRING(strerror(
+            args.size() == 1 ? SRCLANG_VALUE_AS_NUMBER(args[0]) : errno)));
 }
 
 SRCLANG_MODULE_FUNC(System) {
     SRCLANG_CHECK_ARGS_EXACT(1);
     SRCLANG_CHECK_ARGS_TYPE(0, ValueType::String);
-    return WEXITSTATUS(system(SRCLANG_VALUE_AS_STRING(args[0])));
+    auto chstr = wchtoch(SRCLANG_VALUE_AS_STRING(args[0]));
+    int status = WEXITSTATUS(system(chstr));
+    free(chstr);
+    return SRCLANG_VALUE_NUMBER(status);
 }
 
 SRCLANG_MODULE_FUNC(Unsetenv) {
     SRCLANG_CHECK_ARGS_EXACT(1);
     SRCLANG_CHECK_ARGS_TYPE(0, ValueType::String);
-    SAFE_RETURN(unsetenv(SRCLANG_VALUE_AS_STRING(args[0])));
+    auto chstr = wchtoch(SRCLANG_VALUE_AS_STRING(args[0]));
+    int status = unsetenv(chstr);
+    free(chstr);
+    SAFE_RETURN(status);
 }
 
 SRCLANG_MODULE_FUNC(Unshare) {

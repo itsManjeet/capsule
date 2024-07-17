@@ -1,31 +1,29 @@
 #ifndef SRCLANG_INTERPRETER_H
 #define SRCLANG_INTERPRETER_H
 
-#include <filesystem>
-#include <sstream>
-#include <variant>
-
 #include "ByteCode.h"
 #include "Compiler.h"
 #include "Function.h"
 #include "MemoryManager.h"
 #include "SymbolTable.h"
 #include "Value.h"
+#include <filesystem>
+#include <sstream>
+#include <variant>
 
 namespace SrcLang {
 
 class Interpreter {
-   public:
-    using OptionType = std::variant<std::string, int, float, bool>;
+public:
+    using OptionType = std::variant<std::wstring, int, float, bool>;
 
-    class Options : public std::map<std::string, OptionType> {
-       public:
-        explicit Options(std::map<std::string, OptionType> const &options)
-            : std::map<std::string, OptionType>(options) {
-        }
+    class Options : public std::map<std::wstring, OptionType> {
+    public:
+        explicit Options(std::map<std::wstring, OptionType> const& options)
+                : std::map<std::wstring, OptionType>(options) {}
     };
 
-   private:
+private:
     struct Frame {
         typename std::vector<Byte>::iterator ip;
         Value closure;
@@ -39,8 +37,9 @@ class Interpreter {
         std::vector<Frame> frames;
         std::vector<Frame>::iterator fp;
 
-        Context() : stack(1024), sp(stack.begin()), frames(2048), fp(frames.begin()) {
-        }
+        Context()
+                : stack(1024), sp(stack.begin()), frames(2048),
+                  fp(frames.begin()) {}
     };
 
     std::vector<Context> contexts;
@@ -59,14 +58,16 @@ class Interpreter {
     MemoryManager memoryManager;
     SymbolTable symbolTable;
 
-    std::map<std::string, std::pair<void *, Value>> handlers;
+    std::map<std::wstring, std::pair<void*, Value>> handlers;
 
-    std::stringstream errStream;
+    std::wstringstream errStream;
 
     std::vector<std::shared_ptr<DebugInfo>> debugInfo;
     bool debug{}, break_{};
 
-    void error(std::string const &msg);
+    void error(std::wstring const& msg);
+
+    void error(std::string const& msg) { return error(s2ws(msg)); }
 
     bool isEqual(Value a, Value b);
 
@@ -104,25 +105,24 @@ class Interpreter {
 
     bool run();
 
-    Value run(ByteCode &bytecode, const std::shared_ptr<DebugInfo> &debugInfo);
+    Value run(ByteCode& bytecode, const std::shared_ptr<DebugInfo>& debugInfo);
 
-    static Interpreter *m_globalActive;
+    static Interpreter* m_globalActive;
 
-   public:
+public:
     Interpreter();
 
-    template <typename T>
-    void setOption(const std::string &id, T t) {
+    template <typename T> void setOption(const std::wstring& id, T t) {
         options[id] = t;
     }
 
-    template <typename T>
-    T getOption(const std::string &id) {
+    template <typename T> T getOption(const std::wstring& id) {
         return std::get<T>(options[id]);
     }
 
-    void appendOption(const std::string &id, std::string value, const std::string &sep = ":") {
-        options[id] = std::get<std::string>(options[id]) + sep + value;
+    void appendOption(const std::wstring& id, std::wstring value,
+            const std::wstring& sep = L":") {
+        options[id] = std::get<std::wstring>(options[id]) + sep + value;
     }
 
     ~Interpreter();
@@ -137,25 +137,23 @@ class Interpreter {
 
     void pop_context();
 
-    Value call(Value callee, const std::vector<Value> &args);
+    Value call(Value callee, const std::vector<Value>& args);
 
-    Value run(const std::string &source, const std::string &filename);
+    Value run(const std::wstring& source, const std::wstring& filename);
 
-    std::filesystem::path search(const std::string &id);
+    std::wstring search(const std::wstring& id);
 
-    Value loadModule(std::filesystem::path modulePath);
+    Value loadModule(std::wstring modulePath);
 
-    std::string getError() {
-        std::string e = errStream.str();
+    std::wstring getError() {
+        std::wstring e = errStream.str();
         errStream.clear();
         return e;
     }
 
-    static Interpreter *globalActive() {
-        return m_globalActive;
-    }
+    static Interpreter* globalActive() { return m_globalActive; }
 };
 
-}  // namespace SrcLang
+} // namespace SrcLang
 
-#endif  // SRCLANG_INTERPRETER_H
+#endif // SRCLANG_INTERPRETER_H

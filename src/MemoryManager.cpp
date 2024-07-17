@@ -4,8 +4,7 @@
 
 using namespace SrcLang;
 
-MemoryManager::~MemoryManager() {
-}
+MemoryManager::~MemoryManager() {}
 
 void MemoryManager::mark(Value val) {
     if (SRCLANG_VALUE_IS_OBJECT(val)) {
@@ -18,13 +17,13 @@ void MemoryManager::mark(Value val) {
                   << SRCLANG_VALUE_GET_STRING(val) << "'" << std::endl;
 #endif
         if (obj->type == ValueType::List) {
-            mark(reinterpret_cast<std::vector<Value> *>(obj->pointer)->begin(),
-                 reinterpret_cast<std::vector<Value> *>(obj->pointer)->end());
+            mark(reinterpret_cast<std::vector<Value>*>(obj->pointer)->begin(),
+                    reinterpret_cast<std::vector<Value>*>(obj->pointer)->end());
         } else if (obj->type == ValueType::Closure) {
-            mark(reinterpret_cast<Closure *>(obj->pointer)->free.begin(),
-                 reinterpret_cast<Closure *>(obj->pointer)->free.end());
+            mark(reinterpret_cast<Closure*>(obj->pointer)->free.begin(),
+                    reinterpret_cast<Closure*>(obj->pointer)->free.end());
         } else if (obj->type == ValueType::Map) {
-            for (auto &i : *reinterpret_cast<SrcLangMap *>(obj->pointer)) {
+            for (auto& i : *reinterpret_cast<SrcLangMap*>(obj->pointer)) {
                 mark(i.second);
             }
         }
@@ -32,9 +31,7 @@ void MemoryManager::mark(Value val) {
 }
 
 void MemoryManager::mark(Heap::iterator start, Heap::iterator end) {
-    for (auto i = start; i != end; i++) {
-        mark(*i);
-    }
+    for (auto i = start; i != end; i++) { mark(*i); }
 }
 
 void MemoryManager::sweep() {
@@ -50,10 +47,8 @@ void MemoryManager::sweep() {
             iter++;
         } else {
 #ifdef SRCLANG_GC_DEBUG
-            std::cout << "   deallocating "
-                      << uintptr_t(object->pointer) << "'"
-                      << SRCLANG_VALUE_GET_STRING(*iter)
-                      << "'" << std::endl;
+            std::cout << "   deallocating " << uintptr_t(object->pointer) << "'"
+                      << SRCLANG_VALUE_GET_STRING(*iter) << "'" << std::endl;
 #endif
             SRCLANG_VALUE_FREE(*iter);
             iter = heap.erase(iter);

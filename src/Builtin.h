@@ -9,22 +9,21 @@ class Interpreter;
 
 typedef Value (*Builtin)(std::vector<Value>&, Interpreter*);
 
-#define SRCLANG_BUILTIN(id)                            \
-    Value builtin_##id(std::vector<Value> const& args, \
-                       Interpreter* interpreter)
-#define SRCLANG_BUILTIN_LIST \
-    X(println)               \
-    X(print)                 \
-    X(gc)                    \
-    X(len)                   \
-    X(append)                \
-    X(range)                 \
-    X(clone)                 \
-    X(eval)                  \
-    X(pop)                   \
-    X(alloc)                 \
-    X(free)                  \
-    X(bound)                 \
+#define SRCLANG_BUILTIN(id)                                                    \
+    Value builtin_##id(std::vector<Value> const& args, Interpreter* interpreter)
+#define SRCLANG_BUILTIN_LIST                                                   \
+    X(println)                                                                 \
+    X(print)                                                                   \
+    X(gc)                                                                      \
+    X(len)                                                                     \
+    X(append)                                                                  \
+    X(range)                                                                   \
+    X(clone)                                                                   \
+    X(eval)                                                                    \
+    X(pop)                                                                     \
+    X(alloc)                                                                   \
+    X(free)                                                                    \
+    X(bound)                                                                   \
     X(use)
 
 struct Interpreter;
@@ -40,6 +39,6 @@ enum Builtins {
 #undef X
 };
 extern std::vector<Value> builtins;
-}  // namespace SrcLang
+} // namespace SrcLang
 
-#endif  // SRCLANG_BUILTIN_H
+#endif // SRCLANG_BUILTIN_H

@@ -7,12 +7,12 @@
 
 namespace SrcLang {
 
-    struct DebugInfo {
-        std::string filename;
-        std::vector<int> lines;
-        int position{};
-    };
+struct DebugInfo {
+    std::wstring filename;
+    std::vector<int> lines;
+    int position{};
+};
 
-}  // SrcLang
+} // namespace SrcLang
 
-#endif  // SRCLANG_DEBUGINFO_H
+#endif // SRCLANG_DEBUGINFO_H

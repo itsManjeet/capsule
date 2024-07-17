@@ -1,4 +1,3 @@
 #include "Function.h"
 
-namespace SrcLang {
-}  // SrcLang
+namespace SrcLang {} // namespace SrcLang

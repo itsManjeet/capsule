@@ -1,26 +1,25 @@
 #ifndef SRCLANG_COMPILER_H
 #define SRCLANG_COMPILER_H
 
-#include <iostream>
-#include <sstream>
-#include <string>
-#include <vector>
-
 #include "ByteCode.h"
 #include "Function.h"
 #include "Instructions.h"
 #include "MemoryManager.h"
 #include "SymbolTable.h"
 #include "Value.h"
+#include <iostream>
+#include <sstream>
+#include <string>
+#include <vector>
 
 namespace SrcLang {
-using Iterator = std::string::const_iterator;
+using Iterator = std::wstring::const_iterator;
 
-#define SRCLANG_TOKEN_TYPE_LIST \
-    X(Reserved)                 \
-    X(Identifier)               \
-    X(String)                   \
-    X(Number)                   \
+#define SRCLANG_TOKEN_TYPE_LIST                                                \
+    X(Reserved)                                                                \
+    X(Identifier)                                                              \
+    X(String)                                                                  \
+    X(Number)                                                                  \
     X(Eof)
 
 enum class TokenType : uint8_t {
@@ -29,18 +28,20 @@ enum class TokenType : uint8_t {
 #undef X
 };
 
-static const std::vector<std::string> SRCLANG_TOKEN_ID = {
-#define X(id) #id,
-    SRCLANG_TOKEN_TYPE_LIST
-#undef X
+static const std::vector<std::wstring> SRCLANG_TOKEN_ID = {
+        L"Reserved",
+        L"Identifier",
+        L"String",
+        L"Number",
+        L"Eof",
 };
 
 struct Token {
     TokenType type;
-    std::string literal;
+    std::wstring literal;
     Iterator pos;
 
-    friend std::ostream &operator<<(std::ostream &os, const Token &token) {
+    friend std::wostream& operator<<(std::wostream& os, const Token& token) {
         os << SRCLANG_TOKEN_ID[static_cast<int>(token.type)] << ":"
            << token.literal;
         return os;
@@ -50,56 +51,54 @@ struct Token {
 class Interpreter;
 
 class Compiler {
-   private:
-    SymbolTable *symbol_table;
-    SymbolTable *global;
-    Interpreter *interpreter;
+private:
+    SymbolTable* symbol_table;
+    SymbolTable* global;
+    Interpreter* interpreter;
 
     Token cur, peek;
     Iterator iter, start, end;
-    std::string filename;
+    std::wstring filename;
 
     std::vector<std::string> loaded_imports;
     std::vector<std::unique_ptr<Instructions>> instructions;
-    DebugInfo *debug_info;
+    DebugInfo* debug_info;
     std::shared_ptr<DebugInfo> global_debug_info;
 
-    Instructions *inst();
+    Instructions* inst();
 
     void push_scope();
 
     std::unique_ptr<Instructions> pop_scope();
 
-    template <typename Message>
-    void error(const Message &mesg, Iterator pos) {
+    void error(const std::wstring& mesg, Iterator pos) {
         int line;
         Iterator line_start = get_error_pos(pos, line);
-        std::stringstream err;
-        err << filename << ":" << line << '\n';
+        std::wstringstream err;
+        err << filename << L":" << line << L'\n';
         if (pos != end) {
-            err << "ERROR: " << mesg << '\n';
-            err << " | " << get_error_line(line_start) << '\n'
-                << "   ";
-            for (; line_start != pos; ++line_start) err << ' ';
-            err << '^';
+            err << L"ERROR: " << mesg << L'\n';
+            err << L" | " << get_error_line(line_start) << L'\n' << L"   ";
+            for (; line_start != pos; ++line_start) err << L' ';
+            err << L'^';
         } else {
-            err << "Unexpected end of file. ";
-            err << mesg << " line " << line;
+            err << L"Unexpected end of file. ";
+            err << mesg << L" line " << line;
         }
-        throw std::runtime_error(err.str());
+        throw std::runtime_error(ws2s(err.str()));
     }
 
-    Iterator get_error_pos(Iterator err_pos, int &line) const;
+    Iterator get_error_pos(Iterator err_pos, int& line) const;
 
-    [[nodiscard]] std::string get_error_line(Iterator err_pos) const;
+    [[nodiscard]] std::wstring get_error_line(Iterator err_pos) const;
 
-    bool consume(const std::string &expected);
+    bool consume(const std::wstring& expected);
 
     bool consume(TokenType type);
 
     void check(TokenType type);
 
-    void expect(const std::string &expected);
+    void expect(const std::wstring& expected);
 
     void expect(TokenType type);
 
@@ -122,10 +121,9 @@ class Compiler {
         P_Primary,
     };
 
-    Precedence precedence(std::string tok);
+    Precedence precedence(std::wstring tok);
 
-    template <typename T, typename... Ts>
-    int emit(T t, Ts... ts) {
+    template <typename T, typename... Ts> int emit(T t, Ts... ts) {
         int line;
         get_error_pos(cur.pos, line);
         return inst()->emit(debug_info, line, t, ts...);
@@ -148,12 +146,12 @@ class Compiler {
     /// block ::= '{' <stmt>* '}'
     void block();
 
-    void value(Symbol *symbol);
+    void value(Symbol* symbol);
 
     /// fun '(' args ')' block
-    void function(Symbol *symbol, bool skip_args = false);
+    void function(Symbol* symbol, bool skip_args = false);
 
-    void native(Symbol *symbol);
+    void native(Symbol* symbol);
 
     /// list ::= '[' (<expression> % ',') ']'
     void list();
@@ -171,7 +169,8 @@ class Compiler {
     ///        ::= '(' expression ')'
     void prefix(bool can_assign);
 
-    /// binary ::= expr ('+' | '-' | '*' | '/' | '==' | '!=' | '<' | '>' | '>=' | '<=' | 'and' | 'or' | '|' | '&' | '>>' | '<<' | '%') expr
+    /// binary ::= expr ('+' | '-' | '*' | '/' | '==' | '!=' | '<' | '>' | '>='
+    /// | '<=' | 'and' | 'or' | '|' | '&' | '>>' | '<<' | '%') expr
     void binary(OpCode op, int prec);
 
     /// call ::= '(' (expr % ',' ) ')'
@@ -235,12 +234,9 @@ class Compiler {
     /// program ::= statement*
     void program();
 
-   public:
-    Compiler(
-        const std::string &source,
-        const std::string &filename,
-        Interpreter *interpreter,
-        SymbolTable *symbol_table);
+public:
+    Compiler(const std::wstring& source, const std::wstring& filename,
+            Interpreter* interpreter, SymbolTable* symbol_table);
 
     void compile();
 
@@ -249,6 +245,6 @@ class Compiler {
     std::shared_ptr<DebugInfo> debugInfo() { return global_debug_info; }
 };
 
-}  // namespace SrcLang
+} // namespace SrcLang
 
-#endif  // SRCLANG_COMPILER_H
+#endif // SRCLANG_COMPILER_H

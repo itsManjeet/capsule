@@ -1,45 +1,37 @@
+#include "Interpreter.h"
 #include <filesystem>
 #include <fstream>
 
-#include "Interpreter.h"
-
 #ifdef WITH_READLINE
-#include <readline/readline.h>
+#    include <readline/readline.h>
 #endif
 
 using namespace SrcLang;
 
-std::string getline(const std::string& prompt) {
-    std::string line;
-#ifdef WITH_READLINE
-    char* l = readline(prompt.c_str());
-    line = l;
-    free(l);
-#else
+std::wstring getline(const std::string& prompt) {
+    std::wstring line;
     std::cout << prompt;
-    std::getline(std::cin, line);
-#endif
+    std::getline(std::wcin, line);
     return line;
 }
 
-bool is_complete(const std::string& s) {
+bool is_complete(const std::wstring& s) {
     if (s.empty()) return false;
-    std::vector<char> stack;
-    std::map<char, char> mapping = {{'{', '}'}, {'(', ')'}, {'[', ']'}};
+    std::vector<wchar_t> stack;
+    std::map<wchar_t, wchar_t> mapping = {
+            {L'{', L'}'}, {L'(', L')'}, {L'[', L']'}};
     for (auto ch : s) {
         switch (ch) {
-            case '(':
-            case '{':
-            case '[':
-                stack.push_back(ch);
-                break;
-            case ')':
-            case '}':
-            case ']':
-                if (stack.empty()) return true;
-                if (mapping[stack.back()] != ch) return true;
-                stack.pop_back();
-                break;
+        case L'(':
+        case L'{':
+        case L'[': stack.push_back(ch); break;
+        case L')':
+        case L'}':
+        case L']':
+            if (stack.empty()) return true;
+            if (mapping[stack.back()] != ch) return true;
+            stack.pop_back();
+            break;
         }
     }
     return stack.empty();
@@ -61,17 +53,18 @@ int main(int argc, char** argv) {
                 }
             }
             if (strcmp(argv[i], "--debug") == 0)
-                interpreter.setOption("DEBUG", true);
+                interpreter.setOption(L"DEBUG", true);
             else if (strcmp(argv[i], "--break") == 0)
-                interpreter.setOption("BREAK", true);
+                interpreter.setOption(L"BREAK", true);
             else if (strcmp(argv[i], "--search-path") == 0)
-                interpreter.appendOption("SEARCH_PATH", argv[i]);
+                interpreter.appendOption(L"SEARCH_PATH", s2ws(argv[i]));
             else if (strcmp(argv[i], "--interactive") == 0)
                 interactive = true;
             else if (strcmp(argv[i], "--dump-ast") == 0)
-                interpreter.setOption("DUMP_AST", true);
+                interpreter.setOption(L"DUMP_AST", true);
             else {
-                std::cerr << "ERROR: invalid flag '" << argv[i] << "'" << std::endl;
+                std::cerr << "ERROR: invalid flag '" << argv[i] << "'"
+                          << std::endl;
                 return 1;
             }
         } else if (!filename && !isProgArgs && !interactive) {
@@ -83,12 +76,11 @@ int main(int argc, char** argv) {
         }
     }
 
-    std::string source;
+    std::wstring source;
     if (filename) {
-        std::ifstream reader(*filename);
-        source = std::string(
-            (std::istreambuf_iterator<char>(reader)),
-            (std::istreambuf_iterator<char>()));
+        std::wifstream reader(*filename);
+        source = std::wstring((std::istreambuf_iterator<wchar_t>(reader)),
+                (std::istreambuf_iterator<wchar_t>()));
     } else {
         interactive = true;
     }
@@ -103,12 +95,14 @@ int main(int argc, char** argv) {
             }
         }
 
-        auto result = interpreter.run(source, filename ? filename->string() : "stdin");
+        auto result = interpreter.run(
+                source, filename ? s2ws(filename->string()) : L"stdin");
         if (SRCLANG_VALUE_GET_TYPE(result) == ValueType::Error) {
             std::cerr << SRCLANG_VALUE_AS_ERROR(result) << std::endl;
             if (!interactive) return 1;
         } else if (interactive) {
-            std::cout << ":: " << SRCLANG_VALUE_GET_STRING(result) << std::endl;
+            std::wcout << L":: " << SRCLANG_VALUE_GET_STRING(result)
+                       << std::endl;
         } else {
             return 0;
         }
