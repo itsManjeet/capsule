@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include <string.h>
 
 #include "_priv.h"
@@ -157,6 +158,46 @@ BUILTIN_FUN(less) {
     return (a.as.integer < b.as.integer) ? CAPSULE_SYMBOL("T") : Capsule_nil;
 }
 
+BUILTIN_FUN(len) {
+    if (CAPSULE_NILP(args) || !CAPSULE_NILP(CAPSULE_CDR(args)))
+        return CAPSULE_ERROR_POS(CapsuleError_InvalidArgs, CAPSULE_POSITION(args));
+
+    Capsule str = CAPSULE_CAR(args);
+    if (str.type != CapsuleType_String) return CAPSULE_ERROR_POS(CapsuleError_InvalidType, CAPSULE_POSITION(args));
+
+    return CAPSULE_INT(strlen(str.as.symbol));
+}
+
+BUILTIN_FUN(str_at) {
+    if (CAPSULE_NILP(args) || CAPSULE_NILP(CAPSULE_CDR(args)) || !CAPSULE_NILP(CAPSULE_CDR(CAPSULE_CDR(args))))
+        return CAPSULE_ERROR_POS(CapsuleError_InvalidArgs, CAPSULE_POSITION(args));
+
+    Capsule str = CAPSULE_CAR(args);
+    Capsule pos = CAPSULE_CAR(CAPSULE_CDR(args));
+    if (str.type != CapsuleType_String || pos.type != CapsuleType_Integer) return CAPSULE_ERROR_POS(CapsuleError_InvalidType, CAPSULE_POSITION(args));
+
+    return CAPSULE_INT(str.as.symbol[pos.as.integer]);
+
+    return CAPSULE_INT(strlen(str.as.symbol));
+}
+
+BUILTIN_FUN(load) {
+    if (CAPSULE_NILP(args) || !CAPSULE_NILP(CAPSULE_CDR(args)))
+        return CAPSULE_ERROR_POS(CapsuleError_InvalidArgs, CAPSULE_POSITION(args));
+
+    Capsule str = CAPSULE_CAR(args);
+    if (str.type != CapsuleType_String) return CAPSULE_ERROR_POS(CapsuleError_InvalidType, CAPSULE_POSITION(args));
+
+    char* source = readfile(str.as.symbol);
+    if (source == NULL) {
+        return CAPSULE_ERROR_POS(CapsuleError_Unbound, CAPSULE_POSITION(str));
+    }
+    Capsule result = Capsule_eval(source, scope);
+    free(source);
+
+    return result;
+}
+
 void define_builtins(Capsule scope) {
 #define DEFINE_CONST(id, val) Capsule_scope_define(scope, CAPSULE_SYMBOL(id), val);
 #define DEFINE_BUILTIN(id, fun) Capsule_scope_define(scope, CAPSULE_SYMBOL(id), CAPSULE_BUILTIN(BUILTIN_ID(fun)));
@@ -182,4 +223,8 @@ void define_builtins(Capsule scope) {
     DEFINE_BUILTIN("<", less);
     DEFINE_BUILTIN("EQ?", eq);
     DEFINE_BUILTIN("TYPEOF", typeof);
+    DEFINE_BUILTIN("LOAD", load);
+
+    DEFINE_BUILTIN("STRING:LEN", len);
+    DEFINE_BUILTIN("STRING:AT", str_at);
 }
