@@ -6,6 +6,10 @@
 
 #include "_priv.h"
 
+#ifdef _WIN32
+#define strdup _strdup
+#endif
+
 struct Allocation {
     struct Pair pair;
     int mark: 1;
@@ -220,5 +224,8 @@ const char *CapsuleError_str(Capsule error) {
             return "Unbounded Capsule";
         case CapsuleError_InvalidArgs:
             return "Unexpected arguments";
+        default:
+            return "Unknown error";
     }
+
 }

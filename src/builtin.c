@@ -165,7 +165,7 @@ BUILTIN_FUN(len) {
     Capsule str = CAPSULE_CAR(args);
     if (str.type != CapsuleType_String) return CAPSULE_ERROR_POS(CapsuleError_InvalidType, CAPSULE_POSITION(args));
 
-    return CAPSULE_INT(strlen(str.as.symbol));
+    return CAPSULE_INT((long)strlen(str.as.symbol));
 }
 
 BUILTIN_FUN(str_at) {
@@ -178,8 +178,6 @@ BUILTIN_FUN(str_at) {
         return CAPSULE_ERROR_POS(CapsuleError_InvalidType, CAPSULE_POSITION(args));
 
     return CAPSULE_INT(str.as.symbol[pos.as.integer]);
-
-    return CAPSULE_INT(strlen(str.as.symbol));
 }
 
 BUILTIN_FUN(load) {

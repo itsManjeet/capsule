@@ -5,6 +5,10 @@
 
 #include "_priv.h"
 
+#ifdef _WIN32
+#define strdup _strdup
+#endif
+
 #ifdef HAS_READLINE
 #include <readline/readline.h>
 #else
