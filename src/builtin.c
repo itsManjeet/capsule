@@ -174,7 +174,8 @@ BUILTIN_FUN(str_at) {
 
     Capsule str = CAPSULE_CAR(args);
     Capsule pos = CAPSULE_CAR(CAPSULE_CDR(args));
-    if (str.type != CapsuleType_String || pos.type != CapsuleType_Integer) return CAPSULE_ERROR_POS(CapsuleError_InvalidType, CAPSULE_POSITION(args));
+    if (str.type != CapsuleType_String || pos.type != CapsuleType_Integer)
+        return CAPSULE_ERROR_POS(CapsuleError_InvalidType, CAPSULE_POSITION(args));
 
     return CAPSULE_INT(str.as.symbol[pos.as.integer]);
 
@@ -188,7 +189,7 @@ BUILTIN_FUN(load) {
     Capsule str = CAPSULE_CAR(args);
     if (str.type != CapsuleType_String) return CAPSULE_ERROR_POS(CapsuleError_InvalidType, CAPSULE_POSITION(args));
 
-    char* source = readfile(str.as.symbol);
+    char *source = readfile(str.as.symbol);
     if (source == NULL) {
         return CAPSULE_ERROR_POS(CapsuleError_Unbound, CAPSULE_POSITION(str));
     }

@@ -10,6 +10,7 @@
 #else
 
 static char buffer[2048];
+
 char *readline(const char *prompt) {
     fputs(prompt, stdout);
     fgets(buffer, sizeof(buffer), stdin);

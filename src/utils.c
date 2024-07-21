@@ -25,9 +25,9 @@ char *readfile(const char *path) {
         buffer[pos] = '\0';
     }
 
-label_close_file:
+    label_close_file:
     fclose(file);
 
-label_exit:
+    label_exit:
     return buffer;
 }

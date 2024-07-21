@@ -8,7 +8,7 @@
 
 struct Allocation {
     struct Pair pair;
-    int mark : 1;
+    int mark: 1;
     struct Allocation *next;
 };
 
@@ -84,12 +84,12 @@ Capsule Capsule_list_new(int n, ...) {
     va_list ap;
     Capsule list = Capsule_nil;
 
-    va_start(ap, n);
+            va_start(ap, n);
     while (n--) {
         Capsule item = va_arg(ap, Capsule);
         list = Capsule_cons(item, list);
     }
-    va_end(ap);
+            va_end(ap);
 
     Capsule_list_reverse(&list);
     return list;
@@ -124,7 +124,7 @@ void gc_mark(Capsule root) {
     if (!(root.type == CapsuleType_Pair || root.type == CapsuleType_Closure || root.type == CapsuleType_Macro))
         return;
 
-    a = (struct Allocation *)((char *)root.as.pair - offsetof(struct Allocation, pair));
+    a = (struct Allocation *) ((char *) root.as.pair - offsetof(struct Allocation, pair));
 
     if (a->mark)
         return;
@@ -200,7 +200,8 @@ void Capsule_print(Capsule pellet, FILE *out) {
             break;
         case CapsuleType_Error: {
             fprintf(out, "#<ERROR:%d>", CAPSULE_AS_ERROR(pellet));
-        } break;
+        }
+            break;
         default:
             fprintf(out, "#<VALUE:%d>", pellet.type);
             break;

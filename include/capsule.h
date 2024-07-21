@@ -4,11 +4,7 @@
 #include <stdio.h>
 
 typedef enum {
-    CapsuleError_None = 0,
-    CapsuleError_Syntax,
-    CapsuleError_Unbound,
-    CapsuleError_InvalidArgs,
-    CapsuleError_InvalidType
+    CapsuleError_None = 0, CapsuleError_Syntax, CapsuleError_Unbound, CapsuleError_InvalidArgs, CapsuleError_InvalidType
 } CapsuleError;
 
 struct Capsule;
@@ -71,11 +67,15 @@ Capsule Capsule_read(const char *source);
 void Capsule_print(Capsule capsule, FILE *out);
 
 Capsule Capsule_scope_new(Capsule parent);
+
 int Capsule_scope_define(Capsule scope, Capsule symbol, Capsule as);
+
 Capsule Capsule_scope_lookup(Capsule scope, Capsule symbol);
+
 int Capsule_scope_set(Capsule scope, Capsule symbol, Capsule as);
 
 Capsule Capsule_eval_expr(Capsule expr, Capsule scope);
+
 Capsule Capsule_eval(const char *source, Capsule scope);
 
 Capsule Capsule_cons(Capsule car_val, Capsule cdr_val);
@@ -83,10 +83,15 @@ Capsule Capsule_cons(Capsule car_val, Capsule cdr_val);
 Capsule Capsule_symbol_new(const char *s);
 
 int Capsule_listp(Capsule expr);
+
 Capsule Capsule_list_clone(Capsule list);
+
 Capsule Capsule_list_new(int n, ...);
+
 Capsule Capsule_list_at(Capsule list, int k);
+
 void Capsule_list_set(Capsule list, int k, Capsule as);
+
 void Capsule_list_reverse(Capsule *list);
 
 #endif

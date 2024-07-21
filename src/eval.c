@@ -24,13 +24,11 @@ Capsule make_closure(Capsule scope, Capsule args, Capsule body) {
 }
 
 Capsule make_frame(Capsule parent, Capsule scope, Capsule tail) {
-    return Capsule_cons(parent,
-                        Capsule_cons(scope,
-                                     Capsule_cons(Capsule_nil,
-                                                  Capsule_cons(tail,
-                                                               Capsule_cons(Capsule_nil,
-                                                                            Capsule_cons(Capsule_nil,
-                                                                                         Capsule_nil))))));
+    return Capsule_cons(parent, Capsule_cons(scope, Capsule_cons(Capsule_nil, Capsule_cons(tail,
+                                                                                           Capsule_cons(Capsule_nil,
+                                                                                                        Capsule_cons(
+                                                                                                                Capsule_nil,
+                                                                                                                Capsule_nil))))));
 }
 
 int eval_do_exec(Capsule *stack, Capsule *expr, Capsule *scope) {
@@ -148,7 +146,7 @@ int eval_do_return(Capsule *stack, Capsule *expr, Capsule *scope, Capsule *resul
     } else if (op.type == CapsuleType_Symbol) {
         if (strcmp(op.as.symbol, "DEFINE") == 0) {
             Capsule sym = Capsule_list_at(*stack, 4);
-            (void)Capsule_scope_define(*scope, sym, *result);
+            (void) Capsule_scope_define(*scope, sym, *result);
             *stack = CAPSULE_CAR(*stack);
             *expr = Capsule_cons(CAPSULE_SYMBOL("QUOTE"), Capsule_cons(sym, Capsule_nil));
             return CapsuleError_None;
@@ -175,7 +173,7 @@ int eval_do_return(Capsule *stack, Capsule *expr, Capsule *scope, Capsule *resul
         *stack = CAPSULE_CAR(*stack);
         return CapsuleError_None;
     } else {
-    store_arg:
+        store_arg:
 
         args = Capsule_list_at(*stack, 4);
         Capsule_list_set(*stack, 4, Capsule_cons(*result, args));
@@ -232,7 +230,7 @@ Capsule Capsule_eval_expr(Capsule expr, Capsule scope) {
                         sym = CAPSULE_CAR(sym);
                         if (sym.type != CapsuleType_Symbol)
                             return CAPSULE_ERROR(CapsuleError_InvalidType);
-                        (void)Capsule_scope_define(scope, sym, result);
+                        (void) Capsule_scope_define(scope, sym, result);
                         result = sym;
                     } else if (sym.type == CapsuleType_Symbol) {
                         if (!CAPSULE_NILP(CAPSULE_CDR(CAPSULE_CDR(args))))
@@ -258,7 +256,9 @@ Capsule Capsule_eval_expr(Capsule expr, Capsule scope) {
                     expr = CAPSULE_CAR(args);
                     continue;
                 } else if (strcmp(op.as.symbol, "IF") == 0) {
-                    if (CAPSULE_NILP(args) || CAPSULE_NILP(CAPSULE_CDR(args)) || CAPSULE_NILP(CAPSULE_CDR(CAPSULE_CDR(args))) || !CAPSULE_NILP(CAPSULE_CDR(CAPSULE_CDR(CAPSULE_CDR(args)))))
+                    if (CAPSULE_NILP(args) || CAPSULE_NILP(CAPSULE_CDR(args)) ||
+                        CAPSULE_NILP(CAPSULE_CDR(CAPSULE_CDR(args))) ||
+                        !CAPSULE_NILP(CAPSULE_CDR(CAPSULE_CDR(CAPSULE_CDR(args)))))
                         return CAPSULE_ERROR(CapsuleError_InvalidArgs);
 
                     stack = make_frame(stack, scope, CAPSULE_CDR(args));
@@ -278,15 +278,15 @@ Capsule Capsule_eval_expr(Capsule expr, Capsule scope) {
                     if (name.type != CapsuleType_Symbol)
                         return CAPSULE_ERROR(CapsuleError_InvalidType);
 
-                    macro = make_closure(scope, CAPSULE_CDR(CAPSULE_CAR(args)),
-                                         CAPSULE_CDR(args));
+                    macro = make_closure(scope, CAPSULE_CDR(CAPSULE_CAR(args)), CAPSULE_CDR(args));
                     if (!CAPSULE_ERRORP(macro)) {
                         macro.type = CapsuleType_Macro;
                         result = name;
-                        (void)Capsule_scope_define(scope, name, macro);
+                        (void) Capsule_scope_define(scope, name, macro);
                     }
                 } else if (strcmp(op.as.symbol, "APPLY") == 0) {
-                    if (CAPSULE_NILP(args) || CAPSULE_NILP(CAPSULE_CDR(args)) || !CAPSULE_NILP(CAPSULE_CDR(CAPSULE_CDR(args))))
+                    if (CAPSULE_NILP(args) || CAPSULE_NILP(CAPSULE_CDR(args)) ||
+                        !CAPSULE_NILP(CAPSULE_CDR(CAPSULE_CDR(args))))
                         return CAPSULE_ERROR(CapsuleError_InvalidArgs);
 
                     stack = make_frame(stack, scope, CAPSULE_CDR(args));
@@ -294,7 +294,8 @@ Capsule Capsule_eval_expr(Capsule expr, Capsule scope) {
                     expr = CAPSULE_CAR(args);
                     continue;
                 } else if (strcmp(op.as.symbol, "SET!") == 0) {
-                    if (CAPSULE_NILP(args) || CAPSULE_NILP(CAPSULE_CDR(args)) || !CAPSULE_NILP(CAPSULE_CDR(CAPSULE_CDR(args))))
+                    if (CAPSULE_NILP(args) || CAPSULE_NILP(CAPSULE_CDR(args)) ||
+                        !CAPSULE_NILP(CAPSULE_CDR(CAPSULE_CDR(args))))
                         return CAPSULE_ERROR(CapsuleError_InvalidArgs);
                     if (CAPSULE_CAR(args).type != CapsuleType_Symbol)
                         return CAPSULE_ERROR(CapsuleError_InvalidType);
@@ -309,7 +310,7 @@ Capsule Capsule_eval_expr(Capsule expr, Capsule scope) {
             } else if (op.type == CapsuleType_Builtin) {
                 result = (*op.as.builtin)(args, scope);
             } else {
-            push:
+                push:
 
                 stack = make_frame(stack, scope, args);
                 expr = op;

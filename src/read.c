@@ -143,8 +143,7 @@ static Capsule read(const char *input, const char **end) {
         *end += 2;
         return CAPSULE_STRING(str);
     } else if (token[0] == ',') {
-        Capsule result = CAPSULE_CONS(CAPSULE_SYMBOL(
-                                          token[1] == '@' ? "UNQUOTE-SPLICING" : "UNQUOTE"),
+        Capsule result = CAPSULE_CONS(CAPSULE_SYMBOL(token[1] == '@' ? "UNQUOTE-SPLICING" : "UNQUOTE"),
                                       CAPSULE_CONS(Capsule_nil, Capsule_nil));
         CAPSULE_CAR(CAPSULE_CDR(result)) = read(*end, end);
         CAPSULE_POSITION(result) = token;
