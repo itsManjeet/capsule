@@ -28,8 +28,8 @@ let VERTICAL = 1;
 
 let Text = fun (data) {
     return Widget (fun (ctxt, x, y, width, height) {
-        let text = data.text or "No Text";
-        let center = data.center or true;
+        let text = contains(data, "text", "No Text");
+        let center = contains(data, "center", true);
 
         let size = len(text);
     

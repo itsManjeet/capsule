@@ -131,20 +131,22 @@ std::wstring SrcLang::SRCLANG_VALUE_GET_STRING(Value val) {
             } break;
 
             case ValueType::Function: {
-                return L"<function()>";
+                return L"<function(" + SRCLANG_VALUE_AS_FUNCTION(val)->id +
+                       L")>";
             } break;
 
             case ValueType::Closure: {
-                return L"<closure()>";
+                return L"<closure(" + SRCLANG_VALUE_AS_CLOSURE(val)->fun->id +
+                       L")>";
             } break;
 
             case ValueType::Native: {
-                return L"<native()>";
+                return L"<native(" + SRCLANG_VALUE_AS_NATIVE(val)->id + L")>";
             } break;
 
             case ValueType::Pointer: {
                 std::wstringstream ss;
-                ss << L"0x" << std::hex << object->pointer;
+                ss << std::hex << object->pointer;
                 return ss.str();
             }
 

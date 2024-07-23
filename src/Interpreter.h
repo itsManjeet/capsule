@@ -76,7 +76,7 @@ private:
 
     static bool isFalsy(Value val);
 
-    void printStack();
+    void debug_stack(Context *ctxt);
 
     bool callClosure(Value callee, uint8_t count);
 
@@ -141,8 +141,9 @@ public:
 
     Value call(Value callee, const std::vector<Value>& args);
 
-    Value run(const std::wstring& source, const std::wstring& filename,
-            const std::vector<Value>& args);
+    Value run(Value callee);
+
+    Value run(const std::wstring& source, const std::wstring& filename);
 
     std::wstring search(const std::wstring& id);
 

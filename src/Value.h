@@ -98,6 +98,8 @@ typedef uint64_t Value;
     ((Native*)SRCLANG_VALUE_AS_OBJECT(val)->pointer)
 #define SRCLANG_VALUE_AS_CLOSURE(val)                                          \
     ((Closure*)SRCLANG_VALUE_AS_OBJECT(val)->pointer)
+#define SRCLANG_VALUE_AS_FUNCTION(val)                                         \
+    ((Function*)SRCLANG_VALUE_AS_OBJECT(val)->pointer)
 
 #define SRCLANG_VALUE_BOOL(b) ((b) ? SRCLANG_VALUE_TRUE : SRCLANG_VALUE_FALSE)
 #define SRCLANG_VALUE_NUMBER(num) (srclang_decimal_to_value((double)(num)))

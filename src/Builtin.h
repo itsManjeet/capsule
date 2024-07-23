@@ -24,7 +24,8 @@ typedef Value (*Builtin)(std::vector<Value>&, Interpreter*);
     X(pop)                                                                     \
     X(alloc)                                                                   \
     X(free)                                                                    \
-    X(bound)
+    X(bound)                                                                   \
+    X(contains)
 
 class Interpreter;
 #define X(id) SRCLANG_BUILTIN(id);

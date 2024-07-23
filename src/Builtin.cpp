@@ -195,11 +195,10 @@ SRCLANG_BUILTIN(clone) {
 }
 
 SRCLANG_BUILTIN(eval) {
-    SRCLANG_CHECK_ARGS_EXACT(2);
+    SRCLANG_CHECK_ARGS_EXACT(1);
     SRCLANG_CHECK_ARGS_TYPE(0, ValueType::String);
-    SRCLANG_CHECK_ARGS_TYPE(1, ValueType::List);
-    auto result = interpreter->run(SRCLANG_VALUE_AS_STRING(args[0]),
-            L"<inline>", *SRCLANG_VALUE_AS_LIST(args[1]));
+    auto result =
+            interpreter->run(SRCLANG_VALUE_AS_STRING(args[0]), L"<inline>");
     if (SRCLANG_VALUE_GET_TYPE(result) == ValueType::Error) {
         return builtin_clone({result}, interpreter);
     }
@@ -253,4 +252,37 @@ SRCLANG_BUILTIN(free) {
     object->cleanup(object->pointer);
     object->pointer = nullptr;
     return SRCLANG_VALUE_TRUE;
+}
+
+SRCLANG_BUILTIN(contains) {
+    SRCLANG_CHECK_ARGS_RANGE(2, 3);
+    switch (SRCLANG_VALUE_GET_TYPE(args[0])) {
+    case ValueType::String: {
+        SRCLANG_CHECK_ARGS_TYPE(1, ValueType::Number);
+        auto str = SRCLANG_VALUE_AS_STRING(args[0]);
+        int idx = SRCLANG_VALUE_AS_NUMBER(args[1]);
+        if (wcslen(str) <= idx || idx < 0) {
+            return args.size() == 3 ? args[2] : SRCLANG_VALUE_NULL;
+        }
+        return SRCLANG_VALUE_STRING(wcsdup(std::wstring(1, str[idx]).c_str()));
+    } break;
+    case ValueType::List: {
+        SRCLANG_CHECK_ARGS_TYPE(1, ValueType::Number);
+        auto list = SRCLANG_VALUE_AS_LIST(args[0]);
+        int idx = SRCLANG_VALUE_AS_NUMBER(args[1]);
+        if (list->size() <= idx || idx < 0) {
+            return args.size() == 3 ? args[2] : SRCLANG_VALUE_NULL;
+        }
+        return list->at(idx);
+    } break;
+    case ValueType::Map: {
+        SRCLANG_CHECK_ARGS_TYPE(1, ValueType::String);
+        auto map = SRCLANG_VALUE_AS_MAP(args[0]);
+        auto idx = SRCLANG_VALUE_AS_STRING(args[1]);
+        if (map->count(idx) <= 0)
+            return args.size() == 3 ? args[2] : SRCLANG_VALUE_NULL;
+        return map->at(idx);
+    } break;
+    }
+    return args.size() == 3 ? args[2] : SRCLANG_VALUE_NULL;
 }

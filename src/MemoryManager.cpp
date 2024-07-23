@@ -12,31 +12,33 @@ void MemoryManager::mark(Value val) {
         if (obj->marked) return;
         obj->marked = true;
 #ifdef SRCLANG_GC_DEBUG
-        std::cout << "  marked "
-                  << uintptr_t(SRCLANG_VALUE_AS_OBJECT(val)->pointer) << "'"
-                  << SRCLANG_VALUE_GET_STRING(val) << "'" << std::endl;
+        std::wcout << L"  marked " << uintptr_t(SRCLANG_VALUE_AS_OBJECT(val)->pointer)
+                   << L"'" << SRCLANG_VALUE_GET_STRING(val) << L"'"
+                   << std::endl;
 #endif
         if (obj->type == ValueType::List) {
-            mark(reinterpret_cast<std::vector<Value>*>(obj->pointer)->begin(),
-                    reinterpret_cast<std::vector<Value>*>(obj->pointer)->end());
+            mark(SRCLANG_VALUE_AS_LIST(val)->begin(),
+                    SRCLANG_VALUE_AS_LIST(val)->end());
         } else if (obj->type == ValueType::Closure) {
-            mark(reinterpret_cast<Closure*>(obj->pointer)->free.begin(),
-                    reinterpret_cast<Closure*>(obj->pointer)->free.end());
+            mark(SRCLANG_VALUE_AS_CLOSURE(val)->free.begin(),
+                    SRCLANG_VALUE_AS_CLOSURE(val)->free.end());
         } else if (obj->type == ValueType::Map) {
-            for (auto& i : *reinterpret_cast<SrcLangMap*>(obj->pointer)) {
-                mark(i.second);
-            }
+            for (auto& i : *SRCLANG_VALUE_AS_MAP(val)) { mark(i.second); }
         }
     }
 }
 
 void MemoryManager::mark(Heap::iterator start, Heap::iterator end) {
-    for (auto i = start; i != end; i++) { mark(*i); }
+    for (auto i = start; i != end; i++) {
+        if (SRCLANG_VALUE_IS_OBJECT(*i) &&
+                !SRCLANG_VALUE_AS_OBJECT(*i)->marked) {
+            mark(*i);
+        }
+    }
 }
 
 void MemoryManager::sweep() {
-    auto iter = heap.begin();
-    while (iter != heap.end()) {
+    for (auto iter = heap.begin(); iter != heap.end();) {
         if (!SRCLANG_VALUE_IS_OBJECT(*iter)) {
             iter++;
             continue;
@@ -47,8 +49,8 @@ void MemoryManager::sweep() {
             iter++;
         } else {
 #ifdef SRCLANG_GC_DEBUG
-            std::cout << "   deallocating " << uintptr_t(object->pointer) << "'"
-                      << SRCLANG_VALUE_GET_STRING(*iter) << "'" << std::endl;
+            std::wcout << L"   deallocating " << uintptr_t(object->pointer) << L"'"
+                       << SRCLANG_VALUE_GET_STRING(*iter) << L"'" << std::endl;
 #endif
             SRCLANG_VALUE_FREE(*iter);
             iter = heap.erase(iter);
@@ -57,6 +59,6 @@ void MemoryManager::sweep() {
 }
 
 Value MemoryManager::addObject(Value value) {
-    if (SRCLANG_VALUE_IS_OBJECT(value)) heap.push_back(value);
+    if (SRCLANG_VALUE_IS_OBJECT(value)) heap.emplace_back(value);
     return value;
 }

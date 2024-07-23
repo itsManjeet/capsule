@@ -108,7 +108,7 @@ int main(int argc, char** argv) {
         }
 
         auto result = interpreter.run(source,
-                filename ? s2ws(filename->string()) : L"stdin", prog_args);
+                filename ? s2ws(filename->string()) : L"stdin");
         if (SRCLANG_VALUE_GET_TYPE(result) == ValueType::Error) {
             std::wcerr << SRCLANG_VALUE_AS_ERROR(result) << std::endl;
             if (!interactive) return 1;

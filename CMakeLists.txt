@@ -7,6 +7,9 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(POSITION_INDEPENDENT_CODE ON)
 
+add_definitions(-DSRCLANG_GC_STRESS)
+# add_definitions(-DSRCLANG_GC_DEBUG)
+
 if(UNIX)
     find_library(DL dl REQUIRED)
 else()

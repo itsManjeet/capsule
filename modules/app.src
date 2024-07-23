@@ -30,10 +30,14 @@ let Screen = fun (width, height) {
     };
 
     self.Clear = fun (ch) {
-        for (x in range(self.Width)) {
-            for (y in range(self.Height)) {
+        x := 0;
+        for (x < self.Width) {
+            y := 0;
+            for (y < self.Height) {
                 self.Buffer[y * self.Width + x] = ch;
+                y = y + 1;
             }
+            x = x + 1;
         }
     };
 
@@ -115,21 +119,23 @@ let Screen = fun (width, height) {
     };
 };
 
-Run := fun (f) {
+run := fun (f) {
     let size = sys.Gettermsize();
     let screen = Screen(size.Columns, size.Rows);
     
     for (true) {
         screen.Clear(" ");
+        println(f);
         let w = f();
 
-        w.Render(screen, 0, 0, screen.Width - 1, screen.Height - 1);
+        let renderer = contains(w, "Render", fun (a, b, c, d, e) {});
+        renderer(screen, 0, 0, screen.Width - 1, screen.Height - 1);
 
         let ev = screen.PollEvent();
         if (ev == "q") {
             break;
         }
-        
-        w.PollEvent(ev);
+        let evh = contains(w, "PollEvent", fun (e) {});
+        evh(ev);
     }
 };
