@@ -6,6 +6,13 @@ using namespace SrcLang;
 
 MemoryManager::~MemoryManager() {}
 
+void MemoryManager::unmark() {
+    for (auto i : heap) {
+        if (SRCLANG_VALUE_IS_OBJECT(i))
+            SRCLANG_VALUE_AS_OBJECT(i)->marked = false;
+    }
+}
+
 void MemoryManager::mark(Value val) {
     if (SRCLANG_VALUE_IS_OBJECT(val)) {
         auto obj = SRCLANG_VALUE_AS_OBJECT(val);

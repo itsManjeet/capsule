@@ -135,10 +135,10 @@ typedef uint64_t Value;
     SRCLANG_VALUE_HEAP_OBJECT(ValueType::Builtin, (void*)(v))
 
 #define SRCLANG_VALUE_FUNCTION(fun)                                            \
-    SRCLANG_VALUE_HEAP_OBJECT(ValueType::Function, (void*)fun)
+    SRCLANG_VALUE_HEAP_OBJECT(ValueType::Function, (void*)(fun))
 
 #define SRCLANG_VALUE_CLOSURE(fun)                                             \
-    SRCLANG_VALUE_HEAP_OBJECT(ValueType::Closure, (void*)fun)
+    SRCLANG_VALUE_HEAP_OBJECT(ValueType::Closure, (void*)(fun))
 
 #define SRCLANG_VALUE_BOUNDED(b)                                               \
     SRCLANG_VALUE_HEAP_OBJECT(ValueType::Bounded, (void*)(b))

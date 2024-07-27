@@ -861,6 +861,9 @@ void Compiler::require() {
             compiler.global_debug_info.get(), 0, OpCode::RET);
 
     for (auto const& i : nfree) { emit(OpCode::LOAD, i.scope, i.index); }
+
+    closure->fun->nlocals = nlocals;
+    closure->fun->nparams = 0;
     emit(OpCode::CLOSURE, add_constant(SRCLANG_VALUE_FUNCTION(closure->fun)),
             nfree.size());
     free(closure);

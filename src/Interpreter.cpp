@@ -167,19 +167,21 @@ void Interpreter::gc() {
               << std::endl;
     std::cout << "gc begin:" << std::endl;
 #endif
-    auto ctxt = cp;
+    auto curctxt = cp;
+    memoryManager.unmark();
     while (true) {
-        auto fp = ctxt->fp;
-        memoryManager.mark(ctxt->stack.begin(), ctxt->sp);
+        auto fp = curctxt->fp;
+        memoryManager.mark(curctxt->stack.begin(), curctxt->sp);
+
         while (true) {
             memoryManager.mark(fp->closure);
-            if (fp == ctxt->frames.begin()) break;
+            if (fp == curctxt->frames.begin()) break;
             fp--;
         }
-        if (ctxt == contexts.begin()) break;
-        ctxt--;
-    }
 
+        if (curctxt == contexts.begin()) break;
+        curctxt--;
+    }
     memoryManager.mark(
             globals.begin(), globals.begin() + symbolTable.definitions);
     memoryManager.mark(constants.begin(), constants.end());
@@ -401,16 +403,15 @@ bool Interpreter::binary(Value lhs, Value rhs, OpCode op) {
             auto b_size = wcslen(b);
             auto size = a_size + b_size;
 
-            auto* buf = (wchar_t*)malloc(size + 1);
+            auto* buf = (wchar_t*)malloc((size + 1) * sizeof(wchar_t));
             if (buf == nullptr) {
                 throw std::runtime_error(
                         "malloc() failed for string + string, " +
                         std::string(strerror(errno)));
             }
-            memcpy(buf, a, a_size);
-            memcpy(buf + a_size, b, b_size);
+            wcscpy(buf, a);
+            wcscat(buf, b);
 
-            buf[size] = '\0';
             *cp->sp++ = addObject(SRCLANG_VALUE_STRING(buf));
         } break;
         case OpCode::EQ: {
@@ -1385,16 +1386,20 @@ Value Interpreter::loadModule(std::wstring modulePath) {
     try {
         modulePath = search(modulePath);
     } catch (const std::exception& exception) {
-        return SRCLANG_VALUE_ERROR(strdup(exception.what()));
+        return SRCLANG_VALUE_ERROR(wcsdup(s2ws(exception.what()).c_str()));
     }
 
     void* handler = dlopen(ws2s(modulePath).c_str(), RTLD_LAZY | RTLD_LOCAL);
-    if (handler == nullptr) { return SRCLANG_VALUE_ERROR(strdup(dlerror())); }
+    if (handler == nullptr) {
+        return SRCLANG_VALUE_ERROR(wcsdup(s2ws(dlerror()).c_str()));
+    }
 
     auto const map = new SrcLangMap();
     auto* fun = reinterpret_cast<void (*)(SrcLangMap*, Interpreter*)>(
             dlsym(handler, "srclang_module_init"));
-    if (fun == nullptr) { return SRCLANG_VALUE_ERROR(strdup(dlerror())); }
+    if (fun == nullptr) {
+        return SRCLANG_VALUE_ERROR(wcsdup(s2ws(dlerror()).c_str()));
+    }
     fun(map, this);
 
     return SRCLANG_VALUE_MAP(map);
