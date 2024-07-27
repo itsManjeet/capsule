@@ -844,16 +844,12 @@ void Compiler::require() {
     int total = 0;
     // export symbols
     for (const auto& i : symbol_table->store) {
-        if (i.second.scope == Symbol::Scope::LOCAL &&
-                std::isupper(i.first[0])) {
-            closure->fun->instructions->emit(compiler.global_debug_info.get(),
-                    0, OpCode::CONST_,
-                    add_constant(
-                            SRCLANG_VALUE_STRING(wcsdup(i.first.c_str()))));
-            closure->fun->instructions->emit(compiler.global_debug_info.get(),
-                    0, OpCode::LOAD, i.second.scope, i.second.index);
-            total++;
-        }
+        closure->fun->instructions->emit(compiler.global_debug_info.get(), 0,
+                OpCode::CONST_,
+                add_constant(SRCLANG_VALUE_STRING(wcsdup(i.first.c_str()))));
+        closure->fun->instructions->emit(compiler.global_debug_info.get(), 0,
+                OpCode::LOAD, i.second.scope, i.second.index);
+        total++;
     }
     int nlocals = symbol_table->definitions;
     auto nfree = symbol_table->free;
@@ -866,7 +862,11 @@ void Compiler::require() {
 
     for (auto const& i : nfree) { emit(OpCode::LOAD, i.scope, i.index); }
 
-    emit(OpCode::CONST_, add_constant(module));
+    closure->fun->nlocals = nlocals;
+    closure->fun->nparams = 0;
+    emit(OpCode::CLOSURE, add_constant(SRCLANG_VALUE_FUNCTION(closure->fun)),
+            nfree.size());
+    free(closure);
     emit(OpCode::CALL, 0);
 }
 
@@ -967,11 +967,11 @@ Value Compiler::compile() {
     program();
     emit(OpCode::HLT);
 
-    return SRCLANG_VALUE_CLOSURE(
-            (new Closure{new Function{FunctionType::Function, filename,
-                                 std::move(instructions.back()), 0, 0, false,
-                                 global_debug_info},
-                    {}}));
+    return SRCLANG_VALUE_CLOSURE((new Closure{
+            new Function{FunctionType::Function, filename,
+                    std::move(instructions.back()), symbol_table->definitions,
+                    0, false, global_debug_info},
+            {}}));
 }
 
 void Compiler::value(Symbol* symbol) {

@@ -133,8 +133,23 @@ void Interpreter::gc() {
               << std::endl;
     std::cout << "gc begin:" << std::endl;
 #endif
-    for (auto& c : contexts) { memoryManager.mark(c.stack.begin(), c.sp); }
-    memoryManager.mark(globals.begin(), globals.end());
+    auto curctxt = cp;
+    memoryManager.unmark();
+    while (true) {
+        auto fp = curctxt->fp;
+        memoryManager.mark(curctxt->stack.begin(), curctxt->sp);
+
+        while (true) {
+            memoryManager.mark(fp->closure);
+            if (fp == curctxt->frames.begin()) break;
+            fp--;
+        }
+
+        if (curctxt == contexts.begin()) break;
+        curctxt--;
+    }
+    memoryManager.mark(
+            globals.begin(), globals.begin() + symbolTable.definitions);
     memoryManager.mark(constants.begin(), constants.end());
     memoryManager.mark(builtins.begin(), builtins.end());
     memoryManager.sweep();
@@ -354,16 +369,15 @@ bool Interpreter::binary(Value lhs, Value rhs, OpCode op) {
             auto b_size = wcslen(b);
             auto size = a_size + b_size;
 
-            auto* buf = (wchar_t*)malloc(size + 1);
+            auto* buf = (wchar_t*)malloc((size + 1) * sizeof(wchar_t));
             if (buf == nullptr) {
                 throw std::runtime_error(
                         "malloc() failed for string + string, " +
                         std::string(strerror(errno)));
             }
-            memcpy(buf, a, a_size);
-            memcpy(buf + a_size, b, b_size);
+            wcscpy(buf, a);
+            wcscat(buf, b);
 
-            buf[size] = '\0';
             *cp->sp++ = addObject(SRCLANG_VALUE_STRING(buf));
         } break;
         case OpCode::EQ: {
@@ -918,10 +932,8 @@ bool Interpreter::run() {
             auto fun = (Function*)SRCLANG_VALUE_AS_OBJECT(constant)->pointer;
             auto frees = std::vector<Value>(cp->sp - nfree, cp->sp);
             cp->sp -= nfree;
-            auto closure = new Closure{fun, frees};
-            auto closure_value = SRCLANG_VALUE_CLOSURE(closure);
-            *cp->sp++ = closure_value;
-            addObject(closure_value);
+            *cp->sp++ =
+                    addObject(SRCLANG_VALUE_CLOSURE((new Closure{fun, frees})));
         } break;
 
         case OpCode::CALL: {
@@ -985,7 +997,7 @@ bool Interpreter::run() {
                         *cp->sp++ = SRCLANG_VALUE_NULL;
                     } else {
                         *cp->sp++ = SRCLANG_VALUE_STRING(
-                                strdup(std::string(1, buffer[index]).c_str()));
+                                wcsdup(std::wstring(1, buffer[index]).c_str()));
                     }
                 } break;
                 case 2: {
@@ -996,7 +1008,7 @@ bool Interpreter::run() {
                         *cp->sp++ = SRCLANG_VALUE_NULL;
                     } else {
                         auto* buf = (wchar_t*)malloc(
-                                sizeof(char) * (end - index + 1));
+                                sizeof(wchar_t) * (end - index + 1));
                         memcpy(buf, buffer + index, end - index);
 
                         buf[end - index] = '\0';
@@ -1304,16 +1316,20 @@ Value Interpreter::loadModule(std::wstring modulePath) {
     try {
         modulePath = search(modulePath);
     } catch (const std::exception& exception) {
-        return SRCLANG_VALUE_ERROR(strdup(exception.what()));
+        return SRCLANG_VALUE_ERROR(wcsdup(s2ws(exception.what()).c_str()));
     }
 
     void* handler = dlopen(ws2s(modulePath).c_str(), RTLD_LAZY | RTLD_LOCAL);
-    if (handler == nullptr) { return SRCLANG_VALUE_ERROR(strdup(dlerror())); }
+    if (handler == nullptr) {
+        return SRCLANG_VALUE_ERROR(wcsdup(s2ws(dlerror()).c_str()));
+    }
 
     auto const map = new SrcLangMap();
     auto* fun = reinterpret_cast<void (*)(SrcLangMap*, Interpreter*)>(
             dlsym(handler, "srclang_module_init"));
-    if (fun == nullptr) { return SRCLANG_VALUE_ERROR(strdup(dlerror())); }
+    if (fun == nullptr) {
+        return SRCLANG_VALUE_ERROR(wcsdup(s2ws(dlerror()).c_str()));
+    }
     fun(map, this);
 
     return SRCLANG_VALUE_MAP(map);

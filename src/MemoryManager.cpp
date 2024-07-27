@@ -6,6 +6,13 @@ using namespace SrcLang;
 
 MemoryManager::~MemoryManager() {}
 
+void MemoryManager::unmark() {
+    for (auto i : heap) {
+        if (SRCLANG_VALUE_IS_OBJECT(i))
+            SRCLANG_VALUE_AS_OBJECT(i)->marked = false;
+    }
+}
+
 void MemoryManager::mark(Value val) {
     if (SRCLANG_VALUE_IS_OBJECT(val)) {
         auto obj = SRCLANG_VALUE_AS_OBJECT(val);
@@ -17,15 +24,14 @@ void MemoryManager::mark(Value val) {
                   << SRCLANG_VALUE_GET_STRING(val) << "'" << std::endl;
 #endif
         if (obj->type == ValueType::List) {
-            mark(reinterpret_cast<std::vector<Value>*>(obj->pointer)->begin(),
-                    reinterpret_cast<std::vector<Value>*>(obj->pointer)->end());
+            mark(SRCLANG_VALUE_AS_LIST(val)->begin(),
+                    SRCLANG_VALUE_AS_LIST(val)->end());
         } else if (obj->type == ValueType::Closure) {
-            mark(reinterpret_cast<Closure*>(obj->pointer)->free.begin(),
-                    reinterpret_cast<Closure*>(obj->pointer)->free.end());
+            // for (auto c : SRCLANG_VALUE_AS_CLOSURE(val)->free) { mark(c); }
+            mark(SRCLANG_VALUE_AS_CLOSURE(val)->free.begin(),
+                    SRCLANG_VALUE_AS_CLOSURE(val)->free.end());
         } else if (obj->type == ValueType::Map) {
-            for (auto& i : *reinterpret_cast<SrcLangMap*>(obj->pointer)) {
-                mark(i.second);
-            }
+            for (auto& i : *SRCLANG_VALUE_AS_MAP(val)) { mark(i.second); }
         }
     }
 }

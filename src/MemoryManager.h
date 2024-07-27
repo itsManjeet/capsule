@@ -56,6 +56,8 @@ public:
 
     void mark(Heap::iterator start, Heap::iterator end);
 
+    void unmark();
+
     void sweep();
 
     Value addObject(Value value);
