@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2024 Manjeet Singh <itsmanjeet1998@gmail.com>.
+ * Copyright (c) 2024 Manjeet Singh <itsmanjeet1998@gmail.com>.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -51,8 +51,7 @@ int Capsule_Scope_define(Capsule env, Capsule symbol, Capsule value) {
         bs = CAPSULE_CDR(bs);
     }
 
-    CAPSULE_CDR(env) =
-            CAPSULE_CONS(CAPSULE_CONS(symbol, value), CAPSULE_CDR(env));
+    CAPSULE_CDR(env) = CAPSULE_CONS(CAPSULE_CONS(symbol, value), CAPSULE_CDR(env));
 
     return CAPSULE_ERROR_NONE;
 }
@@ -70,7 +69,8 @@ int Capsule_Scope_lookup(Capsule env, Capsule symbol, Capsule* result) {
         bs = CAPSULE_CDR(bs);
     }
 
-    if (CAPSULE_NILP(parent)) return CAPSULE_ERROR_UNBOUND;
+    if (CAPSULE_NILP(parent))
+        return CAPSULE_ERROR_UNBOUND;
 
     return Capsule_Scope_lookup(parent, symbol, result);
 }
@@ -88,7 +88,8 @@ int Capsule_Scope_set(Capsule env, Capsule symbol, Capsule value) {
         bs = CAPSULE_CDR(bs);
     }
 
-    if (CAPSULE_NILP(parent)) return CAPSULE_ERROR_UNBOUND;
+    if (CAPSULE_NILP(parent))
+        return CAPSULE_ERROR_UNBOUND;
 
     return Capsule_Scope_set(parent, symbol, value);
 }

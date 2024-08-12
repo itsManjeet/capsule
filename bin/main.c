@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2024 Manjeet Singh <itsmanjeet1998@gmail.com>.
+ * Copyright (c) 2024 Manjeet Singh <itsmanjeet1998@gmail.com>.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -28,17 +28,31 @@
 #endif
 
 static int is_complete(const char* source) {
-    if (source == NULL || strlen(source) == 0) return 0;
+    if (source == NULL || strlen(source) == 0)
+        return 0;
     int count[3] = {0};
     while (*source != '\0') {
         switch (*source++) {
-        case '(': count[0]++; break;
-        case '{': count[1]++; break;
-        case '[': count[2]++; break;
-        case ')': count[0]--; break;
-        case '}': count[1]--; break;
-        case ']': count[2]--; break;
-        default: break;
+        case '(':
+            count[0]++;
+            break;
+        case '{':
+            count[1]++;
+            break;
+        case '[':
+            count[2]++;
+            break;
+        case ')':
+            count[0]--;
+            break;
+        case '}':
+            count[1]--;
+            break;
+        case ']':
+            count[2]--;
+            break;
+        default:
+            break;
         }
     }
 
@@ -63,11 +77,9 @@ int main(int argc, char** argv) {
             filename = argv[i];
         } else {
             if (CAPSULE_NILP(args_i)) {
-                args = args_i =
-                        CAPSULE_CONS(CAPSULE_STRING(argv[i]), Capsule_nil);
+                args = args_i = CAPSULE_CONS(CAPSULE_STRING(argv[i]), Capsule_nil);
             } else {
-                CAPSULE_CDR(args_i) =
-                        CAPSULE_CONS(CAPSULE_STRING(argv[i]), Capsule_nil);
+                CAPSULE_CDR(args_i) = CAPSULE_CONS(CAPSULE_STRING(argv[i]), Capsule_nil);
                 args_i = CAPSULE_CDR(args_i);
             }
         }
@@ -78,15 +90,14 @@ int main(int argc, char** argv) {
     if (filename) {
         source = slurp(filename);
         if (source == NULL) {
-            fprintf(stderr, "ERROR: failed to read '%s': %s\n", filename,
-                    strerror(errno));
+            fprintf(stderr, "ERROR: failed to read '%s': %s\n", filename, strerror(errno));
             return 1;
         }
     } else {
         printf("%s\n"
                "Capsule Programming Language\n"
                "  CTRL+C to exit\n",
-                Capsule_logo());
+               Capsule_logo());
         interactive = 1;
     }
 
@@ -98,8 +109,7 @@ int main(int argc, char** argv) {
                 size_t source_len = strlen(source);
                 size_t remaining_len = strlen(remaining);
 
-                source = realloc(source,
-                        sizeof(char) * (source_len + remaining_len + 2));
+                source = realloc(source, sizeof(char) * (source_len + remaining_len + 2));
                 strcat(source, " ");
                 strcat(source, remaining);
                 free(remaining);

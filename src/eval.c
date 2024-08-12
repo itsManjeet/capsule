@@ -29,7 +29,8 @@
 static int make_closure(Capsule env, Capsule args, Capsule body, Capsule* result) {
     Capsule p;
 
-    if (!CAPSULE_LISTP(body)) return CAPSULE_ERROR_SYNTAX;
+    if (!CAPSULE_LISTP(body))
+        return CAPSULE_ERROR_SYNTAX;
 
     p = args;
     while (!CAPSULE_NILP(p)) {
@@ -47,10 +48,10 @@ static int make_closure(Capsule env, Capsule args, Capsule body, Capsule* result
 }
 
 static Capsule make_frame(Capsule parent, Capsule env, Capsule tail) {
-    return CAPSULE_CONS(parent,
-            CAPSULE_CONS(env,
-                    CAPSULE_CONS(Capsule_nil,
-                            CAPSULE_CONS(tail, CAPSULE_CONS(Capsule_nil, CAPSULE_CONS(Capsule_nil, Capsule_nil))))));
+    return CAPSULE_CONS(
+        parent,
+        CAPSULE_CONS(
+            env, CAPSULE_CONS(Capsule_nil, CAPSULE_CONS(tail, CAPSULE_CONS(Capsule_nil, CAPSULE_CONS(Capsule_nil, Capsule_nil))))));
 }
 
 static int eval_do_exec(Capsule* stack, Capsule* expr, Capsule* env) {
@@ -74,7 +75,8 @@ static int eval_do_bind(Capsule* stack, Capsule* expr, Capsule* env) {
     Capsule op, args, arg_names, body;
 
     body = Capsule_List_at(*stack, 5);
-    if (!CAPSULE_NILP(body)) return eval_do_exec(stack, expr, env);
+    if (!CAPSULE_NILP(body))
+        return eval_do_exec(stack, expr, env);
 
     op = Capsule_List_at(*stack, 2);
     args = Capsule_List_at(*stack, 4);
@@ -92,12 +94,14 @@ static int eval_do_bind(Capsule* stack, Capsule* expr, Capsule* env) {
             break;
         }
 
-        if (CAPSULE_NILP(args)) return CAPSULE_ERROR_ARGS;
+        if (CAPSULE_NILP(args))
+            return CAPSULE_ERROR_ARGS;
         Capsule_Scope_define(*env, CAPSULE_CAR(arg_names), CAPSULE_CAR(args));
         arg_names = CAPSULE_CDR(arg_names);
         args = CAPSULE_CDR(args);
     }
-    if (!CAPSULE_NILP(args)) return CAPSULE_ERROR_ARGS;
+    if (!CAPSULE_NILP(args))
+        return CAPSULE_ERROR_ARGS;
 
     Capsule_List_set(*stack, 4, Capsule_nil);
 
@@ -122,7 +126,8 @@ static int eval_do_apply(Capsule* stack, Capsule* expr, Capsule* env, Capsule* r
             *stack = make_frame(*stack, *env, Capsule_nil);
             op = CAPSULE_CAR(args);
             args = CAPSULE_CAR(CAPSULE_CDR(args));
-            if (!CAPSULE_LISTP(args)) return CAPSULE_ERROR_SYNTAX;
+            if (!CAPSULE_LISTP(args))
+                return CAPSULE_ERROR_SYNTAX;
 
             Capsule_List_set(*stack, 2, op);
             Capsule_List_set(*stack, 4, args);
@@ -147,7 +152,9 @@ static int eval_do_return(Capsule* stack, Capsule* expr, Capsule* env, Capsule* 
     op = Capsule_List_at(*stack, 2);
     body = Capsule_List_at(*stack, 5);
 
-    if (!CAPSULE_NILP(body)) { return eval_do_apply(stack, expr, env, result); }
+    if (!CAPSULE_NILP(body)) {
+        return eval_do_apply(stack, expr, env, result);
+    }
 
     if (CAPSULE_NILP(op)) {
 
@@ -202,7 +209,9 @@ static int eval_do_return(Capsule* stack, Capsule* expr, Capsule* env, Capsule* 
     }
 
     args = Capsule_List_at(*stack, 3);
-    if (CAPSULE_NILP(args)) { return eval_do_apply(stack, expr, env, result); }
+    if (CAPSULE_NILP(args)) {
+        return eval_do_apply(stack, expr, env, result);
+    }
 
     *expr = CAPSULE_CAR(args);
     Capsule_List_set(*stack, 3, CAPSULE_CDR(args));
@@ -225,7 +234,9 @@ CapsuleError Capsule_eval_cap(Capsule expr, Capsule scope, Capsule* result) {
 
         if (expr.type == CAPSULE_TYPE_SYMBOL) {
             error = Capsule_Scope_lookup(scope, expr, result);
-            if (error == CAPSULE_ERROR_UNBOUND) { fprintf(stderr, "Unbound symbol %s\n", expr.as.symbol); }
+            if (error == CAPSULE_ERROR_UNBOUND) {
+                fprintf(stderr, "Unbound symbol %s\n", expr.as.symbol);
+            }
         } else if (expr.type != CAPSULE_TYPE_PAIR) {
             *result = expr;
         } else if (!CAPSULE_LISTP(expr)) {
@@ -237,23 +248,27 @@ CapsuleError Capsule_eval_cap(Capsule expr, Capsule scope, Capsule* result) {
             if (op.type == CAPSULE_TYPE_SYMBOL) {
 
                 if (strcmp(op.as.symbol, "QUOTE") == 0) {
-                    if (CAPSULE_NILP(args) || !CAPSULE_NILP(CAPSULE_CDR(args))) return CAPSULE_ERROR_ARGS;
+                    if (CAPSULE_NILP(args) || !CAPSULE_NILP(CAPSULE_CDR(args)))
+                        return CAPSULE_ERROR_ARGS;
 
                     *result = CAPSULE_CAR(args);
                 } else if (strcmp(op.as.symbol, "DEFINE") == 0) {
                     Capsule sym;
 
-                    if (CAPSULE_NILP(args) || CAPSULE_NILP(CAPSULE_CDR(args))) return CAPSULE_ERROR_ARGS;
+                    if (CAPSULE_NILP(args) || CAPSULE_NILP(CAPSULE_CDR(args)))
+                        return CAPSULE_ERROR_ARGS;
 
                     sym = CAPSULE_CAR(args);
                     if (sym.type == CAPSULE_TYPE_PAIR) {
                         error = make_closure(scope, CAPSULE_CDR(sym), CAPSULE_CDR(args), result);
                         sym = CAPSULE_CAR(sym);
-                        if (sym.type != CAPSULE_TYPE_SYMBOL) return CAPSULE_ERROR_TYPE;
+                        if (sym.type != CAPSULE_TYPE_SYMBOL)
+                            return CAPSULE_ERROR_TYPE;
                         (void)Capsule_Scope_define(scope, sym, *result);
                         *result = sym;
                     } else if (sym.type == CAPSULE_TYPE_SYMBOL) {
-                        if (!CAPSULE_NILP(CAPSULE_CDR(CAPSULE_CDR(args)))) return CAPSULE_ERROR_ARGS;
+                        if (!CAPSULE_NILP(CAPSULE_CDR(CAPSULE_CDR(args))))
+                            return CAPSULE_ERROR_ARGS;
                         stack = make_frame(stack, scope, Capsule_nil);
                         Capsule_List_set(stack, 2, op);
                         Capsule_List_set(stack, 4, sym);
@@ -263,7 +278,8 @@ CapsuleError Capsule_eval_cap(Capsule expr, Capsule scope, Capsule* result) {
                         return CAPSULE_ERROR_TYPE;
                     }
                 } else if (strcmp(op.as.symbol, "LAMBDA") == 0) {
-                    if (CAPSULE_NILP(args) || CAPSULE_NILP(CAPSULE_CDR(args))) return CAPSULE_ERROR_ARGS;
+                    if (CAPSULE_NILP(args) || CAPSULE_NILP(CAPSULE_CDR(args)))
+                        return CAPSULE_ERROR_ARGS;
 
                     error = make_closure(scope, CAPSULE_CAR(args), CAPSULE_CDR(args), result);
                 } else if (CAPSULE_SYMBOL_COMPARE(op, "BEGIN")) {
@@ -274,9 +290,8 @@ CapsuleError Capsule_eval_cap(Capsule expr, Capsule scope, Capsule* result) {
                         continue;
                     }
                 } else if (strcmp(op.as.symbol, "IF") == 0) {
-                    if (CAPSULE_NILP(args) || CAPSULE_NILP(CAPSULE_CDR(args)) ||
-                            CAPSULE_NILP(CAPSULE_CDR(CAPSULE_CDR(args))) ||
-                            !CAPSULE_NILP(CAPSULE_CDR(CAPSULE_CDR(CAPSULE_CDR(args)))))
+                    if (CAPSULE_NILP(args) || CAPSULE_NILP(CAPSULE_CDR(args)) || CAPSULE_NILP(CAPSULE_CDR(CAPSULE_CDR(args))) ||
+                        !CAPSULE_NILP(CAPSULE_CDR(CAPSULE_CDR(CAPSULE_CDR(args)))))
                         return CAPSULE_ERROR_ARGS;
 
                     stack = make_frame(stack, scope, CAPSULE_CDR(args));
@@ -286,12 +301,15 @@ CapsuleError Capsule_eval_cap(Capsule expr, Capsule scope, Capsule* result) {
                 } else if (strcmp(op.as.symbol, "DEFMACRO") == 0) {
                     Capsule name, macro;
 
-                    if (CAPSULE_NILP(args) || CAPSULE_NILP(CAPSULE_CDR(args))) return CAPSULE_ERROR_ARGS;
+                    if (CAPSULE_NILP(args) || CAPSULE_NILP(CAPSULE_CDR(args)))
+                        return CAPSULE_ERROR_ARGS;
 
-                    if (CAPSULE_CAR(args).type != CAPSULE_TYPE_PAIR) return CAPSULE_ERROR_SYNTAX;
+                    if (CAPSULE_CAR(args).type != CAPSULE_TYPE_PAIR)
+                        return CAPSULE_ERROR_SYNTAX;
 
                     name = CAPSULE_CAR(CAPSULE_CAR(args));
-                    if (name.type != CAPSULE_TYPE_SYMBOL) return CAPSULE_ERROR_TYPE;
+                    if (name.type != CAPSULE_TYPE_SYMBOL)
+                        return CAPSULE_ERROR_TYPE;
 
                     error = make_closure(scope, CAPSULE_CDR(CAPSULE_CAR(args)), CAPSULE_CDR(args), &macro);
                     if (!error) {
@@ -300,8 +318,7 @@ CapsuleError Capsule_eval_cap(Capsule expr, Capsule scope, Capsule* result) {
                         (void)Capsule_Scope_define(scope, name, macro);
                     }
                 } else if (strcmp(op.as.symbol, "APPLY") == 0) {
-                    if (CAPSULE_NILP(args) || CAPSULE_NILP(CAPSULE_CDR(args)) ||
-                            !CAPSULE_NILP(CAPSULE_CDR(CAPSULE_CDR(args))))
+                    if (CAPSULE_NILP(args) || CAPSULE_NILP(CAPSULE_CDR(args)) || !CAPSULE_NILP(CAPSULE_CDR(CAPSULE_CDR(args))))
                         return CAPSULE_ERROR_ARGS;
 
                     stack = make_frame(stack, scope, CAPSULE_CDR(args));
@@ -309,10 +326,10 @@ CapsuleError Capsule_eval_cap(Capsule expr, Capsule scope, Capsule* result) {
                     expr = CAPSULE_CAR(args);
                     continue;
                 } else if (strcmp(op.as.symbol, "SET!") == 0) {
-                    if (CAPSULE_NILP(args) || CAPSULE_NILP(CAPSULE_CDR(args)) ||
-                            !CAPSULE_NILP(CAPSULE_CDR(CAPSULE_CDR(args))))
+                    if (CAPSULE_NILP(args) || CAPSULE_NILP(CAPSULE_CDR(args)) || !CAPSULE_NILP(CAPSULE_CDR(CAPSULE_CDR(args))))
                         return CAPSULE_ERROR_ARGS;
-                    if (CAPSULE_CAR(args).type != CAPSULE_TYPE_SYMBOL) return CAPSULE_ERROR_TYPE;
+                    if (CAPSULE_CAR(args).type != CAPSULE_TYPE_SYMBOL)
+                        return CAPSULE_ERROR_TYPE;
                     stack = make_frame(stack, scope, Capsule_nil);
                     Capsule_List_set(stack, 2, op);
                     Capsule_List_set(stack, 4, CAPSULE_CAR(args));
@@ -322,7 +339,8 @@ CapsuleError Capsule_eval_cap(Capsule expr, Capsule scope, Capsule* result) {
                     goto push;
                 }
             } else if (op.type == CAPSULE_TYPE_BUILTIN) {
-                if ((error = (*op.as.builtin)(args, scope, result))) {}
+                if ((error = (*op.as.builtin)(args, scope, result))) {
+                }
             } else {
             push:
 
@@ -332,9 +350,11 @@ CapsuleError Capsule_eval_cap(Capsule expr, Capsule scope, Capsule* result) {
             }
         }
 
-        if (CAPSULE_NILP(stack)) break;
+        if (CAPSULE_NILP(stack))
+            break;
 
-        if (!error) error = eval_do_return(&stack, &expr, &scope, result);
+        if (!error)
+            error = eval_do_return(&stack, &expr, &scope, result);
     } while (!error);
 
     return error;
@@ -343,6 +363,7 @@ CapsuleError Capsule_eval_cap(Capsule expr, Capsule scope, Capsule* result) {
 CapsuleError Capsule_eval(const char* source, Capsule scope, Capsule* result) {
     CapsuleError error;
     Capsule capsule;
-    if ((error = Capsule_read(source, &capsule))) return error;
+    if ((error = Capsule_read(source, &capsule)))
+        return error;
     return Capsule_eval_cap(capsule, scope, result);
 }

@@ -24,14 +24,16 @@ char* slurp(const char* path) {
     char* buffer = NULL;
 
     FILE* file = fopen(path, "rb");
-    if (file == NULL) goto exit_return;
+    if (file == NULL)
+        goto exit_return;
 
     fseek(file, 0, SEEK_END);
     size_t size = ftell(file);
     fseek(file, 0, SEEK_SET);
 
     buffer = malloc(size + 1);
-    if (buffer == NULL) goto exit_fclose;
+    if (buffer == NULL)
+        goto exit_fclose;
 
     size_t count = fread(buffer, 1, size, file);
     buffer[count] = '\0';
@@ -43,4 +45,6 @@ exit_return:
     return buffer;
 }
 
-const char* Capsule_logo() { return LOGO; }
+const char* Capsule_logo() {
+    return LOGO;
+}

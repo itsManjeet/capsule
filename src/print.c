@@ -20,19 +20,28 @@
 
 const char* Capsule_Error_str(CapsuleError error) {
     switch (error) {
-    case CAPSULE_ERROR_NONE: return "";
-    case CAPSULE_ERROR_ARGS: return "Invalid arguments";
-    case CAPSULE_ERROR_TYPE: return "Invalid type";
-    case CAPSULE_ERROR_SYNTAX: return "Invalid syntax";
-    case CAPSULE_ERROR_UNBOUND: return "Unbounded value";
-    case CAPSULE_ERROR_RUNTIME: return "Runtime Error";
-    default: return "Unknown Error";
+    case CAPSULE_ERROR_NONE:
+        return "";
+    case CAPSULE_ERROR_ARGS:
+        return "Invalid arguments";
+    case CAPSULE_ERROR_TYPE:
+        return "Invalid type";
+    case CAPSULE_ERROR_SYNTAX:
+        return "Invalid syntax";
+    case CAPSULE_ERROR_UNBOUND:
+        return "Unbounded value";
+    case CAPSULE_ERROR_RUNTIME:
+        return "Runtime Error";
+    default:
+        return "Unknown Error";
     }
 }
 
 void Capsule_print(Capsule atom, FILE* out) {
     switch (atom.type) {
-    case CAPSULE_TYPE_NIL: fprintf(out, "NIL"); break;
+    case CAPSULE_TYPE_NIL:
+        fprintf(out, "NIL");
+        break;
     case CAPSULE_TYPE_PAIR:
         fputc('(', out);
         Capsule_print(CAPSULE_CAR(atom), out);
@@ -51,12 +60,26 @@ void Capsule_print(Capsule atom, FILE* out) {
         fputc(')', out);
         break;
     case CAPSULE_TYPE_STRING:
-    case CAPSULE_TYPE_SYMBOL: fprintf(out, "%s", atom.as.symbol); break;
-    case CAPSULE_TYPE_INTEGER: fprintf(out, "%ld", atom.as.integer); break;
-    case CAPSULE_TYPE_DECIMAL: fprintf(out, "%lf", atom.as.decimal); break;
-    case CAPSULE_TYPE_POINTER: fprintf(out, "%p", atom.as.pointer); break;
-    case CAPSULE_TYPE_BUILTIN: fprintf(out, "#<BUILTIN:%p>", atom.as.builtin); break;
-    case CAPSULE_TYPE_CLOSURE: fprintf(out, "#<CLOSURE:%p>", atom.as.pair); break;
-    case CAPSULE_TYPE_MACRO: fprintf(out, "#<MACRO:%p>", atom.as.pair); break;
+    case CAPSULE_TYPE_SYMBOL:
+        fprintf(out, "%s", atom.as.symbol);
+        break;
+    case CAPSULE_TYPE_INTEGER:
+        fprintf(out, "%ld", atom.as.integer);
+        break;
+    case CAPSULE_TYPE_DECIMAL:
+        fprintf(out, "%lf", atom.as.decimal);
+        break;
+    case CAPSULE_TYPE_POINTER:
+        fprintf(out, "%p", atom.as.pointer);
+        break;
+    case CAPSULE_TYPE_BUILTIN:
+        fprintf(out, "#<BUILTIN:%p>", atom.as.builtin);
+        break;
+    case CAPSULE_TYPE_CLOSURE:
+        fprintf(out, "#<CLOSURE:%p>", atom.as.pair);
+        break;
+    case CAPSULE_TYPE_MACRO:
+        fprintf(out, "#<MACRO:%p>", atom.as.pair);
+        break;
     }
 }

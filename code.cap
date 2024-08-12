@@ -1,3 +1,11 @@
 (begin
-  (define state (eval/cc "int add(int a, int b) { return a + b; }"))
-  (write 1 "sum: {}" (call/cc state :int "add" 10 20)))
+  (defmacro (while condition . body)
+    `(let loop ()
+       (cond (,condition
+               (begin . ,body)
+               (loop)))))
+
+  (define counter 10)
+  (while (> counter 0)
+    (write 1 "{}\n" counter))
+  )

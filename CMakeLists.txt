@@ -14,6 +14,7 @@ ExternalProject_Add(tinycc
         GIT_TAG "mob"
         GIT_SHALLOW ON
         GIT_PROGRESS ON
+        UPDATE_COMMAND ""
 
         CONFIGURE_COMMAND "<SOURCE_DIR>/configure" --prefix=<INSTALL_DIR> --enable-static
 )

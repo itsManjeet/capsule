@@ -33,7 +33,8 @@
 #define BUILTIN(id) static CapsuleError BUILTIN_ID(id)(Capsule args, Capsule scope, Capsule * result)
 
 BUILTIN(car) {
-    if (CAPSULE_NILP(args) || !CAPSULE_NILP(CAPSULE_CDR(args))) return CAPSULE_ERROR_ARGS;
+    if (CAPSULE_NILP(args) || !CAPSULE_NILP(CAPSULE_CDR(args)))
+        return CAPSULE_ERROR_ARGS;
 
     if (CAPSULE_NILP(CAPSULE_CAR(args)))
         *result = Capsule_nil;
@@ -46,7 +47,8 @@ BUILTIN(car) {
 }
 
 BUILTIN(cdr) {
-    if (CAPSULE_NILP(args) || !CAPSULE_NILP(CAPSULE_CDR(args))) return CAPSULE_ERROR_ARGS;
+    if (CAPSULE_NILP(args) || !CAPSULE_NILP(CAPSULE_CDR(args)))
+        return CAPSULE_ERROR_ARGS;
 
     if (CAPSULE_NILP(CAPSULE_CAR(args)))
         *result = Capsule_nil;
@@ -82,34 +84,41 @@ BUILTIN(eq) {
 }
 
 BUILTIN(pairp) {
-    if (CAPSULE_NILP(args) || !CAPSULE_NILP(CAPSULE_CDR(args))) return CAPSULE_ERROR_ARGS;
+    if (CAPSULE_NILP(args) || !CAPSULE_NILP(CAPSULE_CDR(args)))
+        return CAPSULE_ERROR_ARGS;
 
     *result = (CAPSULE_CAR(args).type == CAPSULE_TYPE_PAIR) ? CAPSULE_SYMBOL("T") : Capsule_nil;
     return CAPSULE_ERROR_NONE;
 }
 
 BUILTIN(procp) {
-    if (CAPSULE_NILP(args) || !CAPSULE_NILP(CAPSULE_CDR(args))) return CAPSULE_ERROR_ARGS;
+    if (CAPSULE_NILP(args) || !CAPSULE_NILP(CAPSULE_CDR(args)))
+        return CAPSULE_ERROR_ARGS;
 
-    *result = (CAPSULE_CAR(args).type == CAPSULE_TYPE_BUILTIN || CAPSULE_CAR(args).type == CAPSULE_TYPE_CLOSURE)
-                      ? CAPSULE_SYMBOL("T")
-                      : Capsule_nil;
+    *result = (CAPSULE_CAR(args).type == CAPSULE_TYPE_BUILTIN || CAPSULE_CAR(args).type == CAPSULE_TYPE_CLOSURE) ? CAPSULE_SYMBOL("T")
+                                                                                                                 : Capsule_nil;
     return CAPSULE_ERROR_NONE;
 }
 
-#define ADD_ARTHEMATIC(op, id)                                                                                         \
-    BUILTIN(id) {                                                                                                      \
-        if (CAPSULE_NILP(args) || CAPSULE_NILP(CAPSULE_CDR(args)) || !CAPSULE_NILP(CAPSULE_CDR(CAPSULE_CDR(args))))    \
-            return CAPSULE_ERROR_ARGS;                                                                                 \
-        Capsule a = CAPSULE_CAR(args);                                                                                 \
-        Capsule b = CAPSULE_CAR(CAPSULE_CDR(args));                                                                    \
-        if (a.type != b.type) return CAPSULE_ERROR_TYPE;                                                               \
-        switch (a.type) {                                                                                              \
-        case CAPSULE_TYPE_INTEGER: *result = CAPSULE_INTEGER(a.as.integer op b.as.integer); break;                     \
-        case CAPSULE_TYPE_DECIMAL: *result = CAPSULE_DECIMAL(a.as.decimal op b.as.decimal); break;                     \
-        default: return CAPSULE_ERROR_TYPE;                                                                            \
-        }                                                                                                              \
-        return CAPSULE_ERROR_NONE;                                                                                     \
+#define ADD_ARTHEMATIC(op, id)                                                                                      \
+    BUILTIN(id) {                                                                                                   \
+        if (CAPSULE_NILP(args) || CAPSULE_NILP(CAPSULE_CDR(args)) || !CAPSULE_NILP(CAPSULE_CDR(CAPSULE_CDR(args)))) \
+            return CAPSULE_ERROR_ARGS;                                                                              \
+        Capsule a = CAPSULE_CAR(args);                                                                              \
+        Capsule b = CAPSULE_CAR(CAPSULE_CDR(args));                                                                 \
+        if (a.type != b.type)                                                                                       \
+            return CAPSULE_ERROR_TYPE;                                                                              \
+        switch (a.type) {                                                                                           \
+        case CAPSULE_TYPE_INTEGER:                                                                                  \
+            *result = CAPSULE_INTEGER(a.as.integer op b.as.integer);                                                \
+            break;                                                                                                  \
+        case CAPSULE_TYPE_DECIMAL:                                                                                  \
+            *result = CAPSULE_DECIMAL(a.as.decimal op b.as.decimal);                                                \
+            break;                                                                                                  \
+        default:                                                                                                    \
+            return CAPSULE_ERROR_TYPE;                                                                              \
+        }                                                                                                           \
+        return CAPSULE_ERROR_NONE;                                                                                  \
     }
 
 ADD_ARTHEMATIC(+, add)
@@ -117,39 +126,48 @@ ADD_ARTHEMATIC(-, subtract)
 ADD_ARTHEMATIC(*, multiply)
 ADD_ARTHEMATIC(/, divide)
 
-#define ADD_LOGICAL(op, id)                                                                                            \
-    BUILTIN(id) {                                                                                                      \
-        if (CAPSULE_NILP(args) || CAPSULE_NILP(CAPSULE_CDR(args)) || !CAPSULE_NILP(CAPSULE_CDR(CAPSULE_CDR(args))))    \
-            return CAPSULE_ERROR_ARGS;                                                                                 \
-        Capsule a = CAPSULE_CAR(args);                                                                                 \
-        Capsule b = CAPSULE_CAR(CAPSULE_CDR(args));                                                                    \
-        if (a.type != b.type) return CAPSULE_ERROR_TYPE;                                                               \
-        switch (a.type) {                                                                                              \
-        case CAPSULE_TYPE_INTEGER: *result = a.as.integer op b.as.integer ? CAPSULE_SYMBOL("T") : Capsule_nil; break;  \
-        case CAPSULE_TYPE_DECIMAL: *result = a.as.decimal op b.as.decimal ? CAPSULE_SYMBOL("T") : Capsule_nil; break;  \
-        default: return CAPSULE_ERROR_TYPE;                                                                            \
-        }                                                                                                              \
-        return CAPSULE_ERROR_NONE;                                                                                     \
+#define ADD_LOGICAL(op, id)                                                                                         \
+    BUILTIN(id) {                                                                                                   \
+        if (CAPSULE_NILP(args) || CAPSULE_NILP(CAPSULE_CDR(args)) || !CAPSULE_NILP(CAPSULE_CDR(CAPSULE_CDR(args)))) \
+            return CAPSULE_ERROR_ARGS;                                                                              \
+        Capsule a = CAPSULE_CAR(args);                                                                              \
+        Capsule b = CAPSULE_CAR(CAPSULE_CDR(args));                                                                 \
+        if (a.type != b.type)                                                                                       \
+            return CAPSULE_ERROR_TYPE;                                                                              \
+        switch (a.type) {                                                                                           \
+        case CAPSULE_TYPE_INTEGER:                                                                                  \
+            *result = a.as.integer op b.as.integer ? CAPSULE_SYMBOL("T") : Capsule_nil;                             \
+            break;                                                                                                  \
+        case CAPSULE_TYPE_DECIMAL:                                                                                  \
+            *result = a.as.decimal op b.as.decimal ? CAPSULE_SYMBOL("T") : Capsule_nil;                             \
+            break;                                                                                                  \
+        default:                                                                                                    \
+            return CAPSULE_ERROR_TYPE;                                                                              \
+        }                                                                                                           \
+        return CAPSULE_ERROR_NONE;                                                                                  \
     }
 
 ADD_LOGICAL(<, less)
 
 BUILTIN(i2d) {
-    if (CAPSULE_NILP(args) || !CAPSULE_NILP(CAPSULE_CDR(args))) return CAPSULE_ERROR_ARGS;
+    if (CAPSULE_NILP(args) || !CAPSULE_NILP(CAPSULE_CDR(args)))
+        return CAPSULE_ERROR_ARGS;
 
     *result = CAPSULE_INTEGER(CAPSULE_CAR(args).as.decimal);
     return CAPSULE_ERROR_NONE;
 }
 
 BUILTIN(d2i) {
-    if (CAPSULE_NILP(args) || !CAPSULE_NILP(CAPSULE_CDR(args))) return CAPSULE_ERROR_ARGS;
+    if (CAPSULE_NILP(args) || !CAPSULE_NILP(CAPSULE_CDR(args)))
+        return CAPSULE_ERROR_ARGS;
 
     *result = CAPSULE_DECIMAL(CAPSULE_CAR(args).as.integer);
     return CAPSULE_ERROR_NONE;
 }
 
 BUILTIN(write) {
-    if (CAPSULE_NILP(args) || CAPSULE_NILP(CAPSULE_CDR(args))) return CAPSULE_ERROR_ARGS;
+    if (CAPSULE_NILP(args) || CAPSULE_NILP(CAPSULE_CDR(args)))
+        return CAPSULE_ERROR_ARGS;
 
     if (!(CAPSULE_INTEGERP(CAPSULE_CAR(args)) && CAPSULE_STRINGP(CAPSULE_CAR(CAPSULE_CDR(args))))) {
         return CAPSULE_ERROR_TYPE;
@@ -182,9 +200,12 @@ BUILTIN(write) {
 }
 
 BUILTIN(read) {
-    if (CAPSULE_NILP(args) || !CAPSULE_NILP(CAPSULE_CDR(args))) return CAPSULE_ERROR_ARGS;
+    if (CAPSULE_NILP(args) || !CAPSULE_NILP(CAPSULE_CDR(args)))
+        return CAPSULE_ERROR_ARGS;
 
-    if (!CAPSULE_INTEGERP(CAPSULE_CAR(args))) { return CAPSULE_ERROR_TYPE; }
+    if (!CAPSULE_INTEGERP(CAPSULE_CAR(args))) {
+        return CAPSULE_ERROR_TYPE;
+    }
 
     char buffer[BUFSIZ];
     int fd = CAPSULE_CAR(args).as.integer;
@@ -202,7 +223,8 @@ BUILTIN(read) {
 }
 
 BUILTIN(count) {
-    if (CAPSULE_NILP(args) || !CAPSULE_NILP(CAPSULE_CDR(args))) return CAPSULE_ERROR_ARGS;
+    if (CAPSULE_NILP(args) || !CAPSULE_NILP(CAPSULE_CDR(args)))
+        return CAPSULE_ERROR_ARGS;
 
     if (CAPSULE_STRINGP(CAPSULE_CAR(args)) || CAPSULE_SYMBOLP(args))
         *result = CAPSULE_INTEGER(strlen(CAPSULE_CAR(args).as.symbol));
@@ -222,20 +244,25 @@ BUILTIN(count) {
 }
 
 BUILTIN(slurp) {
-    if (CAPSULE_NILP(args) || !CAPSULE_NILP(CAPSULE_CDR(args))) return CAPSULE_ERROR_ARGS;
+    if (CAPSULE_NILP(args) || !CAPSULE_NILP(CAPSULE_CDR(args)))
+        return CAPSULE_ERROR_ARGS;
 
-    if (!CAPSULE_STRINGP(CAPSULE_CAR(args))) return CAPSULE_ERROR_TYPE;
+    if (!CAPSULE_STRINGP(CAPSULE_CAR(args)))
+        return CAPSULE_ERROR_TYPE;
 
     char* file = slurp(CAPSULE_CAR(args).as.symbol);
-    if (file == NULL) return CAPSULE_ERROR_RUNTIME;
+    if (file == NULL)
+        return CAPSULE_ERROR_RUNTIME;
 
     *result = CAPSULE_STRING(file);
     return CAPSULE_ERROR_NONE;
 }
 
 BUILTIN(eval) {
-    if (CAPSULE_NILP(args) || !CAPSULE_NILP(CAPSULE_CDR(args))) return CAPSULE_ERROR_ARGS;
-    if (!CAPSULE_STRINGP(CAPSULE_CAR(args))) return CAPSULE_ERROR_TYPE;
+    if (CAPSULE_NILP(args) || !CAPSULE_NILP(CAPSULE_CDR(args)))
+        return CAPSULE_ERROR_ARGS;
+    if (!CAPSULE_STRINGP(CAPSULE_CAR(args)))
+        return CAPSULE_ERROR_TYPE;
 
     const char* source = CAPSULE_CAR(args).as.symbol;
     return Capsule_eval(source, Capsule_Scope_global(), result);
@@ -244,15 +271,8 @@ BUILTIN(eval) {
 #ifdef HAS_FFI
 
 static ffi_type* FFI_TYPE_MAP[] = {
-        &ffi_type_pointer,
-        &ffi_type_pointer,
-        &ffi_type_pointer,
-        &ffi_type_pointer,
-        &ffi_type_sint64,
-        &ffi_type_double,
-        &ffi_type_pointer,
-        &ffi_type_pointer,
-        &ffi_type_pointer,
+    &ffi_type_pointer, &ffi_type_pointer, &ffi_type_pointer, &ffi_type_pointer, &ffi_type_sint64,
+    &ffi_type_double,  &ffi_type_pointer, &ffi_type_pointer, &ffi_type_pointer,
 };
 
 typedef struct Library {
@@ -267,13 +287,16 @@ void Library_free(void* ptr) {
 }
 
 BUILTIN(loadlibrary) {
-    if (CAPSULE_NILP(args) || !CAPSULE_NILP(CAPSULE_CDR(args))) return CAPSULE_ERROR_ARGS;
+    if (CAPSULE_NILP(args) || !CAPSULE_NILP(CAPSULE_CDR(args)))
+        return CAPSULE_ERROR_ARGS;
 
-    if (!CAPSULE_STRINGP(CAPSULE_CAR(args))) return CAPSULE_ERROR_TYPE;
+    if (!CAPSULE_STRINGP(CAPSULE_CAR(args)))
+        return CAPSULE_ERROR_TYPE;
 
     const char* library_path = CAPSULE_AS_STRING(CAPSULE_CAR(args));
     void* handler = dlopen(library_path, RTLD_LAZY | RTLD_LOCAL);
-    if (handler == NULL) return CAPSULE_ERROR_RUNTIME;
+    if (handler == NULL)
+        return CAPSULE_ERROR_RUNTIME;
 
     Library* library = malloc(sizeof(Library));
     library->is_tcc_state = 0;
@@ -284,14 +307,17 @@ BUILTIN(loadlibrary) {
 }
 
 BUILTIN(evalcc) {
-    if (CAPSULE_NILP(args) || !CAPSULE_NILP(CAPSULE_CDR(args))) return CAPSULE_ERROR_ARGS;
+    if (CAPSULE_NILP(args) || !CAPSULE_NILP(CAPSULE_CDR(args)))
+        return CAPSULE_ERROR_ARGS;
 
-    if (!CAPSULE_STRINGP(CAPSULE_CAR(args))) return CAPSULE_ERROR_TYPE;
+    if (!CAPSULE_STRINGP(CAPSULE_CAR(args)))
+        return CAPSULE_ERROR_TYPE;
 
     const char* source = CAPSULE_AS_STRING(CAPSULE_CAR(args));
     TCCState* state = tcc_new();
     tcc_set_output_type(state, TCC_OUTPUT_MEMORY);
-    if (tcc_compile_string(state, source) == -1) return CAPSULE_ERROR_RUNTIME;
+    if (tcc_compile_string(state, source) == -1)
+        return CAPSULE_ERROR_RUNTIME;
 
     if (tcc_relocate(state) == -1) {
         tcc_delete(state);
@@ -318,15 +344,16 @@ BUILTIN(callcc) {
         const char* library = CAPSULE_AS_STRING(CAPSULE_CAR(args));
         handler = dlopen(library, RTLD_NOW | RTLD_LOCAL);
         managed = 1;
-        if (handler == NULL) { return CAPSULE_ERROR_RUNTIME; }
+        if (handler == NULL) {
+            return CAPSULE_ERROR_RUNTIME;
+        }
     } else if (CAPSULE_POINTERP(CAPSULE_CAR(args))) {
         handler = ((Library*)CAPSULE_AS_POINTER(CAPSULE_CAR(args)))->handler;
         is_tcc_state = ((Library*)CAPSULE_AS_POINTER(CAPSULE_CAR(args)))->is_tcc_state;
     } else if (!CAPSULE_NILP(CAPSULE_CAR(args)))
         return CAPSULE_ERROR_TYPE;
 
-    if (!CAPSULE_INTEGERP(CAPSULE_CAR(CAPSULE_CDR(args))) ||
-            !CAPSULE_STRINGP(CAPSULE_CAR(CAPSULE_CDR(CAPSULE_CDR(args)))))
+    if (!CAPSULE_INTEGERP(CAPSULE_CAR(CAPSULE_CDR(args))) || !CAPSULE_STRINGP(CAPSULE_CAR(CAPSULE_CDR(CAPSULE_CDR(args)))))
         return CAPSULE_ERROR_TYPE;
 
     CapsuleType type = CAPSULE_AS_INTEGER(CAPSULE_CAR(CAPSULE_CDR(args)));
@@ -335,7 +362,8 @@ BUILTIN(callcc) {
     const char* function_id = CAPSULE_AS_STRING(CAPSULE_CAR(CAPSULE_CDR(CAPSULE_CDR(args))));
 
     void* function = is_tcc_state ? tcc_get_symbol(handler, function_id) : dlsym(handler, function_id);
-    if (function == NULL) return CAPSULE_ERROR_RUNTIME;
+    if (function == NULL)
+        return CAPSULE_ERROR_RUNTIME;
 
     args = CAPSULE_CDR(CAPSULE_CDR(CAPSULE_CDR(args)));
     int args_count = 0;
@@ -360,7 +388,8 @@ BUILTIN(callcc) {
     ffi_call(&cif, FFI_FN(function), &result->as, args_values);
     result->type = type;
 
-    if (handler && managed) dlclose(handler);
+    if (handler && managed)
+        dlclose(handler);
 
     return CAPSULE_ERROR_NONE;
 }

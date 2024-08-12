@@ -63,8 +63,8 @@ Capsule Capsule_String_new(const char* str) {
     Allocation* alloc = Capsule_alloc(CAPSULE_TYPE_STRING, sizeof(char) * (size + 1), free);
 
     Capsule string = {
-            .type = CAPSULE_TYPE_STRING,
-            .as.symbol = alloc->pointer,
+        .type = CAPSULE_TYPE_STRING,
+        .as.symbol = alloc->pointer,
     };
 
     memcpy(alloc->pointer, str, size);
@@ -81,7 +81,8 @@ Capsule Capsule_Symbol_new(const char* s) {
     p = sym_table;
     while (!CAPSULE_NILP(p)) {
         a = CAPSULE_CAR(p);
-        if (strcmp(a.as.symbol, s) == 0) return a;
+        if (strcmp(a.as.symbol, s) == 0)
+            return a;
         p = CAPSULE_CDR(p);
     }
 
@@ -99,14 +100,22 @@ void gc_mark(Capsule root) {
     switch (root.type) {
     case CAPSULE_TYPE_PAIR:
     case CAPSULE_TYPE_MACRO:
-    case CAPSULE_TYPE_CLOSURE: alloc = (Allocation*)(root.as.pair) - 1; break;
+    case CAPSULE_TYPE_CLOSURE:
+        alloc = (Allocation*)(root.as.pair) - 1;
+        break;
     case CAPSULE_TYPE_STRING:
-    case CAPSULE_TYPE_SYMBOL: alloc = (Allocation*)(root.as.symbol) - 1; break;
-    case CAPSULE_TYPE_POINTER: alloc = (Allocation*)(root.as.pointer) - 1; break;
-    default: return;
+    case CAPSULE_TYPE_SYMBOL:
+        alloc = (Allocation*)(root.as.symbol) - 1;
+        break;
+    case CAPSULE_TYPE_POINTER:
+        alloc = (Allocation*)(root.as.pointer) - 1;
+        break;
+    default:
+        return;
     }
 
-    if (alloc->mark) return;
+    if (alloc->mark)
+        return;
 
 #ifdef DEBUG_GC
     fprintf(stdout, "marking");
@@ -122,7 +131,8 @@ void gc_mark(Capsule root) {
         gc_mark(CAPSULE_CAR(root));
         gc_mark(CAPSULE_CDR(root));
         break;
-    default: break;
+    default:
+        break;
     }
 }
 
@@ -143,11 +153,18 @@ static void print_allocations() {
         switch (a->type) {
         case CAPSULE_TYPE_PAIR:
         case CAPSULE_TYPE_MACRO:
-        case CAPSULE_TYPE_CLOSURE: Capsule_print((Capsule){.type = a->type, .as.pair = a->pointer}, stdout); break;
+        case CAPSULE_TYPE_CLOSURE:
+            Capsule_print((Capsule){.type = a->type, .as.pair = a->pointer}, stdout);
+            break;
         case CAPSULE_TYPE_STRING:
-        case CAPSULE_TYPE_SYMBOL: Capsule_print((Capsule){.type = a->type, .as.symbol = a->pointer}, stdout); break;
-        case CAPSULE_TYPE_POINTER: Capsule_print((Capsule){.type = a->type, .as.pointer = a->pointer}, stdout); break;
-        default: printf("Unknown type %d", a->type);
+        case CAPSULE_TYPE_SYMBOL:
+            Capsule_print((Capsule){.type = a->type, .as.symbol = a->pointer}, stdout);
+            break;
+        case CAPSULE_TYPE_POINTER:
+            Capsule_print((Capsule){.type = a->type, .as.pointer = a->pointer}, stdout);
+            break;
+        default:
+            printf("Unknown type %d", a->type);
         }
 
         printf("\nMARK    : %d\n", a->mark);
@@ -178,13 +195,18 @@ void gc() {
             switch (a->type) {
             case CAPSULE_TYPE_PAIR:
             case CAPSULE_TYPE_MACRO:
-            case CAPSULE_TYPE_CLOSURE: Capsule_print((Capsule){.type = a->type, .as.pair = a->pointer}, stdout); break;
+            case CAPSULE_TYPE_CLOSURE:
+                Capsule_print((Capsule){.type = a->type, .as.pair = a->pointer}, stdout);
+                break;
             case CAPSULE_TYPE_STRING:
-            case CAPSULE_TYPE_SYMBOL: Capsule_print((Capsule){.type = a->type, .as.symbol = a->pointer}, stdout); break;
+            case CAPSULE_TYPE_SYMBOL:
+                Capsule_print((Capsule){.type = a->type, .as.symbol = a->pointer}, stdout);
+                break;
             case CAPSULE_TYPE_POINTER:
                 Capsule_print((Capsule){.type = a->type, .as.pointer = a->pointer}, stdout);
                 break;
-            default: fprintf(stdout, "invalid type %d", a->type);
+            default:
+                fprintf(stdout, "invalid type %d", a->type);
             }
             fprintf(stdout, "\n");
 #endif
@@ -196,7 +218,9 @@ void gc() {
         }
     }
 
-    if (prev != NULL) { prev->next = NULL; }
+    if (prev != NULL) {
+        prev->next = NULL;
+    }
 
     a = global_allocations;
     while (a != NULL) {
