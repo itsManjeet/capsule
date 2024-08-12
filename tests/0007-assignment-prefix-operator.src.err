@@ -1,3 +1,0 @@
-ERROR: unexpected infix operation
- | not a = "value";
-         ^

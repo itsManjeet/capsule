@@ -1,55 +1,39 @@
-cmake_minimum_required(VERSION 3.10)
-project(srclang
-        VERSION 0.0.2
-        DESCRIPTION "Source Programming Language")
+cmake_minimum_required(VERSION 3.20)
+project(capsule
+        VERSION "0.1"
+        DESCRIPTION "Capsule Programming Language"
+        LANGUAGES C)
 
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(POSITION_INDEPENDENT_CODE ON)
+set(CMAKE_C_STANDARD 17)
+set(CMAKE_C_STANDARD_REQUIRED ON)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-add_definitions(-DSRCLANG_GC_STRESS)
-# add_definitions(-DSRCLANG_GC_DEBUG)
+include(ExternalProject)
+ExternalProject_Add(tinycc
+        GIT_REPOSITORY "git://repo.or.cz/tinycc.git"
+        GIT_TAG "mob"
+        GIT_SHALLOW ON
+        GIT_PROGRESS ON
 
-if(UNIX)
-    find_library(DL dl REQUIRED)
-else()
-    set(DL "")
-endif()
+        CONFIGURE_COMMAND "<SOURCE_DIR>/configure" --prefix=<INSTALL_DIR> --enable-static
+)
+ExternalProject_Get_Property(tinycc INSTALL_DIR)
+add_library(tcc INTERFACE)
+target_include_directories(tcc INTERFACE "${INSTALL_DIR}/include")
+target_link_libraries(tcc INTERFACE "${INSTALL_DIR}/lib/libtcc.a")
 
-find_library(FFI ffi)
-if(FFI)
-    add_definitions(-DWITH_FFI)
-else()
-    set(FFI "")
-endif()
+#add_compile_definitions(-DDEBUG_GC)
+#add_compile_definitions(-DSTRESS_GC)
 
-find_library(READLINE readline)
-if(READLINE)
-    add_definitions(-DWITH_READLINE)
-else()
-    set(READLINE "")
-endif()
+include_directories(include)
+
+add_subdirectory(src)
+add_subdirectory(bin)
+
 include(GNUInstallDirs)
-
-file(GLOB_RECURSE SourceFiles "src/*.cpp" "src/*.h")
-add_executable(${PROJECT_NAME} ${SourceFiles})
-
-set_target_properties(${PROJECT_NAME}
-        PROPERTIES
-        OUTPUT_NAME "${PROJECT_NAME}"
-        PUBLIC_HEADER "src/Value.h;src/ByteCode.h;src/DebugInfo.h;src/Instructions.h;src/Interpreter.h;src/Compiler.h;src/SymbolTable.h;src/MemoryManager.h")
-
-target_link_options(${PROJECT_NAME} PRIVATE
-        -rdynamic)
-        
-target_link_libraries(${PROJECT_NAME} PRIVATE
-        ${FFI} ${DL} ${READLINE})
-
-install(TARGETS ${PROJECT_NAME}
+install(TARGETS ${PROJECT_NAME} ${PROJECT_NAME}_Shared
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-        PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/SrcLang)
-
-add_subdirectory(modules)
-
-enable_testing()
-add_subdirectory(tests)
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/
+)

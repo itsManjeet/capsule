@@ -1,3 +1,0 @@
-if (true) { println ("good"); } else { println ("bad"); }
-if (false) { println ("bad"); } else { println ("good"); }
-if (false) { null; } else { println ("block"); }

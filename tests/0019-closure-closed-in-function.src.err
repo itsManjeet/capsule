@@ -1,3 +1,0 @@
-ERROR: Expected ';' but got 'f'
- | f = f_;
-   ^

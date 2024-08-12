@@ -1,8 +1,0 @@
-let a = "before";
-println (a);
-
-a = "after";
-println (a);
-
-println (a = "arg");
-println (a);

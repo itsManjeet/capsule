@@ -1,6 +1,0 @@
-let f = fun (a, b) {
-    println (a);
-    println (b);
-};
-
-f (1, 2, 3, 4);

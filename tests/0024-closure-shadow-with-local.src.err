@@ -1,3 +1,0 @@
-ERROR: Variable already defined 'foo'
- |     let foo = "shadow";
-           ^

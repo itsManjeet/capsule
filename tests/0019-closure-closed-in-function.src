@@ -1,9 +1,0 @@
-let f = null;
-
-let local = "local";
-let f_ = fun () {
-    println (local);
-}
-f = f_;
-
-f();

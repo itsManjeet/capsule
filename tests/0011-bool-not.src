@@ -1,3 +1,0 @@
-println (not true);
-println (not false);
-println (not not true);

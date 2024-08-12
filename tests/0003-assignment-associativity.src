@@ -1,9 +1,0 @@
-let a = 'a';
-let b = 'b';
-let c = 'c';
-
-a = b = c;
-
-println (a);
-println (b);
-println (c);

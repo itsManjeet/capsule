@@ -1,8 +1,0 @@
-let Foo = fun () {
-    let self = {};
-
-    return self;
-};
-
-let foo = Foo ();
-println(foo.bar);
