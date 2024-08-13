@@ -24,7 +24,6 @@
 #ifdef HAS_FFI
 #    include <dlfcn.h>
 #    include <ffi.h>
-#    include <libtcc.h>
 #endif
 
 #define MAX_FFI_FUN_ARGS 20
@@ -169,17 +168,14 @@ BUILTIN(write) {
     if (CAPSULE_NILP(args) || CAPSULE_NILP(CAPSULE_CDR(args)))
         return CAPSULE_ERROR_ARGS;
 
-    if (!(CAPSULE_INTEGERP(CAPSULE_CAR(args)) && CAPSULE_STRINGP(CAPSULE_CAR(CAPSULE_CDR(args))))) {
+    if (!(CAPSULE_POINTERP(CAPSULE_CAR(args)) && CAPSULE_STRINGP(CAPSULE_CAR(CAPSULE_CDR(args))))) {
         return CAPSULE_ERROR_TYPE;
     }
 
-    int fd = CAPSULE_CAR(args).as.integer;
-    const char* format = CAPSULE_CAR(CAPSULE_CDR(args)).as.symbol;
+    FILE* file = CAPSULE_AS_POINTER(CAPSULE_CAR(args));
+    const char* format = CAPSULE_AS_STRING(CAPSULE_CAR(CAPSULE_CDR(args)));
 
     args = CAPSULE_CDR(CAPSULE_CDR(args));
-
-    fd = dup(fd);
-    FILE* file = fdopen(fd, "w");
 
     while (*format) {
         if (*format == '{' && *(format + 1) == '}') {
@@ -193,8 +189,7 @@ BUILTIN(write) {
             format++;
         }
     }
-
-    fclose(file);
+    fflush(file);
     *result = Capsule_nil;
     return CAPSULE_ERROR_NONE;
 }
@@ -203,22 +198,51 @@ BUILTIN(read) {
     if (CAPSULE_NILP(args) || !CAPSULE_NILP(CAPSULE_CDR(args)))
         return CAPSULE_ERROR_ARGS;
 
-    if (!CAPSULE_INTEGERP(CAPSULE_CAR(args))) {
+    if (!CAPSULE_POINTERP(CAPSULE_CAR(args))) {
         return CAPSULE_ERROR_TYPE;
     }
 
     char buffer[BUFSIZ];
-    int fd = CAPSULE_CAR(args).as.integer;
-
-    fd = dup(fd);
-    FILE* file = fdopen(fd, "r");
+    FILE* file = CAPSULE_CAR(args).as.pointer;
 
     size_t read = fread(buffer, sizeof(char), sizeof(buffer), file);
     buffer[read] = '\0';
 
-    fclose(file);
-
     *result = CAPSULE_STRING(strdup(buffer));
+    return CAPSULE_ERROR_NONE;
+}
+
+BUILTIN(close) {
+    if (CAPSULE_NILP(args) || !CAPSULE_NILP(CAPSULE_CDR(args)))
+        return CAPSULE_ERROR_ARGS;
+
+    if (!CAPSULE_POINTERP(CAPSULE_CAR(args))) {
+        return CAPSULE_ERROR_TYPE;
+    }
+
+    FILE* file = CAPSULE_CAR(args).as.pointer;
+
+    fclose(file);
+    *result = Capsule_nil;
+    return CAPSULE_ERROR_NONE;
+}
+
+BUILTIN(open) {
+    if (CAPSULE_NILP(args) || CAPSULE_NILP(CAPSULE_CDR(args)) || !CAPSULE_NILP(CAPSULE_CDR(CAPSULE_CDR(args))))
+        return CAPSULE_ERROR_ARGS;
+
+    if (!CAPSULE_STRINGP(CAPSULE_CAR(args)) || !CAPSULE_STRINGP(CAPSULE_CAR(CAPSULE_CDR(args)))) {
+        return CAPSULE_ERROR_TYPE;
+    }
+
+    const char* filepath = CAPSULE_AS_STRING(CAPSULE_CAR(args));
+    const char* mode = CAPSULE_AS_STRING(CAPSULE_CAR(CAPSULE_CDR(args)));
+
+    FILE* file = fopen(filepath, mode);
+    if (file == NULL)
+        return CAPSULE_ERROR_RUNTIME;
+
+    *result = CAPSULE_POINTER(file);
     return CAPSULE_ERROR_NONE;
 }
 
@@ -268,23 +292,42 @@ BUILTIN(eval) {
     return Capsule_eval(source, Capsule_Scope_global(), result);
 }
 
+BUILTIN(typeof) {
+    if (CAPSULE_NILP(args) || !CAPSULE_NILP(CAPSULE_CDR(args)))
+        return CAPSULE_ERROR_ARGS;
+    *result = CAPSULE_INTEGER(CAPSULE_CAR(args).type);
+    return CAPSULE_ERROR_NONE;
+}
+
+BUILTIN(popen) {
+    if (CAPSULE_NILP(args) || !CAPSULE_NILP(CAPSULE_CDR(args)))
+        return CAPSULE_ERROR_ARGS;
+
+    if (!CAPSULE_STRINGP(CAPSULE_CAR(args)))
+        return CAPSULE_ERROR_TYPE;
+
+    const char* script = CAPSULE_AS_STRING(CAPSULE_CAR(args));
+    FILE* process = popen(script, "r");
+
+    *result = CAPSULE_POINTER(process);
+    return CAPSULE_ERROR_NONE;
+}
+
+BUILTIN(ref) {
+    if (CAPSULE_NILP(args) || !CAPSULE_NILP(CAPSULE_CDR(args)))
+        return CAPSULE_ERROR_ARGS;
+    if (!CAPSULE_INTEGERP(CAPSULE_CAR(args)))
+        return CAPSULE_ERROR_TYPE;
+    *result = CAPSULE_POINTER((void*)CAPSULE_AS_INTEGER(CAPSULE_CAR(args)));
+    return CAPSULE_ERROR_NONE;
+}
+
 #ifdef HAS_FFI
 
 static ffi_type* FFI_TYPE_MAP[] = {
     &ffi_type_pointer, &ffi_type_pointer, &ffi_type_pointer, &ffi_type_pointer, &ffi_type_sint64,
-    &ffi_type_double,  &ffi_type_pointer, &ffi_type_pointer, &ffi_type_pointer,
+    &ffi_type_double,  &ffi_type_pointer, &ffi_type_pointer, &ffi_type_pointer, &ffi_type_pointer,
 };
-
-typedef struct Library {
-    int is_tcc_state : 1;
-    void* handler;
-} Library;
-
-void Library_free(void* ptr) {
-    Library* library = (Library*)ptr;
-    library->is_tcc_state ? tcc_delete(library->handler) : dlclose(library->handler);
-    free(library);
-}
 
 BUILTIN(loadlibrary) {
     if (CAPSULE_NILP(args) || !CAPSULE_NILP(CAPSULE_CDR(args)))
@@ -294,41 +337,11 @@ BUILTIN(loadlibrary) {
         return CAPSULE_ERROR_TYPE;
 
     const char* library_path = CAPSULE_AS_STRING(CAPSULE_CAR(args));
-    void* handler = dlopen(library_path, RTLD_LAZY | RTLD_LOCAL);
+    void* handler = dlopen(library_path, RTLD_GLOBAL | RTLD_NOW);
     if (handler == NULL)
         return CAPSULE_ERROR_RUNTIME;
 
-    Library* library = malloc(sizeof(Library));
-    library->is_tcc_state = 0;
-    library->handler = handler;
-
-    *result = Capsule_managed_pointer(library, Library_free);
-    return CAPSULE_ERROR_NONE;
-}
-
-BUILTIN(evalcc) {
-    if (CAPSULE_NILP(args) || !CAPSULE_NILP(CAPSULE_CDR(args)))
-        return CAPSULE_ERROR_ARGS;
-
-    if (!CAPSULE_STRINGP(CAPSULE_CAR(args)))
-        return CAPSULE_ERROR_TYPE;
-
-    const char* source = CAPSULE_AS_STRING(CAPSULE_CAR(args));
-    TCCState* state = tcc_new();
-    tcc_set_output_type(state, TCC_OUTPUT_MEMORY);
-    if (tcc_compile_string(state, source) == -1)
-        return CAPSULE_ERROR_RUNTIME;
-
-    if (tcc_relocate(state) == -1) {
-        tcc_delete(state);
-        return CAPSULE_ERROR_RUNTIME;
-    };
-
-    Library* library = malloc(sizeof(Library));
-    library->is_tcc_state = 1;
-    library->handler = state;
-
-    *result = Capsule_managed_pointer(library, Library_free);
+    *result = Capsule_managed_pointer(handler, CAPSULE_DEALLOCATOR(dlclose));
     return CAPSULE_ERROR_NONE;
 }
 
@@ -339,7 +352,6 @@ BUILTIN(callcc) {
 
     void* handler = NULL;
     int managed = 0;
-    int is_tcc_state = 0;
     if (CAPSULE_STRINGP(CAPSULE_CAR(args))) {
         const char* library = CAPSULE_AS_STRING(CAPSULE_CAR(args));
         handler = dlopen(library, RTLD_NOW | RTLD_LOCAL);
@@ -348,8 +360,7 @@ BUILTIN(callcc) {
             return CAPSULE_ERROR_RUNTIME;
         }
     } else if (CAPSULE_POINTERP(CAPSULE_CAR(args))) {
-        handler = ((Library*)CAPSULE_AS_POINTER(CAPSULE_CAR(args)))->handler;
-        is_tcc_state = ((Library*)CAPSULE_AS_POINTER(CAPSULE_CAR(args)))->is_tcc_state;
+        handler = (CAPSULE_AS_POINTER(CAPSULE_CAR(args)));
     } else if (!CAPSULE_NILP(CAPSULE_CAR(args)))
         return CAPSULE_ERROR_TYPE;
 
@@ -360,8 +371,8 @@ BUILTIN(callcc) {
     ffi_type* return_type = FFI_TYPE_MAP[type];
 
     const char* function_id = CAPSULE_AS_STRING(CAPSULE_CAR(CAPSULE_CDR(CAPSULE_CDR(args))));
+    void* function = dlsym(handler, function_id);
 
-    void* function = is_tcc_state ? tcc_get_symbol(handler, function_id) : dlsym(handler, function_id);
     if (function == NULL)
         return CAPSULE_ERROR_RUNTIME;
 
@@ -402,6 +413,10 @@ void define_builtin(Capsule scope) {
 
     DEFINE_VALUE("T", CAPSULE_SYMBOL("T"))
 
+    DEFINE_VALUE("STDOUT", CAPSULE_POINTER(stdout));
+    DEFINE_VALUE("STDERR", CAPSULE_POINTER(stderr));
+    DEFINE_VALUE("STDIN", CAPSULE_POINTER(stdin));
+
     DEFINE_BUILTIN("CAR", car);
     DEFINE_BUILTIN("CDR", cdr);
     DEFINE_BUILTIN("CONS", cons);
@@ -415,11 +430,16 @@ void define_builtin(Capsule scope) {
     DEFINE_BUILTIN("PAIR?", pairp);
     DEFINE_BUILTIN("PROCEDURE?", procp);
 
+    DEFINE_BUILTIN("REF", ref)
     DEFINE_BUILTIN("WRITE", write)
     DEFINE_BUILTIN("READ", read)
+    DEFINE_BUILTIN("OPEN/PROCESS", popen)
+    DEFINE_BUILTIN("OPEN", open)
+    DEFINE_BUILTIN("CLOSE", close)
     DEFINE_BUILTIN("COUNT", count);
     DEFINE_BUILTIN("SLURP", slurp);
     DEFINE_BUILTIN("EVAL", eval);
+    DEFINE_BUILTIN("TYPEOF", typeof);
 
     DEFINE_BUILTIN("INT->DEC", i2d)
     DEFINE_BUILTIN("DEC->INT", d2i)
@@ -428,9 +448,9 @@ void define_builtin(Capsule scope) {
     DEFINE_VALUE(":DEC", CAPSULE_INTEGER(CAPSULE_TYPE_DECIMAL));
     DEFINE_VALUE(":STR", CAPSULE_INTEGER(CAPSULE_TYPE_STRING));
     DEFINE_VALUE(":SYM", CAPSULE_INTEGER(CAPSULE_TYPE_SYMBOL));
+    DEFINE_VALUE(":PTR", CAPSULE_INTEGER(CAPSULE_TYPE_POINTER));
 
 #ifdef HAS_FFI
-    DEFINE_BUILTIN("EVAL/CC", evalcc)
     DEFINE_BUILTIN("CALL/CC", callcc)
     DEFINE_BUILTIN("LOAD-LIBRARY", loadlibrary)
 #endif

@@ -211,7 +211,7 @@ void gc() {
             fprintf(stdout, "\n");
 #endif
             void (*deallocate)(void*) = a->deallocate;
-            deallocate(a);
+            if(deallocate) deallocate(a);
         } else {
             prev = a;
             p = &a->next;

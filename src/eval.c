@@ -245,6 +245,14 @@ CapsuleError Capsule_eval_cap(Capsule expr, Capsule scope, Capsule* result) {
             Capsule op = CAPSULE_CAR(expr);
             Capsule args = CAPSULE_CDR(expr);
 
+            // fprintf(stdout, "OP: ");
+            // Capsule_print(op, stdout);
+            // fprintf(stdout, "\n");
+            //
+            // fprintf(stdout, "ARGS: ");
+            // Capsule_print(args, stdout);
+            // fprintf(stdout, "\n");
+
             if (op.type == CAPSULE_TYPE_SYMBOL) {
 
                 if (strcmp(op.as.symbol, "QUOTE") == 0) {
@@ -356,6 +364,7 @@ CapsuleError Capsule_eval_cap(Capsule expr, Capsule scope, Capsule* result) {
         if (!error)
             error = eval_do_return(&stack, &expr, &scope, result);
     } while (!error);
+
 
     return error;
 }

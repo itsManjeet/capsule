@@ -92,6 +92,8 @@ typedef struct Capsule Capsule;
 
 #define CAPSULE_SYMBOL_COMPARE(cap, str) Capsule_Symbol_compare(cap, str)
 
+#define CAPSULE_DEALLOCATOR(fn) ((void(*)(void*))fn)
+
 static const Capsule Capsule_nil = {CAPSULE_TYPE_NIL};
 
 CapsuleError Capsule_read(const char* source, Capsule* result);

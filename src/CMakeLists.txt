@@ -10,6 +10,11 @@ add_custom_command(
         DEPENDS ${PROJECT_SOURCE_DIR}/scripts/generate-runtime.sh ${CMAKE_CURRENT_SOURCE_DIR}/logo.txt
 )
 
+add_custom_command(
+        OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/include.h"
+        COMMAND "${PROJECT_SOURCE_DIR}/scripts/generate-runtime.sh" CAPSULE_INCLUDE ${CMAKE_SOURCE_DIR}/include/capsule.h ${CMAKE_CURRENT_BINARY_DIR}/include.h
+)
+
 
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
@@ -24,6 +29,7 @@ add_library(${PROJECT_NAME}_Shared STATIC
         scope.c
         ${CMAKE_CURRENT_BINARY_DIR}/runtime.h
         ${CMAKE_CURRENT_BINARY_DIR}/logo.h
+        ${CMAKE_CURRENT_BINARY_DIR}/include.h
         memory.c)
 
 
@@ -32,13 +38,11 @@ if (FFI)
     target_compile_definitions(${PROJECT_NAME}_Shared PRIVATE -DHAS_FFI)
 endif ()
 
-add_dependencies(${PROJECT_NAME}_Shared tinycc)
 
 target_link_libraries(${PROJECT_NAME}_Shared
         PUBLIC
-        ${FFI}
-        tcc)
-
+        ${FFI})
+target_link_options(${PROJECT_NAME}_Shared PUBLIC -rdynamic)
 
 set_target_properties(${PROJECT_NAME}_Shared
         PROPERTIES
