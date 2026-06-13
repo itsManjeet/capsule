@@ -1,0 +1,3 @@
+(#import "../fixtures/math.lipi")
+
+(math-add 20 22)

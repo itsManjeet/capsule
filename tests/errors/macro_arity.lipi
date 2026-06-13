@@ -1,0 +1,4 @@
+(define-macro (when condition body)
+  `(if ,condition ,body void))
+
+(when)

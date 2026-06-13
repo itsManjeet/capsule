@@ -1,0 +1,298 @@
+; alloc.lipi
+;
+; Simple brk-backed free-list allocator.
+;
+; Block Layout
+;
+;   block + 0   : size
+;   block + 8   : free
+;   block + 16  : next_free
+;   block + 24  : prev_free
+;   block + 32  : prev_phys
+;   block + 40  : padding
+;   block + 48  : user payload
+;
+; HEADER-SIZE is 48 so payload stays 16-byte aligned.
+(#import "core")
+
+(#import "syscall")
+
+(#import "math")
+
+(define PAGE-SIZE:i64 4096)
+
+(define HEAP-CHUNK:i64 65536)
+
+(define ALLOC-ALIGN:i64 16)
+
+(define BLOCK-SIZE-OFF:i64 0)
+
+(define BLOCK-FREE-OFF:i64 8)
+
+(define BLOCK-NEXT-FREE-OFF:i64 16)
+
+(define BLOCK-PREV-FREE-OFF:i64 24)
+
+(define BLOCK-PREV-PHYS-OFF:i64 32)
+
+(define HEADER-SIZE:i64 48)
+
+(define MIN-SPLIT-SIZE:i64 64)
+
+(define heap-initialized:bool false)
+
+(define heap-start:i64 0)
+
+(define heap-end:i64 0)
+
+(define heap-last:i64 0)
+
+(define free-list-head:i64 0)
+
+(#inline asm-global ```
+.global load64
+load64:
+  mov (%rdi), %rax
+  ret
+
+.global store64
+store64:
+  mov %rsi, (%rdi)
+  mov %rsi, %rax
+  ret
+```)
+
+(#extern (load64:i64 ptr:i64))
+
+(#extern (store64:i64 ptr:i64 value:i64))
+
+(define (align-up:i64 x:i64 align:i64)
+  (* (/ (+ x (- align 1)) align) align))
+
+(define (brk:i64 addr:i64)
+  (syscall syscall-brk addr))
+
+(define (block-size:i64 block:i64)
+  (load64 (+ block BLOCK-SIZE-OFF)))
+
+(define (block-free:i64 block:i64)
+  (load64 (+ block BLOCK-FREE-OFF)))
+
+(define (block-next-free:i64 block:i64)
+  (load64 (+ block BLOCK-NEXT-FREE-OFF)))
+
+(define (block-prev-free:i64 block:i64)
+  (load64 (+ block BLOCK-PREV-FREE-OFF)))
+
+(define (block-prev-phys:i64 block:i64)
+  (load64 (+ block BLOCK-PREV-PHYS-OFF)))
+
+(define (block-set-size:i64 block:i64 value:i64)
+  (store64 (+ block BLOCK-SIZE-OFF) value))
+
+(define (block-set-free:i64 block:i64 value:i64)
+  (store64 (+ block BLOCK-FREE-OFF) value))
+
+(define (block-set-next-free:i64 block:i64 value:i64)
+  (store64 (+ block BLOCK-NEXT-FREE-OFF) value))
+
+(define (block-set-prev-free:i64 block:i64 value:i64)
+  (store64 (+ block BLOCK-PREV-FREE-OFF) value))
+
+(define (block-set-prev-phys:i64 block:i64 value:i64)
+  (store64 (+ block BLOCK-PREV-PHYS-OFF) value))
+
+(define (block-payload:i64 block:i64)
+  (+ block HEADER-SIZE))
+
+(define (payload-block:i64 ptr:i64)
+  (- ptr HEADER-SIZE))
+
+(define (block-next-phys:i64 block:i64)
+  (let ((next:i64 (+ block (block-size block)))) (if (< next heap-end) next 0)))
+
+(define (malloc-init:void)
+  (let ((cur:i64 (brk 0)))
+    (set heap-start cur)
+    (set heap-end cur)
+    (set heap-last 0)
+    (set free-list-head 0)
+    (set heap-initialized true)))
+
+(define (free-list-remove:i64 block:i64)
+  (let ((prev:i64 (block-prev-free block))
+       (next:i64 (block-next-free block)))
+    (if (= prev 0) (set free-list-head next) (block-set-next-free prev next))
+    (if (= next 0) void (block-set-prev-free next prev))
+    (block-set-next-free block 0)
+    (block-set-prev-free block 0)
+    block))
+
+(define (free-list-insert:void block:i64)
+  (block-set-free block 1)
+  (block-set-prev-free block 0)
+  (block-set-next-free block free-list-head)
+  (if (= free-list-head 0) void (block-set-prev-free free-list-head block))
+  (set free-list-head block))
+
+(define (find-fit:i64 needed:i64)
+  (let loop ((cur:i64 free-list-head))
+    (if (= cur 0)
+      0
+      (if (< (block-size cur) needed) (loop (block-next-free cur)) cur))))
+
+(define (split-block:void block:i64 needed:i64)
+  (let ((old-size:i64 (block-size block)))
+    (let ((remaining:i64 (- old-size needed)))
+      (if (< remaining MIN-SPLIT-SIZE)
+        void
+        (let ((new-block:i64 (+ block needed)) (next:i64 0))
+          (block-set-size block needed)
+          (block-set-size new-block remaining)
+          (block-set-free new-block 1)
+          (block-set-next-free new-block 0)
+          (block-set-prev-free new-block 0)
+          (block-set-prev-phys new-block block)
+          (set next (block-next-phys new-block))
+          (if (= next 0)
+            (set heap-last new-block)
+            (block-set-prev-phys next new-block))
+          (free-list-insert new-block))))))
+
+(define (extend-heap:i64 needed:i64)
+  (let ((grow:i64 (align-up (math-max needed HEAP-CHUNK) PAGE-SIZE))
+       (old-end:i64 heap-end))
+    (let ((wanted:i64 (+ heap-end grow)))
+      (let ((got:i64 (brk wanted)))
+        (if (< got wanted)
+          0
+          (begin
+            (set heap-end got)
+            ; Create one new free block at old heap end.
+            (block-set-size old-end grow)
+            (block-set-free old-end 1)
+            (block-set-next-free old-end 0)
+            (block-set-prev-free old-end 0)
+            (block-set-prev-phys old-end heap-last)
+            ; If the previous physical block is free, merge new memory into it.
+            (if (> heap-last 0)
+              (if (= (block-free heap-last) 1)
+                (let ((last:i64 heap-last))
+                  (let ((new-size:i64 (+ (block-size last) grow)))
+                    (free-list-remove last)
+                    (block-set-size last new-size)
+                    (set heap-last last)
+                    (free-list-insert last)
+                    last))
+                (begin
+                  (set heap-last old-end)
+                  (free-list-insert old-end)
+                  old-end))
+              (begin
+                (set heap-last old-end)
+                (free-list-insert old-end)
+                old-end))))))))
+
+(define (malloc:i64 size:i64)
+  (if heap-initialized void (malloc-init))
+  (if (> size 0)
+    (let ((needed:i64 (align-up (+ size HEADER-SIZE) ALLOC-ALIGN)))
+      (let ((block:i64 (find-fit needed)))
+        (if (= block 0)
+          (begin
+            (extend-heap needed)
+            (set block (find-fit needed)))
+          void)
+        (if (= block 0)
+          0
+          (begin
+            (free-list-remove block)
+            (block-set-free block 0)
+            (split-block block needed)
+            (block-payload block)))))
+    0))
+
+(define (coalesce-next:i64 block:i64)
+  (let ((next:i64 (block-next-phys block)))
+    (if (> next 0)
+      (if (= (block-free next) 1)
+        (begin
+          (free-list-remove next)
+          (block-set-size block (+ (block-size block) (block-size next)))
+          (if (= next heap-last)
+            (set heap-last block)
+            (let ((next2:i64 (block-next-phys block)))
+              (if (= next2 0) void (block-set-prev-phys next2 block))))
+          block)
+        block)
+      block)))
+
+(define (coalesce-prev:i64 block:i64)
+  (let ((prev:i64 (block-prev-phys block)))
+    (if (> prev 0)
+      (if (= (block-free prev) 1)
+        (begin
+          (free-list-remove prev)
+          (block-set-size prev (+ (block-size prev) (block-size block)))
+          (if (= block heap-last)
+            (set heap-last prev)
+            (let ((next:i64 (block-next-phys prev)))
+              (if (= next 0) void (block-set-prev-phys next prev))))
+          prev)
+        block)
+      block)))
+
+(define (try-trim-heap:bool block:i64)
+  ; If the final physical block is free, return it to the OS.
+  ; This simple MVP releases the whole top block.
+  (if (= block heap-last)
+    (if (< (block-size block) HEAP-CHUNK)
+      false
+      (let ((prev:i64 (block-prev-phys block))
+           (wanted:i64 block)
+           (got:i64 (brk block)))
+        (if (= got wanted)
+          (begin
+            (set heap-end wanted)
+            (set heap-last prev)
+            true)
+          false)))
+    false))
+
+(define (free:void ptr:i64)
+  (if (= ptr 0)
+    void
+    (let ((block:i64 (payload-block ptr)))
+      ; Ignore double free for MVP.
+      (if (= (block-free block) 1)
+        void
+        (begin
+          (block-set-free block 1)
+          (set block (coalesce-next block))
+          (set block (coalesce-prev block))
+          (if (try-trim-heap block) void (free-list-insert block)))))))
+
+(define (test-alloc-align-up:void)
+  (assert-eq 16 (align-up 1 16))
+  (assert-eq 16 (align-up 16 16))
+  (assert-eq 32 (align-up 17 16)))
+
+(define (test-alloc-basic:void)
+  (define p:i64 (malloc 8))
+  (assert (> p 0))
+  (assert-eq 42 (store64 p 42))
+  (assert-eq 42 (load64 p))
+  (free p))
+
+(define (test-alloc-reuse-free-block:void)
+  (define p:i64 (malloc 8))
+  (define q:i64 (malloc 8))
+  (free p)
+  (define r:i64 (malloc 8))
+  (assert-eq p r)
+  (free r)
+  (free q))
+
+(define (test-alloc-zero-size:void)
+  (assert-eq 0 (malloc 0))
+  (assert-eq 0 (malloc (- 0 1))))

@@ -1,0 +1,4 @@
+(#import "control")
+
+(control-when true
+  42)

@@ -1,0 +1,1 @@
+(+ (+ (len (append "hi" "!")) (len (append "hi" 33))) (+ (index (append [10 20] 36) 2) 0))

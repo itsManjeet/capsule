@@ -1,0 +1,8 @@
+(#import "core")
+
+(#import "alloc")
+
+(#import "syscall")
+
+(define (print:i64 m:str)
+  (let ((x (str->ptr m))) (syscall syscall-write 1 (ptr->i64 x) (len m))))

@@ -1,0 +1,47 @@
+; Runtime profile facade for the current x86_64-linux MVP.
+(#import "syscall")
+
+(#inline asm-global ```
+.globl lipi_runtime_read
+lipi_runtime_read:
+  mov $0, %rax
+  syscall
+  ret
+
+.globl lipi_runtime_write
+lipi_runtime_write:
+  mov $1, %rax
+  syscall
+  ret
+
+.globl lipi_runtime_write_str
+lipi_runtime_write_str:
+  mov $1, %rax
+  syscall
+  ret
+```)
+
+(#extern (lipi_runtime_read:i64 fd:i64 buf:ptr len:i64))
+
+(#extern (lipi_runtime_write:i64 fd:i64 buf:ptr len:i64))
+
+(#extern (lipi_runtime_write_str:i64 fd:i64 text:str len:i64))
+
+(define (runtime-read:i64 fd:i64 buf:ptr len:i64)
+  (lipi_runtime_read fd buf len))
+
+(define (runtime-exit:void code:i64)
+  (runtime-syscall1 syscall-exit code)
+  void)
+
+(define (runtime-write:i64 fd:i64 buf:ptr len:i64)
+  (lipi_runtime_write fd buf len))
+
+(define (runtime-write-str:i64 fd:i64 text:str len:i64)
+  (lipi_runtime_write_str fd text len))
+
+(define (runtime-alloc:ptr size:i64)
+  (lipi_runtime_alloc size))
+
+(define (runtime-free:void ptr:ptr)
+  (lipi_runtime_free ptr))

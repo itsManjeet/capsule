@@ -1,0 +1,27 @@
+; Operating-system helpers layered on the runtime profile.
+(#import "runtime")
+
+(define (os-exit:void code:i64)
+  (runtime-exit code))
+
+(define (os-read:i64 fd:i64 buf:ptr len:i64)
+  (runtime-read fd buf len))
+
+(define (os-write:i64 fd:i64 buf:ptr len:i64)
+  (runtime-write fd buf len))
+
+(define (os-write-str:i64 fd:i64 text:str len:i64)
+  (runtime-write-str fd text len))
+
+(define (os-alloc:ptr size:i64)
+  (runtime-alloc size))
+
+(define (os-free:void ptr:ptr)
+  (runtime-free ptr))
+
+(define (test-os-alloc:void)
+  (define p:ptr (os-alloc 16))
+  (os-free p))
+
+(define (test-os-write-str:void)
+  (assert-eq 0 (os-write-str 1 "" 0)))

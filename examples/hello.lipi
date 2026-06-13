@@ -1,0 +1,5 @@
+; top-level expression exits with 42
+(define x:i64 40)
+(define y:i64 2)
+
+(+ x y)

@@ -1,0 +1,3 @@
+(define answer:i64 0)
+(set answer 42)
+answer

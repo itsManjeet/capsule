@@ -1,0 +1,61 @@
+(define-macro (do body...)
+  `(begin ,@body))
+
+(define-macro (when condition body...)
+  `(if ,condition (begin ,@body) void))
+
+(define-macro (unless condition body...)
+  `(if ,condition void (begin ,@body)))
+
+(define-macro (__cond-clauses clauses...)
+  (if (= (length clauses) 0)
+    `void
+    (if (= (length (car clauses)) 0)
+      (macro-error "cond clause cannot be empty")
+      (if (= (length (car clauses)) 1)
+        (macro-error "cond clause requires a body")
+        (if (= (car (car clauses)) 'else)
+          `(begin ,@(cdr (car clauses)))
+          `
+            (if ,(car (car clauses))
+              (begin
+                ,@(cdr (car clauses)))
+              (__cond-clauses ,@(cdr clauses))))))))
+
+(define-macro (cond clauses...)
+  `(__cond-clauses ,@clauses))
+
+(define (not:bool value:bool)
+  (if value false true))
+
+(define (bool->i64:i64 value:bool)
+  (if value 1 0))
+
+(define (identity-i64:i64 value:i64)
+  value)
+
+(define (identity-bool:bool value:bool)
+  value)
+
+(define (identity-ptr:ptr value:ptr)
+  value)
+
+(define (test-std-when:void)
+  (let ((value 0)) (when true (set value 42)) (assert-eq 42 value)))
+
+(define (test-std-unless:void)
+  (let ((value 40)) (unless false (set value (+ value 2))) (assert-eq 42 value)))
+
+(define (test-std-cond:void)
+  (define value:i64 2)
+  (assert-eq
+    42
+    (cond
+      ((= value 1) 10)
+      ((= value 2) (define answer:i64 40) (+ answer 2))
+      (else 0))))
+
+(define (test-std-not:void)
+  (assert (not false))
+  (assert-eq 0 (bool->i64 false))
+  (assert-eq 1 (bool->i64 true)))

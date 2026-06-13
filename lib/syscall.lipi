@@ -1,0 +1,814 @@
+(#inline asm-global ```
+.globl lipi_runtime_syscall0
+lipi_runtime_syscall0:
+  mov %rdi, %rax
+  syscall
+  ret
+
+.globl lipi_runtime_syscall1
+lipi_runtime_syscall1:
+  mov %rdi, %rax
+  mov %rsi, %rdi
+  syscall
+  ret
+
+.globl lipi_runtime_syscall2
+lipi_runtime_syscall2:
+  mov %rdi, %rax
+  mov %rsi, %rdi
+  mov %rdx, %rsi
+  syscall
+  ret
+
+.globl lipi_runtime_syscall3
+lipi_runtime_syscall3:
+  mov %rdi, %rax
+  mov %rsi, %rdi
+  mov %rdx, %rsi
+  mov %rcx, %rdx
+  syscall
+  ret
+
+.globl lipi_runtime_syscall4
+lipi_runtime_syscall4:
+  mov %rdi, %rax
+  mov %r8, %r10
+  mov %rsi, %rdi
+  mov %rdx, %rsi
+  mov %rcx, %rdx
+  syscall
+  ret
+
+.globl lipi_runtime_syscall5
+lipi_runtime_syscall5:
+  mov %rdi, %rax
+  mov %r8, %r10
+  mov %r9, %r8
+  mov %rsi, %rdi
+  mov %rdx, %rsi
+  mov %rcx, %rdx
+  syscall
+  ret
+
+.globl lipi_runtime_alloc
+lipi_runtime_alloc:
+  push %rbp
+  mov %rsp, %rbp
+  push %r12
+  mov %rdi, %rsi
+  add $8, %rsi
+  mov %rsi, %r12
+  xor %rdi, %rdi
+  mov $3, %rdx
+  mov $34, %r10
+  mov $-1, %r8
+  xor %r9, %r9
+  mov $9, %rax
+  syscall
+  cmp $-4095, %rax
+  jae .Llipi_runtime_alloc_fail
+  mov %r12, (%rax)
+  add $8, %rax
+  jmp .Llipi_runtime_alloc_done
+.Llipi_runtime_alloc_fail:
+  xor %rax, %rax
+.Llipi_runtime_alloc_done:
+  pop %r12
+  leave
+  ret
+
+.globl lipi_runtime_free
+lipi_runtime_free:
+  test %rdi, %rdi
+  je .Llipi_runtime_free_done
+  sub $8, %rdi
+  mov (%rdi), %rsi
+  mov $11, %rax
+  syscall
+.Llipi_runtime_free_done:
+  ret
+```)
+
+(#extern (lipi_runtime_syscall0:i64 num:i64))
+
+(#extern (lipi_runtime_syscall1:i64 num:i64 a0:i64))
+
+(#extern (lipi_runtime_syscall2:i64 num:i64 a0:i64 a1:i64))
+
+(#extern (lipi_runtime_syscall3:i64 num:i64 a0:i64 a1:i64 a2:i64))
+
+(#extern (lipi_runtime_syscall4:i64 num:i64 a0:i64 a1:i64 a2:i64 a3:i64))
+
+(#extern (lipi_runtime_syscall5:i64 num:i64 a0:i64 a1:i64 a2:i64 a3:i64 a4:i64))
+
+(#extern (lipi_runtime_alloc:ptr size:i64))
+
+(#extern (lipi_runtime_free:void ptr:ptr))
+
+(define (runtime-syscall0:i64 num:i64)
+  (lipi_runtime_syscall0 num))
+
+(define (runtime-syscall1:i64 num:i64 a0:i64)
+  (lipi_runtime_syscall1 num a0))
+
+(define (runtime-syscall2:i64 num:i64 a0:i64 a1:i64)
+  (lipi_runtime_syscall2 num a0 a1))
+
+(define (runtime-syscall3:i64 num:i64 a0:i64 a1:i64 a2:i64)
+  (lipi_runtime_syscall3 num a0 a1 a2))
+
+(define (runtime-syscall4:i64 num:i64 a0:i64 a1:i64 a2:i64 a3:i64)
+  (lipi_runtime_syscall4 num a0 a1 a2 a3))
+
+(define (runtime-syscall5:i64 num:i64 a0:i64 a1:i64 a2:i64 a3:i64 a4:i64)
+  (lipi_runtime_syscall5 num a0 a1 a2 a3 a4))
+
+(define syscall-read:i64 0)
+
+(define syscall-write:i64 1)
+
+(define syscall-open:i64 2)
+
+(define syscall-close:i64 3)
+
+(define syscall-stat:i64 4)
+
+(define syscall-fstat:i64 5)
+
+(define syscall-lstat:i64 6)
+
+(define syscall-poll:i64 7)
+
+(define syscall-lseek:i64 8)
+
+(define syscall-mmap:i64 9)
+
+(define syscall-mprotect:i64 10)
+
+(define syscall-munmap:i64 11)
+
+(define syscall-brk:i64 12)
+
+(define syscall-rt-sigaction:i64 13)
+
+(define syscall-rt-sigprocmask:i64 14)
+
+(define syscall-rt-sigreturn:i64 15)
+
+(define syscall-ioctl:i64 16)
+
+(define syscall-pread64:i64 17)
+
+(define syscall-pwrite64:i64 18)
+
+(define syscall-readv:i64 19)
+
+(define syscall-writev:i64 20)
+
+(define syscall-access:i64 21)
+
+(define syscall-pipe:i64 22)
+
+(define syscall-select:i64 23)
+
+(define syscall-sched-yield:i64 24)
+
+(define syscall-mremap:i64 25)
+
+(define syscall-msync:i64 26)
+
+(define syscall-mincore:i64 27)
+
+(define syscall-madvise:i64 28)
+
+(define syscall-shmget:i64 29)
+
+(define syscall-shmat:i64 30)
+
+(define syscall-shmctl:i64 31)
+
+(define syscall-dup:i64 32)
+
+(define syscall-dup2:i64 33)
+
+(define syscall-pause:i64 34)
+
+(define syscall-nanosleep:i64 35)
+
+(define syscall-getitimer:i64 36)
+
+(define syscall-alarm:i64 37)
+
+(define syscall-setitimer:i64 38)
+
+(define syscall-getpid:i64 39)
+
+(define syscall-sendfile:i64 40)
+
+(define syscall-socket:i64 41)
+
+(define syscall-connect:i64 42)
+
+(define syscall-accept:i64 43)
+
+(define syscall-sendto:i64 44)
+
+(define syscall-recvfrom:i64 45)
+
+(define syscall-sendmsg:i64 46)
+
+(define syscall-recvmsg:i64 47)
+
+(define syscall-shutdown:i64 48)
+
+(define syscall-bind:i64 49)
+
+(define syscall-listen:i64 50)
+
+(define syscall-getsockname:i64 51)
+
+(define syscall-getpeername:i64 52)
+
+(define syscall-socketpair:i64 53)
+
+(define syscall-setsockopt:i64 54)
+
+(define syscall-getsockopt:i64 55)
+
+(define syscall-clone:i64 56)
+
+(define syscall-fork:i64 57)
+
+(define syscall-vfork:i64 58)
+
+(define syscall-execve:i64 59)
+
+(define syscall-exit:i64 60)
+
+(define syscall-wait4:i64 61)
+
+(define syscall-kill:i64 62)
+
+(define syscall-uname:i64 63)
+
+(define syscall-semget:i64 64)
+
+(define syscall-semop:i64 65)
+
+(define syscall-semctl:i64 66)
+
+(define syscall-shmdt:i64 67)
+
+(define syscall-msgget:i64 68)
+
+(define syscall-msgsnd:i64 69)
+
+(define syscall-msgrcv:i64 70)
+
+(define syscall-msgctl:i64 71)
+
+(define syscall-fcntl:i64 72)
+
+(define syscall-flock:i64 73)
+
+(define syscall-fsync:i64 74)
+
+(define syscall-fdatasync:i64 75)
+
+(define syscall-truncate:i64 76)
+
+(define syscall-ftruncate:i64 77)
+
+(define syscall-getdents:i64 78)
+
+(define syscall-getcwd:i64 79)
+
+(define syscall-chdir:i64 80)
+
+(define syscall-fchdir:i64 81)
+
+(define syscall-rename:i64 82)
+
+(define syscall-mkdir:i64 83)
+
+(define syscall-rmdir:i64 84)
+
+(define syscall-creat:i64 85)
+
+(define syscall-link:i64 86)
+
+(define syscall-unlink:i64 87)
+
+(define syscall-symlink:i64 88)
+
+(define syscall-readlink:i64 89)
+
+(define syscall-chmod:i64 90)
+
+(define syscall-fchmod:i64 91)
+
+(define syscall-chown:i64 92)
+
+(define syscall-fchown:i64 93)
+
+(define syscall-lchown:i64 94)
+
+(define syscall-umask:i64 95)
+
+(define syscall-gettimeofday:i64 96)
+
+(define syscall-getrlimit:i64 97)
+
+(define syscall-getrusage:i64 98)
+
+(define syscall-sysinfo:i64 99)
+
+(define syscall-times:i64 100)
+
+(define syscall-ptrace:i64 101)
+
+(define syscall-getuid:i64 102)
+
+(define syscall-syslog:i64 103)
+
+(define syscall-getgid:i64 104)
+
+(define syscall-setuid:i64 105)
+
+(define syscall-setgid:i64 106)
+
+(define syscall-geteuid:i64 107)
+
+(define syscall-getegid:i64 108)
+
+(define syscall-setpgid:i64 109)
+
+(define syscall-getppid:i64 110)
+
+(define syscall-getpgrp:i64 111)
+
+(define syscall-setsid:i64 112)
+
+(define syscall-setreuid:i64 113)
+
+(define syscall-setregid:i64 114)
+
+(define syscall-getgroups:i64 115)
+
+(define syscall-setgroups:i64 116)
+
+(define syscall-setresuid:i64 117)
+
+(define syscall-getresuid:i64 118)
+
+(define syscall-setresgid:i64 119)
+
+(define syscall-getresgid:i64 120)
+
+(define syscall-getpgid:i64 121)
+
+(define syscall-setfsuid:i64 122)
+
+(define syscall-setfsgid:i64 123)
+
+(define syscall-getsid:i64 124)
+
+(define syscall-capget:i64 125)
+
+(define syscall-capset:i64 126)
+
+(define syscall-rt-sigpending:i64 127)
+
+(define syscall-rt-sigtimedwait:i64 128)
+
+(define syscall-rt-sigqueueinfo:i64 129)
+
+(define syscall-rt-sigsuspend:i64 130)
+
+(define syscall-sigaltstack:i64 131)
+
+(define syscall-utime:i64 132)
+
+(define syscall-mknod:i64 133)
+
+(define syscall-uselib:i64 134)
+
+(define syscall-personality:i64 135)
+
+(define syscall-ustat:i64 136)
+
+(define syscall-statfs:i64 137)
+
+(define syscall-fstatfs:i64 138)
+
+(define syscall-sysfs:i64 139)
+
+(define syscall-getpriority:i64 140)
+
+(define syscall-setpriority:i64 141)
+
+(define syscall-sched-setparam:i64 142)
+
+(define syscall-sched-getparam:i64 143)
+
+(define syscall-sched-setscheduler:i64 144)
+
+(define syscall-sched-getscheduler:i64 145)
+
+(define syscall-sched-get-priority-max:i64 146)
+
+(define syscall-sched-get-priority-min:i64 147)
+
+(define syscall-sched-rr-get-interval:i64 148)
+
+(define syscall-mlock:i64 149)
+
+(define syscall-munlock:i64 150)
+
+(define syscall-mlockall:i64 151)
+
+(define syscall-munlockall:i64 152)
+
+(define syscall-vhangup:i64 153)
+
+(define syscall-modify-ldt:i64 154)
+
+(define syscall-pivot-root:i64 155)
+
+(define syscall-sysctl:i64 156)
+
+(define syscall-prctl:i64 157)
+
+(define syscall-arch-prctl:i64 158)
+
+(define syscall-adjtimex:i64 159)
+
+(define syscall-setrlimit:i64 160)
+
+(define syscall-chroot:i64 161)
+
+(define syscall-sync:i64 162)
+
+(define syscall-acct:i64 163)
+
+(define syscall-settimeofday:i64 164)
+
+(define syscall-mount:i64 165)
+
+(define syscall-umount2:i64 166)
+
+(define syscall-swapon:i64 167)
+
+(define syscall-swapoff:i64 168)
+
+(define syscall-reboot:i64 169)
+
+(define syscall-sethostname:i64 170)
+
+(define syscall-setdomainname:i64 171)
+
+(define syscall-iopl:i64 172)
+
+(define syscall-ioperm:i64 173)
+
+(define syscall-create-module:i64 174)
+
+(define syscall-init-module:i64 175)
+
+(define syscall-delete-module:i64 176)
+
+(define syscall-get-kernel-syms:i64 177)
+
+(define syscall-query-module:i64 178)
+
+(define syscall-quotactl:i64 179)
+
+(define syscall-nfsservctl:i64 180)
+
+(define syscall-getpmsg:i64 181)
+
+(define syscall-putpmsg:i64 182)
+
+(define syscall-afs-syscall:i64 183)
+
+(define syscall-tuxcall:i64 184)
+
+(define syscall-security:i64 185)
+
+(define syscall-gettid:i64 186)
+
+(define syscall-readahead:i64 187)
+
+(define syscall-setxattr:i64 188)
+
+(define syscall-lsetxattr:i64 189)
+
+(define syscall-fsetxattr:i64 190)
+
+(define syscall-getxattr:i64 191)
+
+(define syscall-lgetxattr:i64 192)
+
+(define syscall-fgetxattr:i64 193)
+
+(define syscall-listxattr:i64 194)
+
+(define syscall-llistxattr:i64 195)
+
+(define syscall-flistxattr:i64 196)
+
+(define syscall-removexattr:i64 197)
+
+(define syscall-lremovexattr:i64 198)
+
+(define syscall-fremovexattr:i64 199)
+
+(define syscall-tkill:i64 200)
+
+(define syscall-time:i64 201)
+
+(define syscall-futex:i64 202)
+
+(define syscall-sched-setaffinity:i64 203)
+
+(define syscall-sched-getaffinity:i64 204)
+
+(define syscall-set-thread-area:i64 205)
+
+(define syscall-io-setup:i64 206)
+
+(define syscall-io-destroy:i64 207)
+
+(define syscall-io-getevents:i64 208)
+
+(define syscall-io-submit:i64 209)
+
+(define syscall-io-cancel:i64 210)
+
+(define syscall-get-thread-area:i64 211)
+
+(define syscall-lookup-dcookie:i64 212)
+
+(define syscall-epoll-create:i64 213)
+
+(define syscall-epoll-ctl-old:i64 214)
+
+(define syscall-epoll-wait-old:i64 215)
+
+(define syscall-remap-file-pages:i64 216)
+
+(define syscall-getdents64:i64 217)
+
+(define syscall-set-tid-address:i64 218)
+
+(define syscall-restart-syscall:i64 219)
+
+(define syscall-semtimedop:i64 220)
+
+(define syscall-fadvise64:i64 221)
+
+(define syscall-timer-create:i64 222)
+
+(define syscall-timer-settime:i64 223)
+
+(define syscall-timer-gettime:i64 224)
+
+(define syscall-timer-getoverrun:i64 225)
+
+(define syscall-timer-delete:i64 226)
+
+(define syscall-clock-settime:i64 227)
+
+(define syscall-clock-gettime:i64 228)
+
+(define syscall-clock-getres:i64 229)
+
+(define syscall-clock-nanosleep:i64 230)
+
+(define syscall-exit-group:i64 231)
+
+(define syscall-epoll-wait:i64 232)
+
+(define syscall-epoll-ctl:i64 233)
+
+(define syscall-tgkill:i64 234)
+
+(define syscall-utimes:i64 235)
+
+(define syscall-vserver:i64 236)
+
+(define syscall-mbind:i64 237)
+
+(define syscall-set-mempolicy:i64 238)
+
+(define syscall-get-mempolicy:i64 239)
+
+(define syscall-mq-open:i64 240)
+
+(define syscall-mq-unlink:i64 241)
+
+(define syscall-mq-timedsend:i64 242)
+
+(define syscall-mq-timedreceive:i64 243)
+
+(define syscall-mq-notify:i64 244)
+
+(define syscall-mq-getsetattr:i64 245)
+
+(define syscall-kexec-load:i64 246)
+
+(define syscall-waitid:i64 247)
+
+(define syscall-add-key:i64 248)
+
+(define syscall-request-key:i64 249)
+
+(define syscall-keyctl:i64 250)
+
+(define syscall-ioprio-set:i64 251)
+
+(define syscall-ioprio-get:i64 252)
+
+(define syscall-inotify-init:i64 253)
+
+(define syscall-inotify-add-watch:i64 254)
+
+(define syscall-inotify-rm-watch:i64 255)
+
+(define syscall-migrate-pages:i64 256)
+
+(define syscall-openat:i64 257)
+
+(define syscall-mkdirat:i64 258)
+
+(define syscall-mknodat:i64 259)
+
+(define syscall-fchownat:i64 260)
+
+(define syscall-futimesat:i64 261)
+
+(define syscall-newfstatat:i64 262)
+
+(define syscall-unlinkat:i64 263)
+
+(define syscall-renameat:i64 264)
+
+(define syscall-linkat:i64 265)
+
+(define syscall-symlinkat:i64 266)
+
+(define syscall-readlinkat:i64 267)
+
+(define syscall-fchmodat:i64 268)
+
+(define syscall-faccessat:i64 269)
+
+(define syscall-pselect6:i64 270)
+
+(define syscall-ppoll:i64 271)
+
+(define syscall-unshare:i64 272)
+
+(define syscall-set-robust_list:i64 273)
+
+(define syscall-get-robust-list:i64 274)
+
+(define syscall-splice:i64 275)
+
+(define syscall-tee:i64 276)
+
+(define syscall-sync-file-range:i64 277)
+
+(define syscall-vmsplice:i64 278)
+
+(define syscall-move-pages:i64 279)
+
+(define syscall-utimensat:i64 280)
+
+(define syscall-epoll-pwait:i64 281)
+
+(define syscall-signalfd:i64 282)
+
+(define syscall-timerfd-create:i64 283)
+
+(define syscall-eventfd:i64 284)
+
+(define syscall-fallocate:i64 285)
+
+(define syscall-timerfd-settime:i64 286)
+
+(define syscall-timerfd-gettime:i64 287)
+
+(define syscall-accept4:i64 288)
+
+(define syscall-signalfd4:i64 289)
+
+(define syscall-eventfd2:i64 290)
+
+(define syscall-epoll-create1:i64 291)
+
+(define syscall-dup3:i64 292)
+
+(define syscall-pipe2:i64 293)
+
+(define syscall-inotify-init1:i64 294)
+
+(define syscall-preadv:i64 295)
+
+(define syscall-pwritev:i64 296)
+
+(define syscall-rt-tgsigqueueinfo:i64 297)
+
+(define syscall-perf-event-open:i64 298)
+
+(define syscall-recvmmsg:i64 299)
+
+(define syscall-fanotify-init:i64 300)
+
+(define syscall-fanotify-mark:i64 301)
+
+(define syscall-prlimit64:i64 302)
+
+(define syscall-name-to-handle-at:i64 303)
+
+(define syscall-open-by-handle-at:i64 304)
+
+(define syscall-clock-adjtime:i64 305)
+
+(define syscall-syncfs:i64 306)
+
+(define syscall-sendmmsg:i64 307)
+
+(define syscall-setns:i64 308)
+
+(define syscall-getcpu:i64 309)
+
+(define syscall-process-vm-readv:i64 310)
+
+(define syscall-process-vm-writev:i64 311)
+
+(define syscall-kcmp:i64 312)
+
+(define syscall-finit-module:i64 313)
+
+(define syscall-sched-setattr:i64 314)
+
+(define syscall-sched-getattr:i64 315)
+
+(define syscall-renameat2:i64 316)
+
+(define syscall-seccomp:i64 317)
+
+(define syscall-getrandom:i64 318)
+
+(define syscall-memfd-create:i64 319)
+
+(define syscall-kexec-file-load:i64 320)
+
+(define syscall-bpf:i64 321)
+
+(define syscall-execveat:i64 322)
+
+(define syscall-userfaultfd:i64 323)
+
+(define syscall-membarrier:i64 324)
+
+(define syscall-mlock2:i64 325)
+
+(define syscall-copy-file-range:i64 326)
+
+(define syscall-preadv2:i64 327)
+
+(define syscall-pwritev2:i64 328)
+
+(define syscall-pkey-mprotect:i64 329)
+
+(define syscall-pkey-alloc:i64 330)
+
+(define syscall-pkey-free:i64 331)
+
+(define syscall-statx:i64 332)
+
+(define syscall-io-pgetevents:i64 333)
+
+(define syscall-rseq:i64 334)
+
+(define syscall-uretprobe:i64 335)
+
+(define syscall-uprobe:i64 336)
+
+(define-macro (syscall num args...)
+  (if (= (length args) 0)
+    `(runtime-syscall0 ,num)
+    (if (= (length args) 1)
+      `(runtime-syscall1 ,num ,@args)
+      (if (= (length args) 2)
+        `(runtime-syscall2 ,num ,@args)
+        (if (= (length args) 3)
+          `(runtime-syscall3 ,num ,@args)
+          (if (= (length args) 4)
+            `(runtime-syscall4 ,num ,@args)
+            (if (= (length args) 5)
+              `(runtime-syscall5 ,num ,@args)
+              (macro-error
+                "syscall currently supports 0 to 5 arguments; syscall6 needs stack-argument ABI support"))))))))

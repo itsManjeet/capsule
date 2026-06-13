@@ -1,0 +1,5 @@
+lipi
+src/*.o
+*.s
+*.o
+*.out

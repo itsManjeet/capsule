@@ -1,0 +1,4 @@
+(define (add:i64 a:i64 b:i64)
+  (+ a b))
+
+(add 20 22)

@@ -1,0 +1,2 @@
+(define (test-imported:bool)
+  false)

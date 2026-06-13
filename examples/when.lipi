@@ -1,0 +1,7 @@
+(define-macro (when condition body)
+  `(if ,condition
+       ,body
+       void))
+
+(when true
+  42)

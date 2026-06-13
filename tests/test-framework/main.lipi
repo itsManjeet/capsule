@@ -1,0 +1,17 @@
+(#import "imported-tests")
+
+(define (add:i64 a:i64 b:i64)
+  (+ a b))
+
+(define (test-add:void)
+  (assert (= (add 20 22) 42))
+  (assert-eq 42 (add 20 22))
+  (assert-eq "lipi" "lipi"))
+
+(define (test-bool:bool)
+  true)
+
+(define (test-code:i64)
+  0)
+
+99

@@ -1,0 +1,4 @@
+(let ((sum 0))
+  (for-each ch "*!"
+    (set sum (+ sum ch)))
+  (- sum 33))

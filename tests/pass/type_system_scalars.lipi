@@ -1,0 +1,14 @@
+(define a:i8 42)
+(define b:u8 (bool->u8 true))
+(define c:i16 (u8->i16 b))
+(define d:u32 (u32 40))
+(define p:ptr (i64->ptr 1))
+(define s:str (ptr->str (str->ptr "ok")))
+
+(assert-eq 42 a)
+(assert-eq 1 b)
+(assert-eq 1 c)
+(assert-eq 40 d)
+(assert (i64->bool (ptr->i64 p)))
+(assert-eq "ok" s)
+42

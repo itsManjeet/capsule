@@ -1,0 +1,7 @@
+(define x:u8 40)
+(define y:u8 2)
+(define z:u8 (+ x y))
+
+(assert-eq 42 z)
+(assert (> (u8 250) (u8 2)))
+z

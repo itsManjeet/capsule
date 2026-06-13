@@ -1,0 +1,12 @@
+(#inline c ```
+#include "lipi_runtime.h"
+long c_map_sum(struct lipi_map *m) {
+    long total = 0;
+    for (long i = 0; i < m->len; i++) total += m->entries[i].value;
+    return total;
+}
+```)
+
+(#extern (c_map_sum:i64 m:map))
+
+(c_map_sum {"a" 20 "b" 22})

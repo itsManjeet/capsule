@@ -1,0 +1,4 @@
+(#import "../fixtures/control.lipi")
+
+(control-when true
+  42)

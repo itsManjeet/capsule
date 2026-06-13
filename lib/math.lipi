@@ -1,0 +1,31 @@
+; Small i64 math helpers.
+(define (math-abs:i64 value:i64)
+  (if (< value 0) (- 0 value) value))
+
+(define (math-min:i64 a:i64 b:i64)
+  (if (< a b) a b))
+
+(define (math-max:i64 a:i64 b:i64)
+  (if (> a b) a b))
+
+(define (math-clamp:i64 value:i64 low:i64 high:i64)
+  (if (< value low) low (if (> value high) high value)))
+
+(define (math-square:i64 value:i64)
+  (* value value))
+
+(define (math-pow:i64 base:i64 exp:i64)
+  (if (= exp 0) 1 (* base (math-pow base (- exp 1)))))
+
+(define (test-math-abs:void)
+  (assert-eq 40 (math-abs -40)))
+
+(define (test-math-min-max:void)
+  (assert-eq 2 (math-min 2 10))
+  (assert-eq 10 (math-max 2 10)))
+
+(define (test-math-square:void)
+  (assert-eq 16 (math-square 4)))
+
+(define (test-math-pow:void)
+  (assert-eq 32 (math-pow 2 5)))

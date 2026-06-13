@@ -1,0 +1,15 @@
+name = "LIPI"
+grammar = "scheme"
+path_suffixes = ["lipi"]
+line_comments = ["; "]
+tab_size = 2
+autoclose_before = " \t\n)]}\""
+brackets = [
+    { start = "(", end = ")", close = true, newline = true },
+    { start = "[", end = "]", close = true, newline = true },
+    { start = "{", end = "}", close = true, newline = true },
+    { start = "\"", end = "\"", close = true, newline = false, not_in = [
+        "string",
+        "comment",
+    ] },
+]

@@ -1,0 +1,4 @@
+(let ((sum 0))
+  (for-each v {"a" 10 "b" 20 "c" 12}
+    (set sum (+ sum v)))
+  sum)

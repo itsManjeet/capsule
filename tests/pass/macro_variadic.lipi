@@ -1,0 +1,6 @@
+(define-macro (do body...)
+  `(begin ,@body))
+
+(do
+  (define x:i64 40)
+  (+ x 2))

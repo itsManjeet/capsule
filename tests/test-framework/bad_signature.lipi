@@ -1,0 +1,2 @@
+(define (test-bad:void x:i64)
+  void)

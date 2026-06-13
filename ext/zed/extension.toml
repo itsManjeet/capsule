@@ -1,0 +1,15 @@
+id = "lipi"
+name = "LIPI"
+version = "0.0.1"
+schema_version = 1
+authors = ["LIPI Contributors"]
+description = "LIPI language support with syntax highlighting, diagnostics, and formatting"
+repository = "https://github.com/itsmanjeet/lipi"
+
+[grammars.scheme]
+repository = "https://github.com/6cdh/tree-sitter-scheme"
+commit = "c6cb7c7d7a04b3f5d999c28e2e9c0c31b2d50ece"
+
+[language_servers.lipi]
+name = "LIPI Language Server"
+languages = ["LIPI"]

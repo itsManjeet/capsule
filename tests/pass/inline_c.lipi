@@ -1,0 +1,9 @@
+(#inline c ```
+long c_add(long a, long b) {
+    return a + b;
+}
+```)
+
+(#extern (c_add:i64 a:i64 b:i64))
+
+(c_add 20 22)

@@ -1,0 +1,5 @@
+(let loop ((i 0)
+           (sum 0))
+  (if (< i 6)
+      (loop (+ i 1) (+ sum 7))
+      sum))
