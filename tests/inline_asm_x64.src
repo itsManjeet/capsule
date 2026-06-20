@@ -1,0 +1,4 @@
+asm("
+  mov rax, rax
+");
+0;

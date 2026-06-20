@@ -1,0 +1,147 @@
+program        -> ( importDecl | declaration )* EOF ;
+
+declaration    -> classDecl
+                | externDecl
+                | funDecl
+                | varDecl
+                | statement ;
+
+importDecl     -> "import" modulePath ";" ;
+modulePath     -> IDENTIFIER ( "." IDENTIFIER )* ;
+
+classDecl      -> "class" IDENTIFIER superclass? "{" classMember* "}" ;
+superclass     -> "<" IDENTIFIER ;
+
+classMember    -> methodDecl
+                | fieldDecl ;
+
+methodDecl     -> "class"? function ;
+fieldDecl      -> "let" IDENTIFIER typeAnnotation? initializer? ";" ;
+
+funDecl        -> "fun" function ;
+
+function       -> IDENTIFIER "(" parameters? ")" returnType? block ;
+parameters     -> parameter ( "," parameter )* ;
+parameter      -> IDENTIFIER typeAnnotation? ;
+
+returnType     -> ":" type ;
+typeAnnotation -> ":" type ;
+
+externDecl     -> "extern" "fun" IDENTIFIER "(" externParameters? ")" externReturnType? ";" ;
+externParameters
+               -> externParameter ( "," externParameter )* ;
+externParameter
+               -> parameter
+                | "..." ;
+externReturnType
+               -> ":" type
+                | type ;
+
+varDecl        -> "let" IDENTIFIER typeAnnotation? initializer? ";" ;
+initializer    -> "=" expression ;
+statement      -> exprStmt
+                | asmStmt
+                | forStmt
+                | ifStmt
+                | returnStmt
+                | whileStmt
+                | block ;
+
+exprStmt       -> expression ";" ;
+asmStmt        -> "asm" "(" STRING ")" ";" ;
+returnStmt     -> "return" expression? ";" ;
+
+block          -> "{" declaration* "}" ;
+
+ifStmt         -> "if" "(" expression ")" statement elseBranch? ;
+elseBranch     -> "else" statement ;
+
+whileStmt      -> "while" "(" expression ")" statement ;
+
+forStmt        -> "for" "(" forInitializer expression? ";" expression? ")" statement ;
+
+forInitializer -> varDecl
+                | exprStmt
+                | ";" ;
+expression     -> assignment ;
+
+assignment     -> assignmentTarget "=" assignment
+                | logicOr ;
+
+assignmentTarget
+               -> IDENTIFIER
+                | getExpr ;
+
+logicOr        -> logicAnd ( "or" logicAnd )* ;
+logicAnd       -> equality ( "and" equality )* ;
+
+equality       -> comparison ( ( "!=" | "==" ) comparison )* ;
+comparison     -> term ( ( ">" | ">=" | "<" | "<=" ) term )* ;
+term           -> factor ( ( "-" | "+" ) factor )* ;
+factor         -> unary ( ( "/" | "*" | "%" ) unary )* ;
+
+unary          -> ( "!" | "-" ) unary
+                | call ;
+
+call           -> primary callSuffix* ;
+
+callSuffix     -> "(" arguments? ")"
+                | "." IDENTIFIER ;
+
+arguments      -> expression ( "," expression )* ;
+
+getExpr        -> call "." IDENTIFIER ;
+
+primary        -> "true"
+                | "false"
+                | "nil"
+                | "this"
+                | "super" "." IDENTIFIER
+                | NUMBER
+                | STRING
+                | IDENTIFIER
+                | "(" expression ")" ;
+type           -> functionType
+                | nullableType ;
+
+nullableType   -> primaryType "?"? ;
+
+primaryType    -> builtinType
+                | IDENTIFIER
+                | arrayType
+                | "(" type ")" ;
+
+builtinType    -> "any"
+                | "nil"
+                | "bool"
+                | "num"
+                | "u8"
+                | "u16"
+                | "u32"
+                | "u64"
+                | "i8"
+                | "i16"
+                | "i32"
+                | "i64"
+                | "f32"
+                | "f64"
+                | "str"
+                | "string"
+                | "ptr"
+                | "none" ;
+
+arrayType      -> "[" type "]" ;
+
+functionType   -> "fun" "(" typeList? ")" ":" type ;
+
+typeList       -> type ( "," type )* ;
+IDENTIFIER     -> ALPHA ( ALPHA | DIGIT )* ;
+NUMBER         -> DIGIT+ ( "." DIGIT+ )? ;
+STRING         -> "\"" char* "\"" ;
+char           -> any character except unescaped "\"" or EOF ;
+
+ALPHA          -> "a" ... "z"
+                | "A" ... "Z"
+                | "_" ;
+
+DIGIT          -> "0" ... "9" ;

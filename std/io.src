@@ -1,0 +1,7 @@
+fun println(value: any): nil {
+  print(value);
+}
+
+fun line(value: string): string {
+  return value + "\n";
+}

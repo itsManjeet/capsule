@@ -1,0 +1,3 @@
+import support.math;
+
+used(10);

@@ -1,0 +1,21 @@
+let constant: i64 = 5;
+
+fun helper(x: i64): i64 {
+  return x * 2;
+}
+
+fun used(x: i64): i64 {
+  return helper(x) + constant;
+}
+
+fun unused(): i64 {
+  return missingSymbol();
+}
+
+let unusedValue: i64 = missingSymbol();
+
+class UnusedType {
+  broken(): i64 {
+    return missingSymbol();
+  }
+}

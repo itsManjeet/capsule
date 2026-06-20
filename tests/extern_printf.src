@@ -1,0 +1,4 @@
+extern fun printf(format: ptr, ...) i32;
+
+printf("extern printf ok\n");
+0;
